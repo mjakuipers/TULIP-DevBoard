@@ -9,7 +9,7 @@ README for the TULIP4041 DevBoard
 
 Version history
 
-- jul 21 2024    initial version, schematics updated, not yet verified in hardware!
+- jul 21 2024   - initial version, schematics updated, not yet verified in hardware!
 
 
 
