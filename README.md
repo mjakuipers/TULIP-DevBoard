@@ -4,9 +4,13 @@ README for the TULIP4041 DevBoard
 
 [TUP-Devboard Schematics V1.1.pdf](https://github.com/user-attachments/files/16324529/TUP-Devboard.Schematics.V1.1.pdf)
 
+[TUP-Module Adapter Schematics V1.0.pdf](https://github.com/user-attachments/files/16324675/TUP-Module.Adapter.Schematics.V1.0.pdf)
+
 Version history
 
-JUL 21 2024    initial version, schematic not yet verified!
+JUL 21 2024    initial version, schematics updated not yet verified in hardware!
 
 
-All files are open source. Use of the hardware and software AT YOUR OWN RISK
+
+
+All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
