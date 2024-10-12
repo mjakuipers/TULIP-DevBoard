@@ -6,6 +6,8 @@ README for the TULIP4041 DevBoard
 
 [TUP-Module Adapter Schematics V1.0.pdf](https://github.com/user-attachments/files/16324675/TUP-Module.Adapter.Schematics.V1.0.pdf)
 
+If you want to purchase the PCB's please contact me via PM at the HPmuseum forum or lwave an issue with your contact information.
+
 Version history
 
 - jul 21 2024   - initial version, schematics updated, not yet verified in hardware!
