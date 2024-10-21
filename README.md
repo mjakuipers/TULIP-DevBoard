@@ -18,7 +18,11 @@ Version history
 - sep 26 2024   - The directory TULIP4041-RP2040-Final contains the archived 2040 sources and the latest binary (.uf2)
 - sep 26 2024   - The direcory TULIP-P2 contains the sources and build for the RP2350 version
 - oct 11 2024   - BOM adapted, line 11, R6 must be 200k resistor (pulldown)
-                - added componnet references
-  
+                - added component references
+- oct 21 2024   - I mussed have messed up something. Source directory is deleted and will be up when fixed
+                - a new binary (.uf2 file) is now available. Pleas use this
+                - fixed FI driving (to enable HP-IL emulation)
+                - tracing of the FI line is disabled, will be fixed soon
+                - firmware now running at 125 MHz
 
 All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
