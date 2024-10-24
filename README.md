@@ -24,5 +24,9 @@ Version history
                 - fixed FI driving (to enable HP-IL emulation)
                 - tracing of the FI line is disabled, will be fixed soon
                 - firmware now running at 125 MHz
+- oct 24 2024   - new firmware file "tulip4041_00.01.04B-Pico2.uf2" uploaded
+                - fixed FI input issue
+                - increased trace buffer to 5000 samples (from 3000) since we have the memory on the Pico2
+                - still running at 125MHz
 
 All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
