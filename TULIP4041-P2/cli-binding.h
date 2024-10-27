@@ -34,6 +34,7 @@ extern "C" {
         pio           shows pio status\r\n\
         cdc           shows status of CDC interfaces\r\n\
         cdcident      identify all CDC interfaces\r\n\
+                      DO NOT USE if a virtual HP-IL device is connected! \r\n\
         REBOOT        restart the TULIP4041 system\r\n\
         BOOTSEL       restarts the TULIP4041 into BOOTSEL mode for firmware update\r\n\
         poweron       drive ISA for 20 usecs to switch HP41 on\r\n\

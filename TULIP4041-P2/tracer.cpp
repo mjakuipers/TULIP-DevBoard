@@ -156,10 +156,14 @@ void Trace_task()
             }
         }
     }
-    else {
-        // Tracer CDC not connected
+
+    // check for disconnection of the tracer CDC
+    if ((Tracer_firstconnect) && (!cdc_connected(ITF_TRACE))) {
+        // CDC interface is disconnected
+        cli_printf("  CDC Port 2 [tracer] disconnected");
         Tracer_firstconnect = false;
     }
+    
 
     if (!queue_is_empty(&TraceBuffer)) {
         // only do something if there is something in the tracebuffer

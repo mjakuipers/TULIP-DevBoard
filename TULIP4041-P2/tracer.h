@@ -115,7 +115,7 @@ extern const char *mnemonics[];
 void TraceBuffer_init();
 void Trace_task();
 
-const int TRACELENGTH = 3000;       //Trace Buffer length
+const int TRACELENGTH = 5000;       //Trace Buffer length
 
 #define numILmnemonics      49      // number of elements in IL_mnemonics 0.. 48, PILBox commands now included
 

@@ -343,6 +343,13 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
     }
 }
 
+
+// function to return the cycle counter
+uint32_t cycles() {
+    return cycle_counter;
+}
+
+
 // function to wake up the HP41 by driving ISA high if the calculator is sleeping (PWO low)
 // ISA is driven for 20 usecs
 // ISA is under control by the isaout state machine, so we have to force instructions there to drive ISA

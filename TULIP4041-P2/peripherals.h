@@ -52,6 +52,8 @@ extern "C" {
 #define SSRQ   0x49C  // Set Service Request, not used for HP41
 #define CSRQ   0x49D  // Clear Service Request, not used for HP41
 
+#define NO_PIL 0xFFFF  // indicate no PILBox connected
+
 // function definitions in peripherals.cpp
 void gpio_toggle(uint signal);
 void gpio_pulse(uint signal, uint numtimes);
@@ -65,6 +67,7 @@ void HPIL_init();
 void HPIL_task();
 
 extern int m_eMode;          // HP-IL controller/device mode
+extern uint32_t cycles();
 
 #ifdef __cplusplus
 }

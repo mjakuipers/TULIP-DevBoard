@@ -1,8 +1,8 @@
 // Created: 2018/02/04 12:24:41
 // Last modified: 2024/09/17 14:42:46
 
-#define Last_Modified "2024/09/17_19:56:54"
-#define Version_String "*   VERSION 00.01.03 BETA - build time: %s"
+#define Last_Modified "2024/10/26_15:02:06"
+#define Version_String "*   VERSION 00.01.05 BETA - build time: %s"
 
 /*
  * userinterface.c

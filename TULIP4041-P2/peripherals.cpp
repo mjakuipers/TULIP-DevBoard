@@ -32,15 +32,16 @@ const int PrintBufSize = 100;   // size of printbuffer
 
 bool HPIL_firstconnect = false;
 bool ILScope_firstconnect = false;
+bool Print_firstconnect = false;
 bool ilscope_enabled = true;
 
 
 // HP-IL variables
 const int HPIL_BufSize = 10;    // size of printbuffer for both sending and receiving
 
-bool HPIL_closed    = false;         // indicates if the HP-IL loop is closed at the HP82160A
+bool HPIL_closed    = false;        // indicates if the HP-IL loop is closed at the HP82160A
                                     // this is like the cables on the HP-IL module are connected together without any device
-bool PILBox_closed  = false;         // indicates if the HP-IL loop is closed at the HP82160A
+bool PILBox_closed  = false;        // indicates if the HP-IL loop is closed at the HP82160A
                                     // loop is closed by default on the real PILBox if it was not initialized
 bool m_bLoopClosed  = true;         // loop is closed  
 bool enable_AUTOIDY = false;        // if system is in AUTO IDY mode, default when power is applied
@@ -60,6 +61,7 @@ bool PIL_rx_pending = false;        // true is a lo byte is read but not yet the
 bool PIL_tx_pending = false;        // true if the hi byte still has to be sent
 bool PILmode8 = true;               // PILBox transfer mode, true when in 8-bit mode, false when in 7-bit mode
 uint16_t PILBox_mode = TDIS;        // PILBOx mode (TDIS, CON, COFF, COFI)
+uint16_t PILBox_prevmode = 0;       // PILBOx mode to detect a change (TDIS, CON, COFF, COFI)
 
 // enum MODE {eNone = 0, eController = 1 , eDevice = 2};
 // enum MODE m_eMode = eNone;          // controller/device mode
@@ -213,6 +215,9 @@ void bus_init()
     gpio_init(P_PWO);
     gpio_set_dir(P_PWO, GPIO_IN);
 
+    gpio_init(P_FI);                    // FI input on GPIO2, on DevBoard only!
+    gpio_set_dir(P_FI, GPIO_IN);
+
     // helper outputs
     gpio_init(P_T0_TIME);
     gpio_set_dir(P_T0_TIME, GPIO_OUT);
@@ -237,6 +242,9 @@ void bus_init()
     gpio_init(P_IR_LED);  
     gpio_set_dir(P_IR_LED, GPIO_OUT);       // IR led and PWO_OE output driver
     gpio_put(P_IR_LED, 0);                  // set low
+
+
+
 
     //prepare the IRQ for the PWO rising and falling edge
     gpio_set_irq_enabled_with_callback(P_PWO, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &pwo_callback);
@@ -356,6 +364,23 @@ void Print_task()
     // this routine is mainly for the HP82143 emulation and send the printcodes 
     // to both the serial port and the IR led
 
+    // check for a first connection from the Printer CDC
+    if (cdc_connected(ITF_PRINT)) {
+        // only if the Print CDC interface is connected
+        if (!Print_firstconnect) {
+            // HPIL_firstconnect was false, so this is now a new CDC connection
+            Print_firstconnect = true;
+            cli_printf("  CDC Port 5 [printer] connected");
+        }
+    }
+
+    // check for disconnection of Printer
+    if ((Print_firstconnect) && (!cdc_connected(ITF_PRINT))) {
+        // CDC interface is disconnected
+        cli_printf("  CDC Port 5 [printer]] disconnected");
+        Print_firstconnect = false;
+    }
+
     if (!queue_is_empty(&PrintBuffer)) {
         queue_remove_blocking(&PrintBuffer, &PrintChar);
 
@@ -431,6 +456,7 @@ void HPIL_scope(uint16_t wFrame, bool out, bool traceIDY)
     //  traceIDY    - when true will trace IDY frames
     uint16_t framemask;
     int i = 0;
+    int stamp = cycles();
 
     if (ilscope_enabled && cdc_connected(ITF_ILSCOPE) && globsetting.get(ilscope_IL_enabled)) {
         // only do this if something is connected or enabled, otherwise just wasting cycles
@@ -447,7 +473,7 @@ void HPIL_scope(uint16_t wFrame, bool out, bool traceIDY)
     
         // build the ILScope string
         ILScopePrintLen = 0;
-        ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen," %s %03X %s\n\r",  out ? ">":"<", wFrame, IL_mnemonics[i].ILmnemonic);
+        ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen," %s %03X %s                           [%8d]\n\r",  out ? ">":"<", wFrame, IL_mnemonics[i].ILmnemonic, stamp);
 
         cdc_send_string(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
         cdc_flush(ITF_ILSCOPE);
@@ -463,6 +489,7 @@ void PILBox_scope(uint16_t wFrame, uint8_t bhi, uint8_t blo, bool out)
 
     uint16_t framemask;
     int i = 0;
+    int stamp = cycles();
 
     if (ilscope_enabled && cdc_connected(ITF_ILSCOPE) && globsetting.get(ilscope_PIL_enabled)) {
         // only do this if something is connected or enabled, otherwise just wasting cycles
@@ -477,7 +504,7 @@ void PILBox_scope(uint16_t wFrame, uint8_t bhi, uint8_t blo, bool out)
         // build the ILScope string
         ILScopePrintLen = 0;
         ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"  PILBox %s %04X %s   ", out ? ">":"<", wFrame, IL_mnemonics[i].ILmnemonic);
-        ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"hi: %02X lo: %02X\n\r", bhi, blo);
+        ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"hi: %02X lo: %02X  [%8d]\n\r", bhi, blo, stamp);
 
         cdc_send_string(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
         cdc_flush(ITF_ILSCOPE);
@@ -702,7 +729,7 @@ uint16_t PILBox_revcframe()
                 PILBox_mode = TDIS;             // set mode to disabled
                                                 // frame is not forwarded to the HP-IL emulation
                 cdc_send_char_flush(ITF_HPIL, pil_recv);       // return command for confirmation
-                return 0xFFFF;                  // and return with no data
+                // return 0xFFFF;                  // and return with no data
                 break;
             case CON:                           // CON: Controller ON
                 PILBox_mode = CON;              // set mode to controller ON
@@ -900,6 +927,13 @@ void HPIL_task()
         }
     }
 
+    // check for disconnection of IL Scope
+    if ((ILScope_firstconnect) && (!cdc_connected(ITF_ILSCOPE))) {
+        // CDC interface is disconnected
+        cli_printf("  CDC Port 4 [IL Scope] disconnected");
+        ILScope_firstconnect = false;
+    }
+
     // check for a first connection from the HP-IL CDC
     if (cdc_connected(ITF_HPIL)) {
         // only if the HP-IL CDC interface is connected
@@ -907,8 +941,33 @@ void HPIL_task()
             // HPIL_firstconnect was false, so this is now a new CDC connection
             HPIL_firstconnect = true;
             cli_printf("  CDC Port 3 [HPIL] connected");
+            if (PILBox_mode == TDIS || PILBox_mode == 0) {
+                // show a warning that there is no HP-IL connection
+                cli_printf("    WARNING: No virtual HP-IL device connected, HP-IL loop may be open");
+            }
         }
     }
+
+    // check for disconnection of HP-IL
+    if ((HPIL_firstconnect) && (!cdc_connected(ITF_HPIL))) {
+        // CDC interface is disconnected
+        cli_printf("  CDC Port 3 [HPIL] disconnected");
+        HPIL_firstconnect = false;
+    }
+
+    // check for a change in the PILBox mode and report this
+    if (PILBox_mode != PILBox_prevmode) {
+        // there is a change in the PILBox mode, report to the console
+        switch(PILBox_mode) {
+            case TDIS:  cli_printf("  PILBox mode changed to TDIS / disconnected"); break;
+            case CON :  cli_printf("  PILBox mode changed to CON  / Controller ON"); break;
+            case COFF:  cli_printf("  PILBox mode changed to COFF / Controller OFF"); break;
+            case COFI:  cli_printf("  PILBox mode changed to COFI / Controller OFF with IDY"); break;
+            default  :  cli_printf("  PILBox mode uninitialized"); break;
+        }
+        PILBox_prevmode = PILBox_mode;
+    }
+
 
     // HP-IL emulation is active, first check if a frame should be sent
     if (!queue_is_empty(&HPIL_SendBuffer))

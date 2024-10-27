@@ -59,6 +59,21 @@
 
 int main() {
 
+    // set the correct main clock frequency to 125 MHz
+    
+    // pll_init(pll_sys, 1, 1500, 6, 2);
+    clock_configure(clk_sys,
+                    CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                    CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                    125 * MHZ,
+                    125 * MHZ);
+                
+    clock_configure(clk_peri,
+                    0,
+                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+                    125 * MHZ,
+                    125 * MHZ);  
+
     // initialize the USB CDC devices
     usbd_serial_init();
     tusb_init();
