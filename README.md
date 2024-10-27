@@ -15,5 +15,6 @@ Version history
                 - Documentation uploaded: TULIP description, usage, assembly and testing of DevBoard
 - sep 26 2024   - The directory TULIP4041-RP2040-Final contains the archived 2040 sources and the latest binary (.uf2)
 - sep 26 2024   - The direcory TULIP-P2 contains the sources and build for the RP2350 version
+- oct 27 2024   - refreshed sources and firmware to version 00.01.05
 
 All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
