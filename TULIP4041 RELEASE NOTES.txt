@@ -2,7 +2,7 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
-VERSION 00.01.04    -   beta
+VERSION 00.01.05    -   beta
 FOR THE PICO2-RP2350
     Supported functions:    
     -   HP-IL, HP-IL Printer, PILBox 
