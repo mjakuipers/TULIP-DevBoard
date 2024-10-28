@@ -18,3 +18,5 @@ Version history
 - oct 27 2024   - refreshed sources and firmware to version 00.01.05
 
 All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
+
+User Karel designed a tray for the mainboard and a module-like housing for the connectorboard. Thanks Karel for sharing! Details and download here: https://www.printables.com/model/1053554-tulip4041-devboard-case
