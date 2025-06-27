@@ -48,7 +48,7 @@
 #include "sdcard.h"
 #include "crash.h"
 
-static bool ejected = true;
+static bool ejected = false;
 static uint32_t sector_size = 0;
 
 
@@ -70,7 +70,6 @@ void usb_sd_connect()
 // callbacks when the device is mounted by the USB host
 void tud_mount_cb(void)
 {
-  // send message to the CLI
   sd_mount();
   cli_printf("  uSD card mounted by USB host");
 }
@@ -78,7 +77,7 @@ void tud_mount_cb(void)
 // Invoked when device is unmounted
 void tud_umount_cb(void)
 {
-  // send message to the CLI
+  sd_unmount();
   cli_printf("  uSD card unmounted by USB host");
 }
 

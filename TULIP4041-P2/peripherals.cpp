@@ -221,8 +221,8 @@ void bus_init()
     // helper outputs
     gpio_init(P_T0_TIME);
     gpio_set_dir(P_T0_TIME, GPIO_OUT);
-    gpio_init(P_ADDR_END);
-    gpio_set_dir(P_ADDR_END, GPIO_OUT);
+    gpio_init(P_DEBUG);
+    gpio_set_dir(P_DEBUG, GPIO_OUT);
     gpio_init(P_SYNC_TIME);
     gpio_set_dir(P_SYNC_TIME, GPIO_OUT);
 
@@ -243,7 +243,15 @@ void bus_init()
     gpio_set_dir(P_IR_LED, GPIO_OUT);       // IR led and PWO_OE output driver
     gpio_put(P_IR_LED, 0);                  // set low
 
-
+    gpio_init(PICO_VBUS_PIN);
+    gpio_set_dir(PICO_VBUS_PIN, GPIO_IN);
+    
+    #if (TULIP_HARDWARE == T_MODULE)
+        // PWO_OE is shared with SPARE1 on the module version
+        gpio_init(P_PWO_OE);  
+        gpio_set_dir(P_PWO_OE, GPIO_OUT);
+        gpio_put(P_PWO_OE, 0);               // set to low to disable output driver
+    #endif
 
 
     //prepare the IRQ for the PWO rising and falling edge
@@ -429,9 +437,15 @@ void Print_task()
         // line below for debugging the construction of the IR frame
         // printf("IR char = %02X, code = %04X, frame = %08X\n", PrintChar, ir_code, ir_frame);
     }
-
 }
 
+void PrintIRchar(uint8_t c)
+{
+    // send a character to the IR printer, for testing the IR LED
+    ir_code = calculate_frame_payload(c);
+    ir_frame = construct_frame(ir_code);
+    send_ir_frame(ir_frame);
+}
 
 // HP-IL tasks and PIL-box emulation
 
@@ -587,18 +601,18 @@ void PILBox_sendframe(uint16_t frame)
         if (PILmode8)
         {
             // 8-bit transfer mode
-            PIL_tx_lo = (outframe & 0x007F) | 0x80;            // lower 7 data bits, msb = 1
-            PIL_tx_hi = ((outframe >> 6) & 0x1E) | 0x20;       // PILBox hi byte previously sent
-            cdc_send_char(ITF_HPIL, PIL_tx_hi);             // send both chars
-            cdc_send_char_flush(ITF_HPIL, PIL_tx_lo);       // flush after the 2nd byte
+            PIL_tx_lo = (outframe & 0x007F) | 0x80;             // lower 7 data bits, msb = 1
+            PIL_tx_hi = ((outframe >> 6) & 0x1E) | 0x20;        // PILBox hi byte previously sent
+            cdc_send_char(ITF_HPIL, PIL_tx_hi);                 // send both chars
+            cdc_send_char_flush(ITF_HPIL, PIL_tx_lo);           // flush after the 2nd byte
         }
         else
         {
             // 7-bit transfer mode
-            PIL_tx_lo = (outframe & 0x003F) | 0x40;            // lower 7 data bits, msb = 1
-            PIL_tx_hi = ((outframe >> 6) & 0x1F) | 0x20;       // higher byte
-            cdc_send_char(ITF_HPIL, PIL_tx_hi);             // send both chars
-            cdc_send_char_flush(ITF_HPIL, PIL_tx_lo);       // flush after the 2nd byte
+            PIL_tx_lo = (outframe & 0x003F) | 0x40;             // lower 6 data bits, msb = 1
+            PIL_tx_hi = ((outframe >> 6) & 0x1F) | 0x20;        // higher byte
+            cdc_send_char(ITF_HPIL, PIL_tx_hi);                 // send both chars
+            cdc_send_char_flush(ITF_HPIL, PIL_tx_lo);           // flush after the 2nd byte
         }     
     }
     PILBox_scope(outframe, PIL_tx_hi, PIL_tx_lo, true);
@@ -902,7 +916,7 @@ void HPIL_task()
     //  - call the HPIL_AutoIDYTask function 
 
     // first of all check if HP-IL is enabled and active at all
-    if (!globsetting.get(HP82160A_enabled)) return;
+    // if (!globsetting.get(HP82160A_enabled)) return;
 
     // check the status of the IL SCOPE, and if there is a first connect
     // also check for an input char to pause the scope
@@ -943,7 +957,8 @@ void HPIL_task()
             cli_printf("  CDC Port 3 [HPIL] connected");
             if (PILBox_mode == TDIS || PILBox_mode == 0) {
                 // show a warning that there is no HP-IL connection
-                cli_printf("    WARNING: No virtual HP-IL device connected, HP-IL loop may be open");
+                // only show a warning if there is no PilBox connection with 1 second?
+                cli_printf("  WARNING: No virtual HP-IL device connected, HP-IL loop may be open");
             }
         }
     }
@@ -959,11 +974,11 @@ void HPIL_task()
     if (PILBox_mode != PILBox_prevmode) {
         // there is a change in the PILBox mode, report to the console
         switch(PILBox_mode) {
-            case TDIS:  cli_printf("  PILBox mode changed to TDIS / disconnected"); break;
-            case CON :  cli_printf("  PILBox mode changed to CON  / Controller ON"); break;
-            case COFF:  cli_printf("  PILBox mode changed to COFF / Controller OFF"); break;
-            case COFI:  cli_printf("  PILBox mode changed to COFI / Controller OFF with IDY"); break;
-            default  :  cli_printf("  PILBox mode uninitialized"); break;
+            case TDIS:  cli_printf("  PILBox mode changed to TDIS / disconnected            - HP-IL loop may be open!"); break;
+            case CON :  cli_printf("  PILBox mode changed to CON  / Controller ON           - HP-IL loop is closed"); break;
+            case COFF:  cli_printf("  PILBox mode changed to COFF / Controller OFF          - HP-IL loop is closed"); break;
+            case COFI:  cli_printf("  PILBox mode changed to COFI / Controller OFF with IDY - HP-IL loop is closed"); break;
+            default  :  cli_printf("  oops, unknown PILBox mode, try to re-connect or reboot the TULIP"); break;
         }
         PILBox_prevmode = PILBox_mode;
     }

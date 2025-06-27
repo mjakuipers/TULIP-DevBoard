@@ -32,12 +32,20 @@
 #include <sys/time.h>
 
 //RP2040 specific includes
-#include "pico.h"
+#include "tulip.h"
 #include "pico/stdlib.h"
 #include "pico/platform.h"
 #include "pico/util/queue.h"                    // used for safe multi-core FIFO management"
 #include "hardware/gpio.h"
 #include "hardware/uart.h"                      // used for UART0 Printer port
+#include "pico/bootrom.h"
+
+#include "hardware/pll.h"
+#include "hardware/clocks.h"
+#include "hardware/structs/pll.h"
+#include "hardware/structs/clocks.h"
+// #include "hardware/adc.h"
+
 
 // Embedded CLI 
 #include "embedded_cli.h"
@@ -56,54 +64,59 @@
 #include "tracer.h"
 #include "emulation.h"             
 #include "cdc_helper.h"
+#include "module.h"
+
 
 int main() {
 
-    // set the correct main clock frequency to 125 MHz
-    
-    // pll_init(pll_sys, 1, 1500, 6, 2);
-    clock_configure(clk_sys,
-                    CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
-                    CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
-                    125 * MHZ,
-                    125 * MHZ);
-                
-    clock_configure(clk_peri,
-                    0,
-                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
-                    125 * MHZ,
-                    125 * MHZ);  
-
-    // initialize the USB CDC devices
-    usbd_serial_init();
-    tusb_init();
+    // set the correct main clock frequency to 125 MHz   
+    // set_sys_clock_khz(125000, true);
+    set_sys_clock_khz(TULIP_CLOCK, true);   // set the Tulip clock to 48 MHz
+  
+    // initialize the serial devices
     stdio_init_all();           // initialize stdio for the debug UART
     serialport_init();          // debug UART on GPIO 0+1
+
+    measure_freqs();
 
     // initialize all relevant GPIO
     // enable PWO interrupt to reset SYNC state machine
     bus_init();         // in peripherals.cpp
-
-    gpio_put(P_ADDR_END, true);
-
-    sdcard_init();     // initialize the FatFS system ans uSD card SPI interface
-
-    // initialize SPI interface for FRAM
-    init_spi_fram();
-
-    // initialize trace and printbuffers 
-    TraceBuffer_init();     // only if used, do this dynamic in the future
-    PrintBuffer_init();     // only if used, do this dynamic in the future
-    WandBuffer_init();      // only if used, do this dynamic in the future
-    
-    // prepare the HP-IL loop
-    HPIL_init();
 
     // allow some time to stabilize all I/O and USB
     sleep_ms(1000);    
     gpio_toggle(ONBOARD_LED);
     sleep_ms(1000);
     gpio_toggle(ONBOARD_LED);
+    
+    // tusb_init();
+    tud_init(BOARD_TUD_RHPORT); // initialize the TinyUSB stack
+    usbd_serial_init();
+
+    // initialize the debug output
+    gpio_put(P_DEBUG, true);
+
+    // initialize SPI interface for FRAM
+    init_spi_fram();
+
+    // initialize the I2C port for the RTC
+    // only on the module version, on the devboard this is used for the FI input and IR output
+    #if (TULIP_HARDWARE == T_MODULE)
+        i2c_initialize();           // initialize the I2C port for the RTC
+        pcf8520_reset();            // reset the RTC
+    #endif
+
+    sdcard_init();     // initialize the FatFS system and uSD card SPI interface
+
+    // initialize trace and printbuffers 
+    TraceBuffer_init();     // only if used, do this dynamic in the future
+    PrintBuffer_init();     // only if used, do this dynamic in the future
+    WandBuffer_init();      // only if used, do this dynamic in the future
+ 
+    // prepare the HP-IL loop
+    HPIL_init();
+
+    measure_freqs();
 
     // get the global persistent settings and initialize if needed
     globsetting.retrieve();         // only works if PWO was low, but we do not check here
@@ -112,20 +125,38 @@ int main() {
         globsetting.save();
     }
 
-    initCliBinding();       // initialization of the embedded-cli
+    // for a test version HPIL and the HP-IL printer are plugged
+    globsetting.set(HPIL_plugged, 1);               // set the HPIL plugged flag  
+    globsetting.set(ILPRINTER_plugged, 1);          // set the HP-IL printer plugged flag
 
-    welcome();      // show welcome message on the 'old' user interface
-    gpio_put(ONBOARD_LED, false);   // switch off LED, this will now light when HP41 bus activity is detected
+    // and HP-IL must be enabled of course
+    globsetting.set(HP82160A_enabled, 1);           // set the HP-IL enabled flag
+    globsetting.save();                             // save the settings
+    
+    initCliBinding();                               // initialization of the embedded-cli
+
+    welcome();                                      // show welcome message on the 'old' user interface
+    gpio_put(ONBOARD_LED, false);                   // switch off LED, this will now light when HP41 bus activity is detected
 
     // initialize Bank registers
     InitEmulation();
 
-    // launching core1 code, must be done before starting the PIO state machines
-    multicore_launch_core1(core1_pio);  
+    fram_rommap_init();                             // initialize the FRAM ROM map, only if not already done
 
-    // initialize and start the PIO state machines, report the status in the CLI
-    pio_init();                         
+    multicore_reset_core1();                        // reset core1 to initial state
+
+    
+    multicore_launch_core1(core1_pio);       // launching core1 code, must be done before starting the PIO state machines
+
+    // initialize and start the PIO state machines, report the status in the old CLI
+    pio_init();                             // initialize the PIO state machines, this must be done before using them                     
     pio_report();
+
+    adc_init();                             // initialize the ADC
+    adc_set_temp_sensor_enabled(true);      // enable the temperature sensor
+    adc_select_input(4);                    // select the temperature sensor input
+
+    measure_freqs();                        // check the clocks and report in the old CLI
 
     // below is the main loop, it never ends
     
@@ -147,10 +178,9 @@ int main() {
         HPIL_task();                // process the HP-IL task for transmitting and receiving frames
                                     // only if HP-IL is active
 
-        // add a task to check for uSD card removal or insertion 
+        // add a task to check for uSD card removal or insertion ??
         // see workaround on https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
         // sd_test_com();            
-    
     }
 
     return 0;   // of course we will never get here

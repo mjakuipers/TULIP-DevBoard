@@ -24,14 +24,14 @@ extern "C" {
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "pico.h"
+#include "tulip.h"
 
 #include "pico/stdlib.h"
 
 #include "cdc_helper.h"
 #include "emulation.h"
 #include "tracer.h"
-#include "module.h"
+// #include "module.h"
 
 // includes for the SD Card driver
 #include "ff.h"

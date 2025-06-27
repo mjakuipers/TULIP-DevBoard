@@ -414,7 +414,7 @@ EmbeddedCliConfig *embeddedCliDefaultConfig(void) {
     defaultConfig.historyBufferSize = 512;
     defaultConfig.cliBuffer = NULL;
     defaultConfig.cliBufferSize = 0;
-    defaultConfig.maxBindingCount = 12;
+    defaultConfig.maxBindingCount = 15;
     defaultConfig.enableAutoComplete = true;
     defaultConfig.invitation = "> ";
     return &defaultConfig;
@@ -570,6 +570,30 @@ void embeddedCliPrint(EmbeddedCli *cli, const char *string) {
     // print provided string
     writeToOutput(cli, string);
     writeToOutput(cli, lineBreak);
+
+    // print current command back to screen
+    if (!IS_FLAG_SET(impl->flags, CLI_FLAG_DIRECT_PRINT)) {
+        writeToOutput(cli, impl->invitation);
+        writeToOutput(cli, impl->cmdBuffer);
+        impl->inputLineLength = impl->cmdSize;
+
+        printLiveAutocompletion(cli);
+    }
+}
+
+void embeddedCliPrintN(EmbeddedCli *cli, const char *string) {
+    // variation of EnbeddedCliPrint that does not add a line break
+    if (cli->writeChar == NULL)
+        return;
+
+    PREPARE_IMPL(cli);
+
+    // remove chars for autocompletion and live command
+    if (!IS_FLAG_SET(impl->flags, CLI_FLAG_DIRECT_PRINT))
+        clearCurrentLine(cli);
+
+    // print provided string
+    writeToOutput(cli, string);
 
     // print current command back to screen
     if (!IS_FLAG_SET(impl->flags, CLI_FLAG_DIRECT_PRINT)) {

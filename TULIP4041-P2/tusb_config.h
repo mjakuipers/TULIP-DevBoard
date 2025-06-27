@@ -25,6 +25,9 @@
 // Enable Device stack
 #define CFG_TUD_ENABLED       1
 
+// Enable the MSC class
+#define MSC_ENABLE            1
+
 // Default is max speed that hardware controller could support with on-chip PHY
 // #define CFG_TUD_MAX_SPEED     BOARD_TUD_MAX_SPEED
 
@@ -49,11 +52,15 @@
 
 #define CFG_TUD_EP_MAX 16
 
-#define CFG_TUSB_RHPORT0_MODE OPT_MODE_DEVICE
+#define CFG_TUSB_RHPORT0_MODE (OPT_MODE_DEVICE)
 
 // CLASS definitions
 #define CFG_TUD_CDC              5          // using 5 CDC ports
-#define CFG_TUD_MSC              1          // using 1 MSC device
+#if MSC_ENABLE == 1
+    #define CFG_TUD_MSC              1          // using 1 MSC device
+#else
+    #define CFG_TUD_MSC              0
+#endif
 #define CFG_TUD_HID              0
 #define CFG_TUD_MIDI             0
 #define CFG_TUD_VENDOR           0
@@ -64,6 +71,11 @@
 
 // MSC Buffer size of Device Mass storage
 #define CFG_TUD_MSC_EP_BUFSIZE   512
+
+// RHPort number used for device can be defined by board.mk, default to port 0
+#ifndef BOARD_TUD_RHPORT
+#define BOARD_TUD_RHPORT      0
+#endif  
 
 void usbd_serial_init(void);
 

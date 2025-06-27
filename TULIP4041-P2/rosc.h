@@ -16,7 +16,7 @@
 #ifndef __HARDWARE_ROSC_H__
 #define __HARDWARE_ROSC_H__
 
-#include "pico.h"
+#include "tulip.h"
 #include "hardware/structs/rosc.h"
 
 #ifdef __cplusplus

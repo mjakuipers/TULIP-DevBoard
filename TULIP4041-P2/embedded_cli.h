@@ -281,6 +281,13 @@ bool embeddedCliAddBinding(EmbeddedCli *cli, CliCommandBinding binding);
 void embeddedCliPrint(EmbeddedCli *cli, const char *string);
 
 /**
+ * Same as embeddedCliPrint but does not add new line at the end
+ * @param cli
+ * @param string
+ */
+void embeddedCliPrintN(EmbeddedCli *cli, const char *string);
+
+/**
  * Free allocated for cli memory
  * @param cli
  */

@@ -48,6 +48,7 @@ extern "C" {
 #include "peripherals.h"
 #include "globalsettings.h"
 #include "module.h"
+#include "embed_roms.h"
 
 // Definitions for HP41 peripheral mode
 
@@ -75,6 +76,8 @@ extern queue_t HPIL_SendBuffer;             // buffer for HP-IL send and receive
 extern queue_t HPIL_RecvBuffer;             // buffer for HP-IL send and receive
 
 extern int xmem_mods;                       // number of Extended Memory modules active (0, 1 or 2)
+
+
 
 uint32_t cycles();
 

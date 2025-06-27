@@ -25,14 +25,18 @@ extern "C" {
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "pico.h"
+#include "tulip.h"
 #include "pico/stdlib.h"
 
 // #include "disassembler.h"
 #include "cdc_helper.h"
 #include "emulation.h"
 #include "userinterface.h"
-#include "module.h"
+#include "fram.h"
+// #include "module.h"
+
+
+
 
 // #include "peripherals.h"
 
@@ -45,6 +49,7 @@ struct TLine {
     uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes
     uint16_t    isa_address;        // ISA address                                  2 bytes
     uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes
+    uint8_t     bank;               // current selected bank                        1 byte
     uint32_t    data1;              // DATA D31..D00                                4 bytes
     uint32_t    data2;              // DATA D55..D32                                4 bytes
     uint32_t    fi1;                // for FI line tracing                          4 bytes
@@ -108,6 +113,18 @@ struct TLine_IL {
     uint16_t    frame_out;          // HP-IL frame output
     uint8_t     HPILregs[9];        // HP-IL registers
 };
+
+
+// TraceLine definition for PWO events to correctly show in the Tracer
+struct TLine_PowerEvent 
+{
+    uint32_t cycle_number;          // to count the cycles since the last PWO
+    // HP41powermode prev_mode;   // previous power mode
+    // HP41powermode new_mode;    // new power mode
+    absolute_time_t t_start;        // start time of this event
+    absolute_time_t t_end;          // end time of this event
+};
+
 
 
 extern const char *mnemonics[];

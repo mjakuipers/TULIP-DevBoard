@@ -73,7 +73,6 @@ void cdc_sendbuf(int itf, char* buffer, int len)
 
     wait_for_write(itf, len);                   // wait until enough room is in the output queue
     sent = tud_cdc_n_write(itf, buffer, len);   // and send it
-
 }
 
 // printf version for printing into the console
@@ -220,6 +219,11 @@ void cdc_flush_console()
     tud_cdc_n_write_flush(ITF_CONSOLE);
 }
 
+void cdc_read_flush(int itf)
+{
+    tud_cdc_n_read_flush(itf);
+}
+
 // send the string in buffer with len characters
 // the function does not flush
 void cdc_send_string(int itf, char* buffer, int len)
@@ -240,8 +244,6 @@ void cdc_send_string(int itf, char* buffer, int len)
         printf("\n** len: %d - sent: %d  %.10s\n", len, sent, buffer);
     }
 }
-
-
 
 
 // initializes the USB CDC ports

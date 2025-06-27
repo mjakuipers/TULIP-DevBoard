@@ -99,30 +99,8 @@ loop_addr:
         wait 1 gpio P_CLK02     side 1  ; to wait for CLK012 rising edge        
                                         ; which marks the start of SYNC_TIME
 .wrap                                   ; and use wrap to get back and set SYNC_TIME
-
-
 ; 21 instructions
 
-
-
-; **  original code below
-;        set x, 28               side 1  ; number of cycles until end of ISA ADDRESS, T0_TIME is cleared by sideset
-;loop_addr:                              ; loop to sample ISA ADDRESS
-;        wait 1 gpio P_CLK01     side 1  ; wait for rising edge of CLK01
-;        in pins,1               side 1  ; input 1 bit from ISA into the ISR
-;        wait 0 gpio P_CLK01     side 1  ; wait for falling edge of CLK01
-;        jmp x-- loop_addr       side 1  ; decrement X and jump into the loop until x=0
-;        push noblock            side 1  ; push the ISR to the Input FIFO, do not wait if full! ISR is cleared
-;                                        ; after the push we are at T30
-;
-;        set x,14                side 1  ; number of cycles until start of ISA INSTRUCTION
-;loop_iwait:                 
-;        wait 0 gpio P_CLK02     side 1  ; wait for falling edge of CLK02
-;        wait 1 gpio P_CLK02     side 1  ; wait for rising edge of CLK02
-;        jmp x-- loop_iwait      side 1  ; decrement X and jump into the loop until x=0
-; .wrap                                   ; now at the rising edge of CLK02 at T44, SYNC time so ready to return back to the main loop
-
-; 25 instructions
 
 //
 // helper functions for hp41_pio_sync
@@ -150,11 +128,12 @@ static inline void hp41_pio_sync_program_init(PIO pio, uint sm, uint offset,
     );
 
     // configure the clock divider here
-    // float clkdiv = 15.625;
+    // not used in the SYNC state machine, runs at full speed
+    // float clkdiv = 1;
     // sm_config_set_clkdiv(&c, clkdiv);
 
     // set correct pin direction for outputs
-    pio_sm_set_consecutive_pindirs(pio, sm, sideset_base_pin, 2, true);      // pin direction 2 output pins D0_TIME and SYNC_TIME
+    pio_sm_set_consecutive_pindirs(pio, sm, sideset_base_pin, 2, true);      // pin direction 2 output pins T0_TIME and SYNC_TIME
 
     // connect the pins to the PIO for output
     pio_gpio_init(pio, sideset_base_pin);           // T0_TIME
@@ -253,6 +232,7 @@ static inline void hp41_pio_datain_program_init(PIO pio, uint sm, uint offset,
 
     // configure the clock to run at 12.5 MHz, clock divider is 10
     // one clockcycle is now 80 ns
+     
     float clkdiv = 10;
     sm_config_set_clkdiv(&c, clkdiv);
 
@@ -274,15 +254,15 @@ static inline void hp41_pio_datain_program_init(PIO pio, uint sm, uint offset,
 ; ****************************************
 
 ; **
-; ** drive P_ADDR_END for debugging to indicate position in core1 C-code
+; ** drive P_DEBUG for debugging to indicate position in core1 C-code
 ; ** simply autpull at 16 bits and output these
 ; ** best to always start and end with a 0 bit
 
 ; **
 ; ** pins used:
-; **   output:  P_ADDR_END      GPIO28  debug output
+; **   output:  P_DEBUG      GPIO28  debug output
 
-; ** out base will be P_ADDR_END (GPIO28), no sideset_base_pin
+; ** out base will be P_DEBUG (GPIO28), no sideset_base_pin
 ; ** autopull to be set at 16
 
 .wrap_target
@@ -297,7 +277,7 @@ static inline void hp41_pio_datain_program_init(PIO pio, uint sm, uint offset,
 
 % c-sdk {
 static inline void hp41_pio_debugout_program_init(PIO pio, uint sm, uint offset, 
-        uint out_base_pin,              // base for output pin P_ADDR_END
+        uint out_base_pin,              // base for output pin P_DEBUG
         uint sideset_base_pin,          // (not used) base for sideset outputs ISA_OE
         uint set_base_pin,              // (not used) base for set pins
         uint jmp_pin)                   // (not used) pin used in jmp
@@ -306,7 +286,7 @@ static inline void hp41_pio_debugout_program_init(PIO pio, uint sm, uint offset,
     pio_sm_config c = hp41_pio_debugout_program_get_default_config(offset);
 
     // set correct pin direction for outputs
-    pio_sm_set_consecutive_pindirs(pio, sm, out_base_pin, 1, true);          // pin direction for P_ADDR_END
+    pio_sm_set_consecutive_pindirs(pio, sm, out_base_pin, 1, true);          // pin direction for P_DEBUG
 
     sm_config_set_out_pins(&c, out_base_pin, 1);    // just using 1 output
 
@@ -321,7 +301,11 @@ static inline void hp41_pio_debugout_program_init(PIO pio, uint sm, uint offset,
     );
 
     // connect the pins to the PIO for output
-    pio_gpio_init(pio, out_base_pin);               // P_ADDR_END
+    pio_gpio_init(pio, out_base_pin);               // P_DEBUG
+
+    // configure the clock to run at 12.5 MHz, clock divider is 10
+    float clkdiv = 10;
+    sm_config_set_clkdiv(&c, clkdiv);
 
     // load the configuration and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
@@ -332,7 +316,7 @@ static inline void hp41_pio_debugout_program_init(PIO pio, uint sm, uint offset,
 %}
 
 
-.program hp41_pio_isaout
+.program hp41_pio_isaout 
 
 ; ****************************************
 ; **   HP41 PIO interface

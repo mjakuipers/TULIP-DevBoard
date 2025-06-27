@@ -41,17 +41,13 @@ extern "C" {
 #include "pico/util/queue.h"                    // used for safe FIFO management
 #include "hardware/structs/systick.h"
 #include "hardware/uart.h"                      // used for UART0 Printer port
+
+
 #include "hp41_defs.h"
+#include "cli-binding.h"
+#include "hpinterface_hardware.h"
 
-
-//SPI hardware  configurations
-#define PIN_SPI0_RX     4
-#define PIN_SPI0_CS     5
-#define PIN_SPI0_SCK    6
-#define PIN_SPI0_TX     7
-#define SPI_PORT_FRAM   spi0
-
-#define SPI_FRAM_SPEED  30*1000*1000             // set speed to 30 (?) MHz
+#define SPI_FRAM_SPEED  (40*1000*1000)          // set speed to 30 (?) MHz
 
 // chip select macros
 #define CS_on           gpio_put(PIN_SPI0_CS,0) 
@@ -72,9 +68,14 @@ extern "C" {
 //  0x1E000                 XMEM start
 //   
 
+#define FRAM_SIZE               0x40000                 // size of the FRAM device in bytes (256k*8 = 2 Mbit device)
 #define FRAM_gsettings_start    0x1D000                 // start of global peristent settings in FRAM
 #define FRAM_tracer_start       0x1D400                 // start of tracer settings
 #define XMEMstart               0x1E000                 // start address of XMEM modules in FRAM
+
+#define FRAM_INIT_ADDR          0x00000                  // address to store the FRAM initialization value
+#define FRAM_INIT_VALUE         0x4041                  // value to indicate that the FRAM is initialized
+#define FRAM_ROMMAP_START       0x00010
 
 
 // FRAM commands
@@ -96,8 +97,28 @@ extern "C" {
 
 void init_spi_fram();
 void fram_write(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t * data, size_t len);
+void fram_write16(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t * data, size_t len);
+void fram_write32(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t * data, size_t len);
+
 void fram_read(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t *buf, size_t len);
+void fram_read16(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint16_t *buf, size_t len);
 void fram_read32(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint32_t *buf, size_t len);
+
+
+// read from FRAM device, with fixed spi channel and cs pin
+void fr_read(uint32_t addr, uint8_t *buf, size_t len);
+void fr_readid(uint8_t *buf);
+
+uint16_t fr_read16(uint32_t addr);
+uint32_t fr_read32(uint32_t addr);
+
+void fr_write(uint32_t addr, uint8_t *buf, size_t len);
+void fr_write16(uint32_t addr, uint16_t word);
+void fr_write32(uint32_t addr, uint32_t word);
+void fram_show(uint32_t addr);
+
+
+void fr_nukeall();                     // erase all FRAM to zero
 
 
 #ifdef __cplusplus

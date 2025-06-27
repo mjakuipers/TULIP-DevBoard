@@ -24,8 +24,11 @@ extern "C" {
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "pico.h"
+#include "inttypes.h"
+#include "sys/types.h"
+#include "tulip.h"
 #include "pico/stdlib.h"
+#include "pico/unique_id.h"
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
 #include "hardware/flash.h"
@@ -34,12 +37,24 @@ extern "C" {
 #include "pico/bootrom.h"
 #include "fram.h"
 #include "tracer.h"
-// #include "powermodes.h"          removed for RP2350 version
+#include "ffmanager.h"
+// #include "powermodes.h"
+
+#include "hardware/pll.h"
+#include "hardware/clocks.h"
+#include "hardware/structs/pll.h"
+#include "hardware/structs/clocks.h"
+#include "hardware/adc.h"
 
 #include "emulation.h"
 #include "globalsettings.h"
-
+#include "embed_roms.h"
+#include "peripherals.h"
+#include "i2c_devices.h"
 #include "cli-binding.h"
+#include "fram.h"
+
+#include "module.h"
 
 // includes for FatFS
 #include "sdcard.h"
@@ -63,6 +78,8 @@ void uif_poweron();
 void uif_configinit();    
 void uif_configlist();
 
+void measure_freqs(void);
+
 void uif_blink(int b);
 
 void uif_dir(const char *dir);            // dir
@@ -73,10 +90,16 @@ void uif_sdcard_mount();       // mount the uSD card
 void uif_sdcard_unmount();     // unmount the uSD card
 void uif_sdcard_mounted();
 
-void uif_import(int F, char *fname);       // import a file and program in FLASH
+void uif_import(const char *fname, int a2, int a3);       // import a file and program in FLASH/FRAM
 
-void uif_plug(int i);          // plug the selected ROM
+void uif_list(int i, const char *fname);    // list
+void uif_delete(const char *fname);  // delete a file from FLASH/FRAM
+
+void uif_plug(int func, int Page, int Bank, const char *fname);          // plug the selected ROM 
 void uif_unplug(int i);        // unplug the selected ROM
+void uif_cat(int p);                // show the plugged ROMs
+
+void uif_fram(int i, uint32_t addr);       // FRAM functions
 
 void uif_printer(int i);       // HP82143A printer functions
 
@@ -84,17 +107,21 @@ void uif_xmem(int i);          // functions for Extended Memory control
 
 void uif_tracer(int i);        // functions for the bus tracer
 
+void uif_rtc(int i, const char *args);    // RTC test functions
+
+void uif_emulate(int i);        // enable/disable hardware emulation functions
+
 void uif_welcome();
 void pio_welcome();
 
 extern void usb_sd_eject();
 extern void usb_sd_connect();
 
+   
 
 void welcome();
 
 void serial_loop();
-
 
 void toggle_trace(void);
 void toggle_disasm(void);
@@ -112,6 +139,7 @@ extern bool default_map;
 extern bool default_map_off;
 
 extern void wakemeup_41();
+extern void PrintIRchar(uint8_t c);
 
 // extern embed_rom1[];
 // extern embed_romP[];
@@ -122,8 +150,7 @@ extern const uint16_t *flash_contents;
 } 
 #endif 
 
-
-    
+ 
 #endif  // __USERINTERFACE_H__
 
 

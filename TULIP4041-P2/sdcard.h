@@ -24,7 +24,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "pico.h"
+#include "tulip.h"
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
@@ -43,7 +43,7 @@ extern "C" {
 #include "crash.h"
 
 #define DRIVENUM        0       // drive number on TULIP is always 0
-#define DEFAULT_DRIVE   "0:/"     // this will be our default drive mount
+#define DEFAULT_DRIVE   ""     // this will be our default drive mount
 #define SECT_SIZE       512     // fix the sector size
 
 uint32_t sd_sect_count();

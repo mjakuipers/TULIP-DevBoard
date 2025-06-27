@@ -115,8 +115,6 @@ uint64_t usermemCache;                      // for testing with all 56 (64) bits
 
 int fram_offset;                            // offset into the FRAM
 
-#define endofflash PICO_FLASH_SIZE_BYTES
-
 const uint16_t *flash_contents = (const uint16_t *) (XIP_BASE + ROM_BASE_OFFSET);
 
 uint16_t fram_buf[0x10];
@@ -126,6 +124,7 @@ uint32_t cycle_counter = 0;         // counts cycles since last PWO
 struct TLine TraceLine;             // the variable with the TraceLine used in capturing cycles in core1
 extern queue_t TraceBuffer;
 
+extern CModules TULIP_Pages;
 
 
 extern int m_eMode;
@@ -157,29 +156,31 @@ uint16_t nextIL_inst = 0;       // used for detection of IL instructions
 PIO pio0_pio = pio0;        // pio instantiation for pio0, here we put the main SYNC and ISA input state machine
 PIO pio1_pio = pio1;        // pio instantiation for pio1, for most other state machines
 
-uint sync_offset;           // offset in SM instruction memory for the SYNC state machine
-uint sync_sm;               // pio sm identifier for the SYNC/ISA state machine
+int sync_offset     = -1;   // offset in SM instruction memory for the SYNC state machine
+int sync_sm         = -1;   // pio sm identifier for the SYNC/ISA state machine
 
-uint datain_offset;         // offset in SM instruction memory for the DATAIN state machine
-uint datain_sm;             // identifier for the DATAIN state machine
+int datain_offset   = -1;   // offset in SM instruction memory for the DATAIN state machine
+int datain_sm       = -1;   // identifier for the DATAIN state machine
 
-uint debugout_offset;       // offset in SM instruction memory for the DEBUGOUT state machine
-uint debugout_sm;           // identifier for the DEBUGOUT state machine
+int debugout_offset = -1;   // offset in SM instruction memory for the DEBUGOUT state machine
+int debugout_sm     = -1;   // identifier for the DEBUGOUT state machine
 
-uint isaout_offset;         // offset in SM instruction memory for the ISAOUT state machine
-uint isaout_sm;             // identifier for the ISAOUT state machine
+int isaout_offset   = -1;   // offset in SM instruction memory for the ISAOUT state machine
+int isaout_sm       = -1;   // identifier for the ISAOUT state machine
 
-uint dataout_offset;        // offset in SM instruction memory for the DATAOUT state machine
-uint dataout_sm;            // identifier for the DATAOUT state machine
+int dataout_offset  = -1;   // offset in SM instruction memory for the DATAOUT state machine
+int dataout_sm      = -1;   // identifier for the DATAOUT state machine
 
-uint fiout_offset;          // offset in SM instruction memory for the FIOUT state machine
-uint fiout_sm;              // identifier for the FIOUT state machine
+int fiout_offset    = -1;   // offset in SM instruction memory for the FIOUT state machine
+int fiout_sm        = -1;   // identifier for the FIOUT state machine
 
-uint irout_offset;          // offset in SM instruction memory for the IROUT state machine
-uint irout_sm;              // identifier for the DATAOUT state machine
+int irout_offset    = -1;   // offset in SM instruction memory for the IROUT state machine
+int irout_sm        = -1;   // identifier for the DATAOUT state machine
 
-uint fiin_offset;          // offset in SM instruction memory for the FIIN state machine
-uint fiin_sm;              // identifier for the FIIN state machine
+int fiin_offset     = -1;   // offset in SM instruction memory for the FIIN state machine
+int fiin_sm         = -1;   // identifier for the FIIN state machine
+
+
 
 
 void pio_report()
@@ -230,11 +231,13 @@ void pio_init()
     datain_sm = pio_claim_unused_sm(pio0_pio, true);                        // claim a state machine in pio0
     datain_offset = pio_add_program(pio0_pio, &hp41_pio_datain_program);    // in pio 0 !!
 
-    // for the fiin state machine we use a second instantiation of the datain state machine
-    // these are functionally identical
-    fiin_sm = pio_claim_unused_sm(pio0_pio, true);                          // claim a state machine in pio0    
-    fiin_offset = datain_offset;
-    // fiin_offset = pio_add_program(pio0_pio, &hp41_pio_datain_program);      // in pio 0 !!
+    #if (TULIP_HARDWARE == T_DEVBOARD)
+        // we only have FI input on the DevBoard, not on the module version
+        // for the fiin state machine we use a second instantiation of the datain state machine
+        // these are functionally identical
+        fiin_sm = pio_claim_unused_sm(pio0_pio, true);                          // claim a state machine in pio0    
+        fiin_offset = datain_offset;
+    #endif
 
     debugout_sm = pio_claim_unused_sm(pio0_pio, true);                      // claim a state machine in pio0
     debugout_offset = pio_add_program(pio0_pio, &hp41_pio_debugout_program);// in pio 0 !!
@@ -255,8 +258,12 @@ void pio_init()
     // state machines in PIO0    
     hp41_pio_sync_program_init(pio0_pio, sync_sm, sync_offset, P_ISA, P_T0_TIME);
     hp41_pio_datain_program_init(pio0_pio, datain_sm, datain_offset, P_DATA, P_T0_TIME);
-    hp41_pio_datain_program_init(pio0_pio, fiin_sm, datain_offset, P_FI, P_T0_TIME);            // new instantiation of datain for fiin
-    hp41_pio_debugout_program_init(pio0_pio, debugout_sm, debugout_offset, P_ADDR_END, 0, 0, 0);
+
+    #if (TULIP_HARDWARE == T_DEVBOARD)
+        hp41_pio_datain_program_init(pio0_pio, fiin_sm, datain_offset, P_FI, P_T0_TIME);            // new instantiation of datain for fiin
+    #endif
+
+    hp41_pio_debugout_program_init(pio0_pio, debugout_sm, debugout_offset, P_DEBUG, 0, 0, 0);
 
     // state machines in PIO1
     hp41_pio_isaout_program_init(pio1_pio, isaout_sm, isaout_offset, P_ISA_OUT, P_ISA_OE, 0, 0);
@@ -287,7 +294,11 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
         // there should be no data in the sync sm, but there will be data in the datain sm
 
         pio_sm_exec(pio0_pio, datain_sm, pio_encode_push(0, 0) ); 
-        pio_sm_exec(pio0_pio, fiin_sm, pio_encode_push(0, 0) ); 
+
+        #if (TULIP_HARDWARE == T_DEVBOARD)
+            pio_sm_exec(pio0_pio, fiin_sm, pio_encode_push(0, 0) );
+            pio_sm_clear_fifos(pio0_pio, fiin_sm); 
+        #endif
 
         pio_sm_clear_fifos(pio1_pio, fiout_sm); 
 
@@ -298,11 +309,12 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
         pio_sm_clear_fifos(pio0_pio, sync_sm);
         pio_sm_exec(pio0_pio, sync_sm, pio_encode_jmp(sync_offset + hp41_pio_sync_offset_sync_start) | pio_encode_sideset(2, 1));   
 
-        pio_sm_clear_fifos(pio0_pio, datain_sm);  
+        pio_sm_clear_fifos(pio0_pio, datain_sm); 
         pio_sm_exec(pio0_pio, datain_sm, pio_encode_jmp(datain_offset + hp41_pio_datain_offset_data_start));  
 
-        pio_sm_clear_fifos(pio0_pio, fiin_sm); 
-        pio_sm_exec(pio0_pio, fiin_sm, pio_encode_jmp(datain_offset + hp41_pio_datain_offset_data_start));  
+        #if (TULIP_HARDWARE == T_DEVBOARD)
+            pio_sm_exec(pio0_pio, fiin_sm, pio_encode_jmp(datain_offset + hp41_pio_datain_offset_data_start));  
+        #endif
 
         enabled_bank = 1;                   // reset enabled bank      
         // initialize bank registers
@@ -313,31 +325,37 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
         // FI output
         fi_out1 = 0;                       // for flag output driver
         fi_out2 = 0;
-
     } 
     else {
         // upon rising edge of PWO
         // PWO is now high so HP41 is running
         // reset state machine, next SYNC is imminent
+        gpio_put(ONBOARD_LED, 1);           // turn LED on
 
         // enforce a jump to the start of the SYNC state machine
-        pio_sm_clear_fifos(pio0_pio, sync_sm); 
+        pio_sm_clear_fifos(pio0_pio, sync_sm);
         pio_sm_exec(pio0_pio, sync_sm, pio_encode_jmp(sync_offset + hp41_pio_sync_offset_sync_start)| pio_encode_sideset(2, 1));  
 
         // code below to add the value 42 in the state machine Y register to be used as a longer counter
         pio_sm_put(pio0_pio, sync_sm, 42);                                                          // value 42 in the FIFO; 
         pio_sm_exec(pio0_pio, sync_sm, pio_encode_pull(false, false) | pio_encode_sideset(2,1));    // pull to OSR
-        pio_sm_exec(pio0_pio,sync_sm, pio_encode_mov(pio_y, pio_osr) | pio_encode_sideset(2,1));    // move OSR to Y
+        pio_sm_exec(pio0_pio, sync_sm, pio_encode_mov(pio_y, pio_osr) | pio_encode_sideset(2,1));    // move OSR to Y
 
         pio_sm_clear_fifos(pio0_pio, datain_sm); 
-        pio_sm_clear_fifos(pio0_pio, fiin_sm); 
+
+        #if (TULIP_HARDWARE == T_DEVBOARD)
+            pio_sm_clear_fifos(pio0_pio, fiin_sm);
+            pio_sm_exec(pio0_pio, fiin_sm, pio_encode_jmp(datain_offset + hp41_pio_datain_offset_data_start));
+        #endif
+        
         pio_sm_exec(pio0_pio, datain_sm, pio_encode_jmp(datain_offset + hp41_pio_datain_offset_data_start));    
-        pio_sm_exec(pio0_pio, fiin_sm, pio_encode_jmp(datain_offset + hp41_pio_datain_offset_data_start));  
         pio_sm_exec(pio1_pio, fiout_sm, pio_encode_jmp(fiout_offset + hp41_pio_fiout_offset_fiout_start));  
         pio_sm_clear_fifos(pio1_pio, fiout_sm);
 
-        gpio_put(ONBOARD_LED, 1);           // turn LED on
         enabled_bank = 1;                   // reset enabled bank  
+        for (int i = 0; i < 16; i++) {
+            active_bank[i] = 1;
+        }  
         cycle_counter = 0;
         ramselected = 0;
     }
@@ -378,7 +396,6 @@ void wakemeup_41()
 
         // now stop driving ISA_OE by going back to the start of the state machine
         pio_sm_exec(pio1_pio, isaout_sm, pio_encode_jmp(isaout_offset + hp41_pio_isaout_offset_handle_carry) | pio_encode_sideset(1, 0)); 
-
     }
 }
 
@@ -393,9 +410,18 @@ void wakemeup_41()
 
 void shutdown_41()
 {
-    pio_sm_exec(pio1_pio, irout_sm, pio_encode_set(pio_x, 0) | pio_encode_sideset(1, 0));
-    pio_sm_exec(pio1_pio, irout_sm, pio_encode_jmp(irout_offset + hp41_pio_irout_offset_hilo_loop) | pio_encode_sideset(1, 0));
-
+    #if (TULIP_HARDWARE == T_DEVBOARD)
+        // drive PWO_OE high, on teh DevBoard this is shared with IR Output
+        pio_sm_exec(pio1_pio, irout_sm, pio_encode_set(pio_x, 0) | pio_encode_sideset(1, 0));
+        pio_sm_exec(pio1_pio, irout_sm, pio_encode_jmp(irout_offset + hp41_pio_irout_offset_hilo_loop) | pio_encode_sideset(1, 0));
+    #else
+        // on the Module version PWO is shared with SPARE1
+        // drive PWO high for 5 usecs
+        gpio_put(P_PWO_OE, 1);           // drive PWO high
+        busy_wait_us(5);                 // wait 5 us
+        gpio_put(P_PWO_OE, 0);           // drive PWO_OE low
+    #endif
+    
 }
 
 
@@ -404,7 +430,6 @@ void send_ir_frame(uint32_t frame)
     // not much to do, just dump the formatted frame in the TX FIFO of the irout state machine
     // note that this is a blocking function, maybe change that?
     pio_sm_put_blocking(pio1_pio, irout_sm, frame);  // send the data
-
 }
 
 // for external equipment to be able to set an FI flag
@@ -612,6 +637,9 @@ void __not_in_flash_func(core1_pio)()
 
     uint isaout_sideset = 0;
 
+    uint pagetoswitch = 1;               // bank for ROM paging
+    uint banktoswitch = 1;
+
     int i = 0;
     int var = 0;
     int n = 0;
@@ -649,7 +677,7 @@ void __not_in_flash_func(core1_pio)()
 
         rx_inst = pio_sm_get_blocking(pio0_pio, sync_sm) >> 20;     // first read is INSTRUCTION
 
-        // gpio_put(P_ADDR_END, 1);
+        // gpio_put(P_DEBUG, 1);
         pio_sm_put(pio0_pio, debugout_sm, DBG_OUT0);
 
         TraceLine.cycle_number = cycle_counter;
@@ -658,7 +686,7 @@ void __not_in_flash_func(core1_pio)()
         // TraceLine.xq_instr = 0;
         // TraceLine.xq_data = 0;
 
-        // gpio_pulse(P_ADDR_END, 2);                                  // for debugging                                      
+        // gpio_pulse(P_DEBUG, 2);                                  // for debugging                                      
 
         // for peripheral emulation this is the place where the instruction must be decoded and handled
         // fast enough to be ready to send a carry at T0_TIME or data starting at T0_TIME
@@ -723,6 +751,7 @@ void __not_in_flash_func(core1_pio)()
       
         if (globsetting.get(HP82143A_enabled))
         {
+
             // handling of HP82143A (Printer) specific instructions
             switch (rx_inst) {
 
@@ -892,8 +921,8 @@ void __not_in_flash_func(core1_pio)()
         // put instruction in TraceLine for the ISA instruction
         TraceLine.isa_instruction = rx_inst;
 
-        // gpio_put(P_ADDR_END, 0);
-        // gpio_pulse(P_ADDR_END, 3);                                  // for debugging 
+        // gpio_put(P_DEBUG, 0);
+        // gpio_pulse(P_DEBUG, 3);                                  // for debugging 
         pio_sm_put(pio0_pio, debugout_sm, DBG_OUT1);
      
         // ========================================================================
@@ -956,17 +985,18 @@ void __not_in_flash_func(core1_pio)()
             // when we get here there is also data in the FI input state machine
             // read both words, but at the first start there may be only one word in the RX FIFO
 
+            #if (TULIP_HARDWARE == T_DEVBOARD) 
+                if (pio_sm_get_rx_fifo_level(pio0, fiin_sm) > 0) {
+                    TraceLine.fi1 = pio_sm_get_blocking(pio0_pio, fiin_sm); 
+                }
 
-            if (pio_sm_get_rx_fifo_level(pio0, fiin_sm) > 0)
-            {
-                TraceLine.fi1 = pio_sm_get_blocking(pio0_pio, fiin_sm); 
-            }
-
-            if (pio_sm_get_rx_fifo_level(pio0, fiin_sm) > 0)
-            {
-                TraceLine.fi2 = pio_sm_get_blocking(pio0_pio, fiin_sm); 
-            }
-
+                if (pio_sm_get_rx_fifo_level(pio0, fiin_sm) > 0){
+                    TraceLine.fi2 = pio_sm_get_blocking(pio0_pio, fiin_sm); 
+                }
+            #elif (TULIP_HARDWARE == T_MODULE)
+                TraceLine.fi1 = fi_out1;
+                TraceLine.fi2 = fi_out2;
+            #endif
 
             TraceLine.data2 = rx_data2 >> 8;                            // get received data in TraceLine and align
 
@@ -1153,27 +1183,8 @@ void __not_in_flash_func(core1_pio)()
             }
             // end of incoming HP-IL handling
 
-            /* bankswitching disabled in VERSION 00.01.01
-            if (rom_pg == 0x8) 
-            // bankswitching currently only in Page 8
-            {
-                switch (rx_inst)
-                {
-                    case inst_ENBANK1:
-                        enabled_bank = 1;
-                        break;
-                    case inst_ENBANK2:
-                        enabled_bank = 2;
-                        break;
-                    case inst_ENBANK3:
-                        enabled_bank = 3;
-                        break;
-                    case inst_ENBANK4:
-                        enabled_bank = 4;
-                        break;                    
-                }
-            }
-            */
+
+
 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT3);
 
@@ -1182,19 +1193,87 @@ void __not_in_flash_func(core1_pio)()
             // PWO is high, HP41 still running, get ISA ADDRESS
 
             rx_addr = pio_sm_get_blocking(pio0_pio, sync_sm);           // 2nd read from SYNC/ISA state machine is ADDRESS
-            rom_addr = rx_addr >> 16;                                   // to get the current address
+            rom_addr = rx_addr >> 16;                 
+                              // to get the current address
             TraceLine.isa_address = rom_addr;
             // at this point we have a valid address which is left justified in rx_addr and right justified in rom_addr
             // this can be used to check for a ROM hit, read data and present it on the ISA output
 
             // this is the place to handle the ROM mapping and bankswitching 
-            rom_pg = (rom_addr & 0xF000) >> 12;                            // right align
 
-            // gpio_pulse(P_ADDR_END, 6);                                  // for debugging 
+            // monitor ENBANK instructions for tracing, not used for reading ROM images
+            // must isolate page for correct handling
+            // take care of the following:
+            //   HP41CX, ENBANK in Page 3 actually switched Page 5 active bank
+            //   for Port 8/9, A/B, C/D and E/F both banks are swichted
+            //   
+
+            rom_pg = (rom_addr & 0xF000) >> 12;                            // right aligned page number
+            banktoswitch = 0;                                               // default no bankswitching
+
+            switch (rx_inst)
+            {
+                case inst_ENBANK1:
+                    banktoswitch = 1;
+                    break;
+                case inst_ENBANK2:
+                    banktoswitch = 2;
+                    break;
+                case inst_ENBANK3:
+                    banktoswitch = 3;
+                    break;
+                case inst_ENBANK4:
+                    banktoswitch = 4;
+                    break;                  
+                default:
+                    banktoswitch = 0;       // if there was no ENBANKx instruction, do nothing
+                    break;
+            }
+
+            if (banktoswitch != 0) {
+                // only if there is an ENBANKx instruction
+                if (rom_pg == 3)
+                {
+                    // HP41CX, ENBANK in Page 3 actually switched Page 5 active bank
+                    active_bank[5] = banktoswitch;
+                }
+                else if ((rom_pg == 9) || (rom_pg == 0xB) || (rom_pg == 0xD) || (rom_pg == 0xF))
+                {
+                    // for Port 8/9, A/B, C/D and E/F both banks are swichted
+                    active_bank[rom_pg] = banktoswitch;
+                    active_bank[rom_pg - 1] = banktoswitch;
+                }
+                else if ((rom_pg == 8) || (rom_pg == 0xA) || (rom_pg == 0xC) || (rom_pg == 0xE))
+                {
+                    // for Port 8/9, A/B, C/D and E/F both banks are swichted
+                    active_bank[rom_pg] = banktoswitch;
+                    active_bank[rom_pg + 1] = banktoswitch;
+                }
+                else
+                {
+                    active_bank[rom_pg] = banktoswitch;
+                }
+            }
+
+
+            // we should now add the Bank information to the Traceline
+            TraceLine.bank = active_bank[rom_pg];
+
+            // gpio_pulse(P_DEBUG, 6);                                  // for debugging 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT4);
 
-            // BETA test version 00.01.01 ROM memory map
+            // Read the ROM, embedded or from FLASH
             isa_out_data = 0xffff;              // default if ROM is empty
+
+            if (TULIP_Pages.isEnabled(rom_pg, 1)) {
+                // check if the page is enabled, if not then return empty data
+                // this is for the TULIP pages, which are not always enabled
+                // this is done in the TULIP_Pages class
+                isa_out_data = TULIP_Pages.getword(rom_addr);
+            }
+            
+            // old code to read from an Embedded ROM
+            /*
             switch(rom_pg) {
                   
                 case 0x6:                       // IL-PRINTER or HP82143A PRINTER
@@ -1217,6 +1296,7 @@ void __not_in_flash_func(core1_pio)()
                     } 
                     break;
             }
+                    */
 
             if (isa_out_data != 0xFFFF)
             // not an empty page so return valid data
@@ -1236,7 +1316,7 @@ void __not_in_flash_func(core1_pio)()
                 pio_sm_put_blocking(pio1_pio, isaout_sm, isa_out_data); 
             }
 
-            // gpio_pulse(P_ADDR_END, 7);                                  // for debugging  
+            // gpio_pulse(P_DEBUG, 7);                                  // for debugging  
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT5);
 
             // =================================================================================
@@ -1247,7 +1327,7 @@ void __not_in_flash_func(core1_pio)()
             rx_data1 = pio_sm_get_blocking(pio0_pio, datain_sm);                 // blocking read from datain state machine   
             TraceLine.data1 = rx_data1;
 
-            // gpio_pulse(P_ADDR_END, 8);                                  // for debugging             
+            // gpio_pulse(P_DEBUG, 8);                                  // for debugging             
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT6);
 
             
@@ -1423,7 +1503,7 @@ void __not_in_flash_func(core1_pio)()
                 TraceLine.HPILregs[i] = HPIL_REG[i];
             }
            
-            // gpio_pulse(P_ADDR_END, 9);                                  // for debugging 
+            // gpio_pulse(P_DEBUG, 9);                                  // for debugging 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT7);
 
             // at this time we can update the HP-IL flags
@@ -1514,8 +1594,8 @@ void __not_in_flash_func(core1_pio)()
             // in any case, update the Trace buffer with whatever we have
             queue_try_add(&TraceBuffer, &TraceLine);                    // add to internal trace buffer for handling by core0   
 
-            // gpio_pulse(P_ADDR_END, 10);                                  // for debugging 
+            // gpio_pulse(P_DEBUG, 10);                                  // for debugging 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT7);
         }        
     }
-}
+}                       // end of the core1 loop

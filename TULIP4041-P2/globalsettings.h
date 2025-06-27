@@ -21,7 +21,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "pico.h"
+#include "tulip.h"
 #include "pico/stdlib.h"
 
 #include "hpinterface_hardware.h"
@@ -120,11 +120,13 @@
                                             // used to set the defaults the first time
                                             // settings marked as initialized when this field = 41
 #define     gset_num            93          // to keep track of active set of GSettings
-#define     gsettings_lastitem  99          // to get the total number of items in the array
+#define     rommap              94          // default rom map filename
+#define     rommap_end          (rommap + 31) // active rom map filename length
+#define     gsettings_lastitem  (rommap_end + 1)  // to get the total number of items in the array
 
 #define     init_value          0x4041
 
-class GSettings {
+class GSettings { 
 
     public:
 
@@ -134,7 +136,7 @@ class GSettings {
         // initialize to default settings
 
         // first set all items to 0, all false (disabled)
-        for (int i = 0; i < gsettings_lastitem; i++) {
+        for (int i = 0; i < rommap; i++) {
             gsettings[i] = 0;
         }
     }
@@ -143,7 +145,7 @@ class GSettings {
     int set_default() {
         // now set the items that should be enabled by default 
         // first set all items to 0, all false (disabled)
-        for (int i = 0; i < gsettings_lastitem; i++) {
+        for (int i = 0; i < rommap; i++) {
             gsettings[i] = 0;
         }
 

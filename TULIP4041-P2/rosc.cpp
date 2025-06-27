@@ -13,7 +13,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "pico.h"
+#include "tulip.h"
 
 // For MHZ definitions etc
 #include "hardware/clocks.h"

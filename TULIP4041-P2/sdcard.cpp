@@ -91,20 +91,14 @@ void sdcard_init()
 void sd_mounted()
 {
     sd_card_t *TULIP_uSD_p = sd_get_by_num(DRIVENUM);
-    if (!TULIP_uSD_p)
-    {
+    if (!TULIP_uSD_p) {
         // no valid drive initialized
         cli_printf("  no drive initialized");
-    }
-    else
-    {
+    } else {
         // check if drive mounted
-        if (TULIP_uSD_p->state.mounted)
-        {
+        if (TULIP_uSD_p->state.mounted) {
             cli_printf("  SD card mounted");
-        }
-        else
-        {
+        } else {
             cli_printf("  SD card not mounted");
         }
     }

@@ -69,6 +69,7 @@ uint32_t cdc_available(int itf);
 int16_t cdc_read_byte(int itf);
 int cdc_read_buf(int itf, char* buffer, int len);
 char cdc_read_char(int itf);
+void cdc_read_flush(int itf);
 
 void cdc_printf_console(const char *format, ...);       // prevent using this function
 void cdc_printf_(int itf, const char *format, ...);     // prevent using this function

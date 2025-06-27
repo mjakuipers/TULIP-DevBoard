@@ -19,12 +19,13 @@
 // #define PICO_STDIO_USB_ENABLE_RESET_VIA_BAUD_RATE 0
 // #define PICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE 1 
 
-#include "pico.h"
+#include "tulip.h"
 #include "hardware/flash.h"
+#include "hpinterface_hardware.h"
 
 // #include "tusb_config.h"
 #include <tusb.h>
-
+			
 #define DESC_STR_MAX 20
 #define CFG_TUD_EP_MAX 16
 
@@ -40,7 +41,12 @@
 
 //  to be used for CDC +MSC
 // #define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN + (TUD_VENDOR_DESC_LEN * CFG_TUD_VENDOR) + (TUD_CDC_DESC_LEN * CFG_TUD_CDC)) + (TUD_MSC_DESC_LEN)
-#define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN  + (TUD_CDC_DESC_LEN * CFG_TUD_CDC)) + (TUD_MSC_DESC_LEN)
+
+#if MSC_ENABLE == 1
+	#define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN + (TUD_CDC_DESC_LEN * CFG_TUD_CDC)) + (TUD_MSC_DESC_LEN)
+#else
+	#define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN  + (TUD_CDC_DESC_LEN * CFG_TUD_CDC))
+#endif
 
 
 #define USBD_MAX_POWER_MA 500
@@ -61,8 +67,13 @@
 
 // #define USBD_ITF_RPI_RESET (2)				// for RPI reset with Picotool
 
-// #define USBD_ITF_MAX (10)					// CDC only
-#define USBD_ITF_MAX (11)					// CDC + MSC
+#if MSC_ENABLE == 1
+	#define USBD_ITF_MAX (11)					// CDC + MSC
+#else
+	#define USBD_ITF_MAX (10)					// CDC only
+#endif
+
+
 // #define USBD_ITF_MAX 4 (original)
 
 #define USBD_CDC_0_EP_CMD 0x81
@@ -151,9 +162,14 @@ static const uint8_t usbd_desc_cfg[USBD_DESC_LEN] = {
 		USBD_CDC_CMD_MAX_SIZE, USBD_CDC_4_EP_OUT, USBD_CDC_4_EP_IN,
 		USBD_CDC_IN_OUT_MAX_SIZE),  
 
+	// TUD_MSC_DESCRIPTOR(USBD_ITF_MSC, USBD_STR_MSC, USBD_MSC_OUT, USBD_MSC_IN, 64), 
+
 	// to be added for the MSC device
+	#if MSC_ENABLE == 1
+	 	TUD_MSC_DESCRIPTOR(USBD_ITF_MSC, USBD_STR_MSC, USBD_MSC_OUT, USBD_MSC_IN, 64),
+	#endif
 	// Interface number, string index, EP Out & EP In address, EP size
-  	TUD_MSC_DESCRIPTOR(USBD_ITF_MSC, USBD_STR_MSC, USBD_MSC_OUT, USBD_MSC_IN, 64),  
+  	// TUD_MSC_DESCRIPTOR(USBD_ITF_MSC, USBD_STR_MSC, USBD_MSC_OUT, USBD_MSC_IN, 64),  
 
 };
 
@@ -168,14 +184,22 @@ static const char *const usbd_desc_str[] = {
 	// [USBD_STR_RPI_RESET] = "Reset",
 };  */
 
+
+#define USBD_DESC_STR_MAX 5
+
 static const char *const usbd_desc_str[] = {	
-	"",
-	"Mein-USB",				// Manufacturer string		
-	"TEST4041",				// Product		
+	"MK-TULIP Prods", 		// Manufacturer string		
+#if (TULIP_HARDWARE == T_DEVBOARD)
+	"TULIP4041 DEV",	    // Product		
+#elif (TULIP_HARDWARE == T_MODULE)
+	"TULIP4041 MOD",	    // Product
+#endif
 	usbd_serial,			// Serial number, Flash chip ID will be filled here
 	"TULIP-CDC",     		// CDC Interface
 	// "TULIP-MSC",	    	// MSC Interface
 };
+
+
 
 // Invoked when received GET DEVICE DESCRIPTOR
 // Application return pointer to descriptor   
@@ -220,8 +244,24 @@ void usbd_serial_init(void)
 	uint8_t id[8];
 	int drivercount;
 
+
 	flash_get_unique_id(id);
+
+	// for the production testing create a fixed serial number
+	// easer to have fixed COM ports
+	#ifdef DEBUG
+	id[0] = 0x40;
+	id[1] = 0x41;
+	id[2] = 0x40;
+	id[3] = 0x41;
+	id[4] = 0x40;
+	id[5] = 0x41;
+	id[6] = 0x40;
+	id[7] = 0x41;
+	#endif
 
 	snprintf(usbd_serial, USBD_STR_SERIAL_LEN, "%02X%02X%02X%02X%02X%02X%02X%02X",
 		 id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]);
+
+
 }

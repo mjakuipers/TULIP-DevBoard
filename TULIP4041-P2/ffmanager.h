@@ -24,15 +24,19 @@ extern "C" {
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "pico.h"
+#include "tulip.h"
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
 #include "hardware/flash.h"
 #include "hardware/watchdog.h"
 #include "pico/multicore.h"
+#include "cli-binding.h"
 
-#include "modfile.h"
+
+#include "cdc_helper.h"
+#include "emulation.h"
+#include "module.h"
 
 // includes for FatFS
 #include "ff.h"             /* Obtains integer types */
@@ -43,35 +47,25 @@ extern "C" {
 #include "sd_card.h"
 #include "crash.h"
 
-
-// definitions for storing information
-
-#define FF_OFFSET       0x00080000                          // start of file system in FLASH
-
-#define FF_SYSTEM_BASE  FF_OFFSET + XIP_BASE                // base of FF manager is at 0x10000000
-                                                            //                     plus 0x00080000
-                                                            //                       is 0x10080000
-
-#define FF_SYSTEM_END   XIP_BASE + PICO_FLASH_SIZE_BYTES    // end of FLASH memory for Pico relative to FF_SYSTEM_BASE
-#define FF_SYSTEM_SIZE  FF_SYSTEM_END - FF_SYSTEM_BASE      // total bytes in the file system
-
-#define FRAM_BASE       0x10000                             // space before is used by the system
-#define FRAM_END        0x40000                             // for 256 KByte device
-
-#define FL_PAGE_MASK    0xFF
-
-#define FL_BOUND        FLASH_SECTOR_SIZE - 1               // FL_BOUND becomes 0x0FFF, FLASH_BLOCK_SIZE is 0x1000
-#define BLOCK_MASK      ~FL_BOUND                           // BLOCK_MASK becomes 0xFFFFF000
-
-#define NOTFOUND        0xFFFFFFFF
-
-
 // definitions for the flash memory
 
-const uint8_t  *flash_contents_bt = (const uint8_t *)  (FF_SYSTEM_BASE);    // pointer to FLASH byte array
-const uint16_t *flash_contents_wd = (const uint16_t *) (FF_SYSTEM_BASE);    // pointer to FLASH word array
-
-
+void ff_delay500();
+void ff_show(uint32_t addr);
+void ff_init();
+void ff_nuke();
+uint32_t ff_lastfree(uint32_t offs);
+uint32_t ff_findfree(uint32_t offs, uint32_t size);
+uint32_t ff_findnextf(uint32_t offs);
+uint32_t ff_findfile(const char *name);
+void ff_erase(uint32_t fl_start, uint32_t fl_end);
+bool ff_flasherased(int num);
+int ff_compare(uint32_t offs, uint8_t *buf, int num);
+uint32_t ff_erased(uint32_t offs, uint32_t size, int num);
+bool ff_write_range(uint32_t offs, uint8_t *buf, int num);
+bool ff_write(uint32_t offs, uint8_t data);
+bool ff_writeable(uint32_t offs, uint32_t size);
+bool ff_writeableb(uint32_t offs, uint8_t data);
+bool ff_isinited();
 
 #ifdef __cplusplus 
 } 
