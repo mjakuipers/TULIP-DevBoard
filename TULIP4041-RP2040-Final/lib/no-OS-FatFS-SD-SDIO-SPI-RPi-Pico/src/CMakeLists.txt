@@ -13,6 +13,7 @@ target_sources(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/ff15/source/ffunicode.c
     ${CMAKE_CURRENT_LIST_DIR}/sd_driver/dma_interrupts.c
     ${CMAKE_CURRENT_LIST_DIR}/sd_driver/sd_card.c
+    ${CMAKE_CURRENT_LIST_DIR}/sd_driver/sd_timeouts.c
     ${CMAKE_CURRENT_LIST_DIR}/sd_driver/SDIO/rp2040_sdio.c
     ${CMAKE_CURRENT_LIST_DIR}/sd_driver/SDIO/sd_card_sdio.c
     ${CMAKE_CURRENT_LIST_DIR}/sd_driver/SPI/my_spi.c
@@ -25,7 +26,7 @@ target_sources(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/src/file_stream.c
     ${CMAKE_CURRENT_LIST_DIR}/src/glue.c
     ${CMAKE_CURRENT_LIST_DIR}/src/my_debug.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtc.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/my_rtc.c
     ${CMAKE_CURRENT_LIST_DIR}/src/util.c
 )
 target_include_directories(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico INTERFACE
@@ -33,11 +34,19 @@ target_include_directories(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico INTERFACE
     sd_driver
     include
 )
+
+if(PICO_RISCV)
+    set(HWDEP_LIBS hardware_watchdog)
+else()
+    set(HWDEP_LIBS cmsis_core)
+endif()
+
 target_link_libraries(no-OS-FatFS-SD-SDIO-SPI-RPi-Pico INTERFACE
     hardware_dma
     hardware_pio
     hardware_spi
+    hardware_sync
     pico_aon_timer
     pico_stdlib
-    cmsis_core
+    ${HWDEP_LIBS}
 )
