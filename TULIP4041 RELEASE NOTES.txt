@@ -2,31 +2,48 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
-VERSION 00.01.05    -   beta
-FOR THE PICO2-RP2350
-    Supported functions:    
-    -   HP-IL, HP-IL Printer, PILBox 
-    -   HP82143 Printer
-    -   HP-IL Scope
-    -   basic CLI
-    -   HP41 Tracer
+VERSION 0.9 BETA 1, June 2025
+-   Public beta, second version for the Pico2-RP2350
+-   Updated to the Pico SDK 2.1.0
+-   FatFS no-OS-FatFS-SD-SDIO-SPI-RPi-Pico Version 3.7.0
+-   USBD_PID Manufacturer and Product ID updated for TULIP4041
+-   Development tree with versions for DevBoard and Module, two binaries!
+-   uSD card will automatically mount and connect to host computer
+-   Many changes under the hood to prepare for the Module version, MOD files and Bank Switching
+
+Functional changes:
+-   SDCard FAT and exFAT supported, subdirectories and dir command
+-   FLASH File system with NUKEALL, INIT, delete, dump, list and import functions
+-   FRAM management functions, initialization and dump
+-   plug and unplug functions, ROM mapping stored in FRAM
+-   cat function
+-   emulate function
+-   HP-IL, IL Printer and 82143A Printer still embedded and easy to plug without import in FLASH
+-   tracer now registers active bank
+-   RTC support in the firmware for the Module using I2C
+
+Limitations:
+-   uSD card must be >2 GByte
+-   No Bank Switching
+-   Only ROM files supported for plugging
+-   NO power management!
+-   exFAT file system on the uSD card is recommended, FAT seems to be slow when registering with the host PC
+
+READ THE DOCUMENTATION BEFORE USE!
 
 USB virtual serial port assignment
 -   ITF 0		main console, user interface
 -   ITF 1		trace output HP41 bus tracer 
--   IFT 2		HP-IL frames
+-   IFT 2		HP-IL frames (connect with ILPer or pyILPer  )
 -   ITF 3		HP-IL frame tracing
 -   ITF 4		Printer output for HP82143A
 
-The SD Card is exposed as a USB MSC device, not used in the application
-
 The UART on GPIO 0 and 1 is used by the 'old' user interface and can be 
-used for simple monitoring.
-DO NOT USE THE FLASH FUNCTIONS!
+used for simple monitoring. DO NOT USE THE FLASH FUNCTIONS!
 
 USE AT YOUR OWN RISK
-This is a preliminary public BETA release.
-The sources contain may functions that are still in development 
-and very subject to changes
+This is a preliminary public BETA release. 
+The sources contain may functions that are still in development and very subject to changes
+Please report any issues on the github issue tracker.
 
 The .uf2 file is ready to be loaded in the Pico.
