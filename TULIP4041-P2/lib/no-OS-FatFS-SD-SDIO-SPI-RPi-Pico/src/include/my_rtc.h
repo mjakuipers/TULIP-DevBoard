@@ -1,4 +1,4 @@
-/* f_util.h
+/* my_rtc.h
 Copyright 2021 Carl John Kugler III
 
 Licensed under the Apache License, Version 2.0 (the License); you may not use 
@@ -12,21 +12,16 @@ CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 */
 #pragma once
-#include "ff.h"
+
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-    const char *FRESULT_str(FRESULT i);
-    FRESULT delete_node (
-        TCHAR* path,    /* Path name buffer with the sub-directory to delete */
-        UINT sz_buff,   /* Size of path name buffer (items) */
-        FILINFO* fno    /* Name read buffer */
-    );
+extern time_t epochtime;
+void time_init();
 
-    void ls(const char *dir);
-    
 #ifdef __cplusplus
 }
 #endif

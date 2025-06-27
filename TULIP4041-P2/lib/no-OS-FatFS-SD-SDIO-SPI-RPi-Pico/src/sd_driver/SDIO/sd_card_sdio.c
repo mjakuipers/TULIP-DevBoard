@@ -28,6 +28,7 @@
 #include "rp2040_sdio.pio.h"  // build\build\rp2040_sdio.pio.h
 #include "sd_card_constants.h"
 #include "sd_card.h"
+#include "sd_timeouts.h"
 #include "SdioCard.h"
 #include "util.h"
 
@@ -84,6 +85,7 @@ static bool logSDError(sd_card_t *sd_card_p, int line)
 static float calculate_clk_div(uint baud) {
     float div = (float)clock_get_hz(clk_sys) / (CLKDIV * baud);
     /* Baud rate cannot exceed clk_sys frequency divided by CLKDIV! */
+    DBG_PRINTF("clk_div = %f\n", div);
     myASSERT(div >= 1 && div <= 65536);
     return div;
 }
@@ -129,7 +131,7 @@ bool sd_sdio_begin(sd_card_t *sd_card_p)
             return false;
         }
 
-        if ((uint32_t)(millis() - start) > 1000)
+        if ((uint32_t)(millis() - start) > sd_timeouts.sd_sdio_begin)
         {
             EMSG_PRINTF("SDIO card initialization timeout\n");
             return false;
@@ -204,7 +206,7 @@ bool sd_sdio_begin(sd_card_t *sd_card_p)
     }
     // Increase to high clock rate
     if (!sd_card_p->sdio_if_p->baud_rate)
-        sd_card_p->sdio_if_p->baud_rate = 10 * 1000 * 1000;  // 10 MHz default
+        sd_card_p->sdio_if_p->baud_rate = clock_get_hz(clk_sys) / 12; // Default
     if (!rp2040_sdio_init(sd_card_p, calculate_clk_div(sd_card_p->sdio_if_p->baud_rate)))
         return false; 
 
