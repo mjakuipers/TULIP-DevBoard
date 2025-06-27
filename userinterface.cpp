@@ -1,0 +1,3367 @@
+// Created: 2018/02/04 12:24:41
+
+#define Version_Number VERSION_STRING
+#define Comp_Date_string COMP_DATE_TIME
+
+/*  
+ * userinterface.c
+ *
+ * This file is part of the TULIP4041 project.
+ * Copyright (C) 2024 Meindert Kuipers
+ *
+ * This is free software: you are free to change and redistribute it.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * 
+ * USE AT YOUR OWN RISK
+ *
+ */
+
+#include "userinterface.h"
+
+#define IMPORT_SINGLE 0
+#define IMPORT_ALL 1
+#define IMPORT_UPDATE 2
+#define IMPORT_COMPARE 3
+#define IMPORT_FRAM 4 
+
+
+ // Global settings strings for human readable settings
+const char* __in_flash("flash_constants")glob_set_[] = {
+
+    "HP82143A Printer enabled",                 //  0   HP82143A printer active and SELP9 decoded
+    "HP82153A Wand enabled",                    //  1   HP82153A Wand active
+    "HP82160A HP-IL enabled",                   //  2   HP82160A HP-IL module active
+    "HP82242A IR Printer enabled ",             //  3   HP82242A Blinky IR printer module active
+    "HP82104A Cardreader enabled",              //  4   HP82104A Cardreader active
+    "HP82182A Time Module enabled",             //  5   HP82104A Time Module active
+    "HP41CL Emulation enabled",                 //  6   HP41CL emulation active (limited function set)
+    "HEPAX instructions enabled",               //  7   HEPAX module native support  
+    "QROM enabled (WROM instruction decoded)",  //  8   WROM instruction decoded
+    "ROM reading enabled",                      //  9   ROM reading enabled
+    "Bankswitching enabled",                    // 10   bankswitch instructions enabled  
+    "Expanded Memory enabled",                  // 11   Expandend Memory enabled (MAXX emulation)
+    "Tiny41 Instructions enabled",              // 12   enable decoding of TT specific instructions for device control
+    "All QROM write protected",                 // 13   Write Protect all QROM (same effact as #8 ??)
+
+    "",                                         // 14   placeholder
+
+    "HP-IL module plugged",                     // 15   HP-IL module plugged in Page 7
+    "HP-IL Printer plugged",                    // 16   IL-Printer module plugged in Page 6
+    "HP82143 Printer plugged",                  // 17   HP82143A Printer module plugged
+    "",                                         // 18   placeholder
+    "",                                         // 19   placeholder
+
+// control of TULIP4041 outputs to the HP41 system bus
+    "DATA drive enabled ",                      // 20   enable driving of DATA output
+    "ISA drive enabled ",                       // 21   enable driving of ISA (to switch ROM emulation on/off)
+    "PWO drive enabled ",                       // 22   enable driving of PWO line for reset of the HP41
+    "FI drive enabled",                         // 23   driving of FI is enabled
+    "IR drive enabled ",                        // 24   driving the IR led is enabled
+
+    "",                                         // 25   placeholder
+    "",                                         // 26   placeholder
+    "",                                         // 27   placeholder
+    "",                                         // 28   placeholder
+    "",                                         // 29   placeholder
+
+// control of tracer settings
+    "Tracer enabled",                           // 30   tracer enabled
+    "Tracing HP-IL Registers",                  // 31   tracing of HP-IL registers enabled
+    "Tracer disassembler on",                   // 32   disassembly enabled
+    "Tracer FI line on",                        // 33   FI tracing enabled
+    "Tracer Mnemonics type",                    // 34   tracer disassembly type (JDA only for now)
+                                                //      0 = JDA
+                                                //      1 = HP   (not yet supported)
+                                                //      2 = ...
+    "Tracing System Pages 0..7",                // 35   tracing of system ROMS pages P0..7
+                                                //      bit pattern in byte refers to page
+    "Tracing User ROM P8..F",                   // 36   tracing of user ROM pages 8..F
+                                                //      bit pattern in byte refers to page
+    "Tracer selected system loops",             // 37   tracing of system loops enabled:
+                        	                      //      0x0098 - 0x00A1       RSTKB and RST05
+        	                                      //      0x0177 - 0x0178       delay for debounce
+        	                                      //      0x089C - 0x089D       BLINK01
+                                                //      others ??
+
+    "",                                         // 38   placeholder
+    "",                                         // 39   placeholder
+    "",                                         // 40   placeholder
+    "",                                         // 41   placeholder
+    "",                                         // 42   placeholder
+    "",                                         // 43   placeholder
+    "",                                         // 44   placeholder
+    "",                                         // 45   placeholder
+    "",                                         // 46   placeholder
+    "",                                         // 47   placeholder
+    "",                                         // 48   placeholder
+    "",                                         // 49   placeholder
+
+// HP-IL scope settings
+    "HP-IL Scope enabled",                      // 50   HP-IL scope enabled
+    "HP-IL PILBox scope enabled",               // 51   PILBox serial tracing enabled
+    "",                                         // 52
+    "",                                         // 53
+    "",                                         // 54
+    "",                                         // 55
+    "",                                         // 56
+    "",                                         // 57
+    "",                                         // 58
+    "",                                         // 59
+
+
+// XMEM/User memory settings
+    "Extended Memory pages",                    // 60   XMEM/XFUN pages   0x01    XFunctions Memory
+                                                //                        0x02    XMem #1 active
+                                                //                        0x04    XMem #2 active
+    "User Memory pages",                        // 61   User Memory pages 0x01    Memory Module #1
+                                                //                        0x02    Memory Module #2
+                                                //                        0x04    Memory Module #3
+                                                //                        0x08    Memory Module #4
+
+    "",                                         // 62   placeholder
+    "",                                         // 63   placeholder
+    "",                                         // 64   placeholder
+    "",                                         // 65   placeholder
+    "",                                         // 66   placeholder
+    "",                                         // 67   placeholder
+    "",                                         // 68   placeholder
+    "",                                         // 69   placeholder
+
+// control of various messages
+    "Print monitor enabled",                    // 70   monitor printer characters to console
+    "Power monitor enabled",                    // 71   monitor power mode changes to console
+
+    "",                                         // 72
+    "",                                         // 73
+    "",                                         // 74
+    "",                                         // 75
+    "",                                         // 76
+    "",                                         // 77
+    "",                                         // 78
+    "",                                         // 79
+
+// settings for HP82143 printer
+    "Printer mode",                             // 80   HP82143 status word, matches bits in SMA and SMB field (bit 15 + 16)
+                                                //      0 - MAN mode
+                                                //      1 - NORM
+                                                //      2 - TRACE mode
+                                                //      3 - TRACE mode (not used)                                    
+    "Printer port delay (0.1 secs)",            // 81   for IR printing/ delay in HP82143 printing
+    "Printer Paper loaded",                     // 82   is paper loaded
+    "Printer Power on",                         // 83   printer power
+    "Printer serial output",                    // 84   use serial printer output for output in terminal emulator
+
+    "",                                         // 85
+    "",                                         // 86
+    "",                                         // 87
+    "",                                         // 88
+    "",                                         // 89
+
+// control of TULIP4041 device
+    "CLI on USB",                               // 90   CLI goes to USB CDC port, otherwise to serial port
+    "PWO show events",                          // 91   show PWO events in the CLI ? or better in the tracer?
+    "Global settings initialized",              // 92   are the global settings initialized? 
+                                                //      used to set the defaults the first time
+    "Global set active number",                 // 93   to keep track of active set of GSettings   
+
+    "",                                         // 94
+    "",                                         // 95
+    "",                                         // 96
+    "",                                         // 97
+    "",                                         // 98
+
+    "Global settings last item",                // 99   to identify the last item
+    "",                                         // 100  guard
+};
+
+
+// emulation control, this will be in GlobalSettings soon
+int trace_enabled          = 1;     // real-time tracing is enable
+int trace_outside          = 1;     // trace only addresses > 0x3000
+int trace_int              = 1;     // only tracing of internal emulation actions
+int trace_disassembler     = 1;     // disassembler is enabled
+
+int emu_rom                = 1;     // rom emulation enabled
+int emu_mldl               = 1;     // MLDL/QRAM emulation enabled
+int emu_hepax              = 0;     // HEPAX emulation enabled
+int emu_HP82143            = 0;     // HP82143 emulation enabled
+int emu_HPIL               = 0;     // HP-IL emulation enabled
+int emu_display            = 0;     // HP41 display emulation enabled
+int emu_wand               = 0;     // HP41 WAND emulation enabled
+int emu_blinky             = 0;     // HP41 IR Printer emulation enabled
+
+int sample_break           = 0;     // start trace sampling after nn traces, for very long traces
+
+ 
+int8_t ROMBuffer[0x2000];           // array for download buffer
+uint16_t *rom_buf = (uint16_t *) ROMBuffer;  // same, for 16-bit access
+
+char  UPrint[250];        // used for building cli messages
+int   UPrintLen = 0;
+
+uint32_t flash_dump_addr = 0;
+uint32_t fram_dump_addr = 0;
+
+int rom_target = -1;                // target ROM page for FLASH or FRAM programming
+typedef enum {                      // memory type for ROM programming
+  P_NONE,                           // no programming possible
+  P_FLASH,                          // program in FLASH
+  P_FRAM                            // program in FRAM
+} prog_target;
+
+prog_target prog_t = P_NONE;
+
+extern struct TLine TraceLine;      // the variable with the TraceLine
+
+extern CModules TULIP_Pages;
+
+bool enable_programming = false;    // enable FLASH/FRAM programming
+
+char ROMname[16]; // 16 chars will do normally
+char ROMrev[6];
+const char __in_flash()HPchar[] = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ |\"#$%&`()*+{-}/0123456789†,<=>?"; 
+
+
+void testglob()
+{
+  globsetting.save();
+}
+
+// memory statistics functions
+uint32_t getTotalHeap() {
+   extern char __StackLimit, __bss_end__;
+   return &__StackLimit  - &__bss_end__;
+}
+
+uint32_t getFreeHeap() {
+   struct mallinfo m = mallinfo();
+   return getTotalHeap() - m.uordblks;
+}
+
+// wake up the HP41 by driving ISA high
+void power_on()
+{
+  wakemeup_41();
+}
+
+int pcount = 0;
+
+// Serial loop command structure
+typedef struct
+{
+  char key;
+  FPTR fn;
+  const char *desc;
+} SERIAL_COMMAND;
+
+void serial_help();
+void print_help();
+void rom_help();
+//void pio_status();
+
+// Serial loop command structure for the printer sub-functions
+typedef struct
+{
+  char key;
+  FPTR fn;
+  const char *desc;
+} PRINT_COMMAND;
+
+// Serial loop command structure for the ROM sub-functions
+typedef struct
+{
+  char key;
+  FPTR fn;
+  const char *desc;
+} ROM_COMMAND;
+
+// Serial loop command structure for the TRACE sub-functions
+typedef struct
+{
+  char key;
+  FPTR fn;
+  const char *desc;
+} TRACE_COMMAND;
+
+typedef enum {
+  // used for parameter entry
+  ST_NONE,        // no state
+  ST_QRAM,        // entry of QRAM parameter (not yet used)
+  ST_PLUG,        // entry of plug-in module (not yet used)
+  ST_BRK,         // entry of breakpoint (not yet used)
+  ST_PRT,         // entry of printer function
+  ST_XMEM,        // entry of active Extended Memory Modules 
+  ST_FILE,        // entry of file submenu
+  ST_ROM,         // entry of ROM submenu
+  ST_TRACE,       // entry of TRACE subcommands
+  ST_WAND,        // entry of Wand subcommands (0..9)
+} State_e;    
+
+State_e state = ST_NONE; 
+
+// functions called from the CLI
+
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "hardware/pll.h"
+#include "hardware/clocks.h"
+#include "hardware/structs/pll.h"
+#include "hardware/structs/clocks.h"
+
+
+
+
+void measure_freqs(void) {
+    uint32_t f_pll_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
+    uint32_t f_pll_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY);
+    uint32_t f_rosc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC);
+    uint32_t f_clk_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    uint32_t f_clk_peri = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
+    uint32_t f_clk_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB);
+    uint32_t f_clk_adc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC);
+#ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+    uint f_clk_rtc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_RTC);
+#endif
+
+    printf("pll_sys  = %dkHz\n", f_pll_sys);
+    printf("pll_usb  = %dkHz\n", f_pll_usb);
+    printf("rosc     = %dkHz\n", f_rosc);
+    printf("clk_sys  = %dkHz\n", f_clk_sys);
+    printf("clk_peri = %dkHz\n", f_clk_peri);
+    printf("clk_usb  = %dkHz\n", f_clk_usb);
+    printf("clk_adc  = %dkHz\n", f_clk_adc);
+#ifdef CLOCKS_FC0_SRC_VALUE_CLK_RTC
+    printf("clk_rtc  = %dkHz\n", f_clk_rtc);
+#endif
+
+    // Can't measure clk_ref / xosc as it is the ref
+}
+
+
+// CLI Welcome message and status
+void uif_status()
+{
+
+    measure_freqs();  // prints to serial console
+
+    uint32_t f_pll_sys  = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
+    uint32_t f_pll_usb  = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY);
+    uint32_t f_rosc     = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC);
+    uint32_t f_clk_sys  = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    uint32_t f_clk_peri = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
+    uint32_t f_clk_usb  = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB);
+    uint32_t f_clk_adc  = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC);
+
+    // adc_select_input(4);                    // select the temperature sensor input
+    const float conversionFactor = 3.3f / (1 << 12); // 3.3V reference voltage, 12-bit ADC
+    float adc = (float)adc_read() * conversionFactor;
+    float tempC = 27.0f - (adc - 0.706f) / 0.001721f;
+
+    float speed = clock_get_hz(clk_sys)/MHZ;
+
+      // clk_sys)/1000000;
+    float totalheap = getTotalHeap() / 1024;
+    float freeheap = getFreeHeap() / 1024;
+    float tracebytes = (sizeof(TraceLine) * TRACELENGTH) / 1024;
+
+    pico_unique_board_id_t board_id;
+    pico_get_unique_board_id(&board_id);
+
+    char board_id_str[sizeof(board_id.id) * 2 + 1];
+    for (int i = 0; i < sizeof(board_id.id); ++i) {
+        sprintf(board_id_str + i * 2, "%02X", board_id.id[i]);
+    }
+
+
+/*  /\    /\
+   /  \/\/  \
+  (    \ \   )
+   (        )
+    -     /
+     \    /
+	    \  /
+
+    */
+    cli_printf("****************************************************************************");
+    cli_printf("*    __   ___    __");
+    cli_printf("*   /  | |   |  /  | /|  Welcome to TULIP4041");   
+    cli_printf("*  /___| |   | /___|  |  The ULtimate Intelligent Peripheral for the HP41");
+    cli_printf("*      | |___|     |  |  (C) 2025 Meindert Kuipers, Netherlands");
+    if (TULIP_HARDWARE == T_DEVBOARD) {
+      cli_printf("*                        Firmware for the DevBoard version!");
+    } else {
+      cli_printf("*                        Firmware for the Module version!");
+    }
+    cli_printf("*  Version %s -- Compiled %s %s", Version_Number, __DATE__, __TIME__);
+    #ifdef DEBUG
+      cli_printf("*  *** DEBUG build, not for production use! ***");
+    #endif
+    cli_printf("*");
+    cli_printf("*  Clock overview");
+    cli_printf("*    TULIP freq : %7.2lf MHz", speed);
+    cli_printf("*      pll_sys  : %7d kHz", f_pll_sys);
+    cli_printf("*      pll_usb  : %7d kHz", f_pll_usb);
+    cli_printf("*      rosc     : %7d kHz", f_rosc);
+    cli_printf("*      clk_sys  : %7d kHz", f_clk_sys);
+    cli_printf("*      clk_peri : %7d kHz", f_clk_peri);
+    cli_printf("*      clk_usb  : %7d kHz", f_clk_usb);
+    cli_printf("*      clk_adc  : %7d kHz", f_clk_adc);
+    cli_printf("*      cpu temp :   %.02f C, %.02f F", tempC, tempC*9/5+32);	
+    cli_printf("*      board id :  %s (unique RP2350 CPU identifier)", board_id_str);
+    cli_printf("*"); 
+    cli_printf("*  Memory usage");
+    cli_printf("*    Total RAM  : %7.2lf KBytes", 520);
+    cli_printf("*    Total heap : %7.2lf KBytes", totalheap);
+    cli_printf("*    Free heap  : %7.2lf KBytes", freeheap);
+    cli_printf("*    Tracebuffer: %7.2lf KBytes, %d samples = %d bytes/traceline", tracebytes, TRACELENGTH, sizeof(TraceLine));
+    cli_printf("*");    
+    cli_printf("****************************************************************************");
+}
+
+// PIO status
+void uif_pio_status()
+{
+    uif_pio_report();
+} 
+
+
+// CDC connection status
+void uif_cdc_status()
+{
+  cli_printf("  CDC Port 1 [console]  connected? %s", cdc_connected(ITF_CONSOLE) ? "yes":"no");
+  cli_printf("  CDC Port 2 [tracer]   connected? %s", cdc_connected(ITF_TRACE)   ? "yes":"no");
+  cli_printf("  CDC Port 3 [HP-IL]    connected? %s", cdc_connected(ITF_HPIL)    ? "yes":"no");
+  cli_printf("  CDC Port 4 [IL scope] connected? %s", cdc_connected(ITF_ILSCOPE) ? "yes":"no");
+  cli_printf("  CDC Port 5 [printer]  connected? %s", cdc_connected(ITF_PRINT)   ? "yes":"no");
+}
+
+// identify all CDC ports
+void uif_cdc_ident()
+{
+  // for testing 
+  int i;
+  int PrintLen;
+  char  PrintStr[200];
+
+  cli_printf("\n");
+
+  for (i = 0; i < 5; i++)
+  {
+    if (cdc_connected(i))
+    {
+      cli_printf("  CDC Port %d OK  connected: %s", i, ITF_str[i]);
+
+      PrintLen = 0;
+      PrintLen += sprintf(PrintStr + PrintLen,"\n  *** testing CDC Port %i: %s ***\n\r", i, ITF_str[i]);
+      cdc_send_string(i, PrintStr, PrintLen);
+      cdc_flush(i);
+    }
+    else
+    {
+      cli_printf("  CDC Port %d NOT connected: %s", i, ITF_str[i]);
+    }
+  }
+}
+
+
+void uif_reboot()
+{
+  cli_printf("  RESETTING THE TULIP4041 in 2 seconds !! press any key to cancel");
+  watchdog_enable(2000, 1);   // set the watchdog to 2 seconds
+  while(true) {
+    tud_task();                 // to process IO until the watchdog triggers
+
+    // check for any input to disable the timer
+    if (cdc_available(ITF_CONSOLE)) {
+      // stop the watchdog
+      hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+      cdc_read_flush(ITF_CONSOLE);
+      cli_printf("  reset cancelled");
+      return;
+    }
+  }
+}
+
+
+void uif_bootsel()
+{
+  uint sleepcount = 500;
+
+  cli_printf("  RESETTING THE TULIP4041 to BOOTSEL mode in 2 seconds!! press any key to cancel");
+
+  while(true) {
+    tud_task();                 // to process IO until the watchdog triggers
+    sleep_ms(2);
+    if (cdc_available(ITF_CONSOLE)) {
+      cdc_read_flush(ITF_CONSOLE);
+      cli_printf("  reset cancelled");
+      return;
+    }
+    sleepcount--;
+    if (sleepcount == 0) {  
+    // reboots the RP2350 when the counter expires, uses the standard LED for activity monitoring
+      reset_usb_boot(1<<PICO_DEFAULT_LED_PIN, 0);      
+    }
+  }
+}
+
+// blink the LED b times, just for testing and fun
+void uif_blink(int b)
+{
+  if (b == 0) {
+    // toggle the LED once, to show that the command was received
+    cli_printf("toggle LED status");
+    gpio_toggle(PICO_DEFAULT_LED_PIN);
+    return;
+  }
+  while ((b > 0) && (b < 10)) {
+    // blink the LED b times, just for testing and fun
+    cli_printfn("%d ", b);
+    gpio_toggle(PICO_DEFAULT_LED_PIN);
+    sleep_ms(250);
+    gpio_toggle(PICO_DEFAULT_LED_PIN);
+    sleep_ms(250);
+    b--;
+  }
+  cli_printf("");
+}
+
+// helper function, returns true if PWO is low
+// returns false and sends a message to the CLI if PWO is high
+bool uif_pwo_low()
+{
+    if (gpio_get(P_PWO) == 0) {
+      return true;
+    }
+    cli_printf("  PWO is high, function only permitted when HP41 is OFF or STANDBY");
+    return false;
+}
+
+void uif_calcreset() {
+  // drive PWO low, 
+  cli_printf("  forcing PWO low to reset the HP41");
+  shutdown_41();
+}
+
+void uif_poweron() {
+  // can only be done if PWO is low!
+  if (uif_pwo_low()) {
+    cli_printf("  driving ISA to power on the HP41");
+    wakemeup_41();
+  }
+}
+
+void uif_configinit() {
+  // can only be done if PWO is low!
+    if (uif_pwo_low()) {
+      cli_printf("  re-initializing all peristent settings");
+      globsetting.set_default();
+    }
+}
+
+void uif_configlist() {
+  // can only be done if PWO is low!
+    if (uif_pwo_low()) {
+      for (int i = 0; i <= rommap + 1; i++) {
+        cli_printf("  item# %2d  value %04X - %s", i, globsetting.get(i), glob_set_[i]);
+      }
+    }
+}
+
+void uif_dir(const char *dir)
+{
+  sd_dir(dir);
+}
+
+
+// all sdcard functions
+void uif_sdcard_status()      // uSD card status
+{
+  sd_status();
+}
+
+void uif_sdcard_mount()       // mount the uSD card
+{
+  sd_mount();
+}
+
+void uif_sdcard_unmount()     // unmount the uSD card
+{
+  sd_unmount();
+}
+
+void uif_sdcard_mounted()     // check if the SD card is mounted
+{
+  sd_mounted();
+}
+
+void uif_sdcard_eject()
+{
+  usb_sd_eject();
+}
+
+void uif_sdcard_connect()
+{
+  usb_sd_connect();
+}
+
+const char* file_types[] =
+// list of file types for the import command
+{
+    "ROM",
+    "MOD",
+    "ilprinter",
+    "printer",
+};
+
+// copmare the current open file with the one in FLASH at offset offs
+// the file is already open, and the file in FLASH is found at offs
+// returns the following values:
+// 0 - file is not in FLASH or file read error
+// 1 - file is in FLASH and the same
+// 2 - file is in FLASH but different and can be updated without erasing
+// 3 - file is in FLASH but different and requires erasing before updating
+// 4 - file is in FLASH but with different size or type and cannot be updated
+
+#define COMPARE_NOT_FOUND 0
+#define COMPARE_SAME 1
+#define COMPARE_DIFFERENT 2
+#define COMPARE_DIFF_ERASE 3
+#define COMPARE_DIFF_SIZE 4
+
+int compare_openfile(FIL* fp, uint32_t offs)  
+{
+  uint8_t buf[0x1000];          // 4K buffer
+
+  uint filesize = f_size(fp);   // get the filesize
+
+  #ifdef DEBUG
+    cli_printf("  comparing open file size %d bytes with FLASH file at %08X", filesize, offs);
+  #endif
+
+  // no check is done of the type of file, this is done in the import function
+
+  // now map the header of the file in FLASH
+  ModuleMetaHeader_t *MetaH;          // pointer to meta header for getting info of next file
+  MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+  cli_printf("  filename                         type  size      address     next file");
+  cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+  cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+                MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+  
+  // verify size infomation
+  if (MetaH->FileSize != filesize) {
+    cli_printf("  file size in FLASH is %d, ndifferent from file on uSD card, cannot update", MetaH->FileSize);
+    return COMPARE_DIFF_SIZE;
+  }
+
+  // now read the file from the uSD card in chunks of 4K compare with the file in FLASH
+  uint32_t addr = FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t);
+  UINT read = 0;
+  uint32_t toread = filesize;
+  uint32_t readsize = 0x1000;
+  bool result = true;
+  FRESULT fr = f_lseek(fp, 0);    // set the file pointer to the beginning of the file
+
+  while ((toread > 0) && result) {
+    if (toread < readsize) readsize = toread;
+    fr = f_read(fp, buf, readsize, &read);
+    if (FR_OK != fr) {
+      cli_printf("  file read error: %s (%d)", FRESULT_str(fr), fr);
+      return COMPARE_NOT_FOUND;
+    }
+
+    // compare the buffer with the FLASH
+    result = (memcmp((void*)addr, buf, read) == 0);
+
+    toread -= read;
+    addr += read;
+  }
+
+  // now check the result of the comparison
+  // if the files conetnst are equal, return COMPARE_SAME
+  // if not, do another check to find out if the file in FLASH can be updated without first erasing
+  if (result) return COMPARE_SAME;
+
+  // when we get here, the files are different
+  // do another compare to see if the file in FLASH can be updated without erasing
+
+
+
+  // cli_printf("  file %s %s", fname, result ? "is the same" : "is different");
+
+  
+  return COMPARE_DIFFERENT;
+  
+}
+
+// compare a file with the one in FLASH
+// returns the following values:
+// 0 - file is not in FLASH or file read error
+// 1 - file is in FLASH and the same
+// 2 - file is in FLASH but different and can be updated without erasing
+// 3 - file is in FLASH but different and requires erasing before updating
+// 4 - file is in FLASH but with different size or type and cannot be updated
+
+
+int compare_file(const char *fname)
+{
+  uint8_t buf[0x1000];          // 4K buffer
+  char ffname[32];
+
+  FIL fil;
+  FRESULT fr = f_open(&fil, fname, FA_READ);
+  if (FR_OK != fr) {
+      cli_printf("  cannot open file: %s, %s (%d)", fname, FRESULT_str(fr), fr);
+      return COMPARE_NOT_FOUND;
+  }
+
+  // make a copy of fname in ffname
+  strcpy(ffname, fname);
+
+  // convert the filename to upper case
+  for (int i = 0; i < strlen(ffname); i++) {
+    ffname[i] = toupper(ffname[i]);
+  }
+
+  // get the file extension from the filename
+  char *ext = strrchr(ffname, '.');
+
+  // file is open now for reading, first get the file size
+  uint filesize = f_size(&fil);
+  cli_printf("  file %s opened, size %d bytes, type is %s", fname, filesize, ext);
+
+  // remove the directory indicator from the filename
+  char *p = strrchr(fname, '/');
+  if (p != NULL) {
+    fname = p + 1;
+  }
+
+  // determine file type from the extension
+  int type = 0;
+  if (strcmp(ext, ".MOD") == 0) type = 1;     // can be MOD1 or MOD2
+  if (strcmp(ext, ".ROM") == 0) type = 3;     // ROM file
+  if (strcmp(ext, ".UMM") == 0) type = 4;     // User Memory
+  if (strcmp(ext, ".EXT") == 0) type = 5;     // Extended Memory
+  if (strcmp(ext, ".EXP") == 0) type = 6;     // Expanded Memory
+  if (strcmp(ext, ".TRM") == 0) type = 7;     // ROM mapping
+  if (strcmp(ext, ".TGL") == 0) type = 8;     // Global settings
+  if (strcmp(ext, ".TTF") == 0) type = 9;     // Tracer settings
+
+  // check if the file type is supported
+  if (type == 0) {
+    cli_printf("  file type not supported");
+    f_close(&fil);
+    return COMPARE_NOT_FOUND;
+  }
+
+  // check if the file exists in FLASH
+  uint32_t offs = ff_findfile(fname); 
+  if (offs == NOTFOUND) {
+    cli_printf("  file not in FLASH");
+    f_close(&fil);
+    return COMPARE_NOT_FOUND;
+  }
+
+  cli_printf("  file in FLASH at 0x%08X", offs);
+
+  // now map the header of the file in FLASH
+  ModuleMetaHeader_t *MetaH;          // pointer to meta header for getting info of next file
+  MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+  cli_printf("  filename                         type  size      address     next file");
+  cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+  cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+                MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+  
+  // verify size infomation
+  if (MetaH->FileSize != filesize) {
+    cli_printf("  file size in FLASH is different, cannot update");
+    f_close(&fil);
+    return COMPARE_DIFF_SIZE;
+  }
+
+  // now read the file from FLASH and compare with the file on the uSD card
+  uint32_t addr = FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t);
+  UINT read = 0;
+  uint32_t toread = filesize;
+  uint32_t readsize = 0x1000;
+  bool result = true;
+
+  while ((toread > 0) && result) {
+    if (toread < readsize) readsize = toread;
+    fr = f_read(&fil, buf, readsize, &read);
+    if (FR_OK != fr) {
+      cli_printf("  file read error: %s (%d)", FRESULT_str(fr), fr);
+      f_close(&fil);
+      return COMPARE_NOT_FOUND;
+    }
+
+    // compare the buffer with the FLASH
+    result = (memcmp((void*)addr, buf, read) == 0);
+
+    toread -= read;
+    addr += read;
+  }
+
+  f_close(&fil);        // compare done, close file
+
+  cli_printf("  file %s %s", fname, result ? "is the same" : "is different");
+
+  if (result) return COMPARE_SAME;
+  return COMPARE_DIFFERENT;
+  
+}
+
+// import a file with a given filename
+// import a file and program in FLASH
+// k = 0      only filename, regular single file import
+// k = 2      UPDATE option
+// k = 3      COMPARE option
+/*  #define IMPORT_SINGLE 0
+    #define IMPORT_ALL 1
+    #define IMPORT_UPDATE 2
+    #define IMPORT_COMPARE 3
+    #define IMPORT_FRAM 4
+*/
+
+// import a single file and program in FLASH
+// also called by the import_all function
+void import_file(const char *fname, int option)
+{
+  uint8_t buf[0x1000];          // 4K buffer
+  char ffname[32];
+
+  // first sort out the file to be imported
+
+  FIL fil;
+  FRESULT fr = f_open(&fil, fname, FA_READ);
+  if (FR_OK != fr) {
+      cli_printf("  cannot open file: %s, %s (%d)", fname, FRESULT_str(fr), fr);
+      return;
+  }
+
+  // make a copy of fname in ffname
+  strcpy(ffname, fname);
+
+  // convert the filename to upper case
+  for (int i = 0; i < strlen(ffname); i++) {
+    ffname[i] = toupper(ffname[i]);
+  }
+
+  // get the file extension from the filename
+  char *ext = strrchr(ffname, '.');
+  
+  // file is open now for reading, first get the file size
+  uint filesize = f_size(&fil);
+  cli_printfn("  file %-31s opened, size %8d bytes, type is %-20s  ", fname, filesize, ext);
+
+  // remove the directory indicator from the filename
+  char *p = strrchr(fname, '/');
+  if (p != NULL) {
+    fname = p + 1;
+  }
+
+  // determine file type from the extension
+  int type = 0;  
+  if (strcmp(ext, ".MOD") == 0) type = 1;     // can be MOD1 or MOD2
+  if (strcmp(ext, ".ROM") == 0) type = 3;     // ROM file
+  if (strcmp(ext, ".UMM") == 0) type = 4;     // User Memory
+  if (strcmp(ext, ".EXT") == 0) type = 5;     // Extended Memory
+  if (strcmp(ext, ".EXP") == 0) type = 6;     // Expanded Memory
+  if (strcmp(ext, ".TRM") == 0) type = 7;     // ROM mapping
+  if (strcmp(ext, ".TGL") == 0) type = 8;     // Global settings  
+  if (strcmp(ext, ".TTF") == 0) type = 9;     // Tracer settings
+
+  // check if the file type is supported  
+  if (type == 0) {
+    cli_printf("  file type not supported"); 
+    f_close(&fil);
+    return;
+  }
+
+  // the file is now sorted out
+  // check if the file already exists in FLASH
+  // if it exists maybe the UPDATE option is used
+  uint32_t offs = ff_findfile(fname);
+  if (offs != NOTFOUND) {
+    cli_printf("  file already in FLASH at 0x%08X", offs);
+    // check for the UPDATE option
+    if (option == IMPORT_UPDATE) {
+      // check if the file is the same
+      int result = compare_openfile(&fil, offs);
+      if (result == COMPARE_SAME) {
+        cli_printf("  file is the same, no update needed");
+        f_close(&fil);
+        return;
+      }
+      if (result == COMPARE_NOT_FOUND) {
+        cli_printf("  file not found in FLASH");
+        f_close(&fil);
+        return;
+      }
+      if (result == COMPARE_DIFF_SIZE) {
+        cli_printf("  file size in FLASH is different, cannot update");
+        f_close(&fil);
+        return;
+      }
+      if (result == COMPARE_DIFF_ERASE) {
+        cli_printf("  file in FLASH is different, requires erasing before updating");
+        f_close(&fil);
+        return;
+      }
+    } else {
+      cli_printf("  file already in FLASH, cannot import again");     
+    }
+
+    f_close(&fil);
+    return;
+  }
+
+  // now check where we can put the file
+  // find the end of the file chain
+  offs = ff_lastfree(0);
+  if (offs == NOTFOUND ) {
+    cli_printf("  no free space in FLASH");
+    f_close(&fil);
+    return;
+  }
+
+  #ifdef DEBUG
+  cli_printf("  last free space in FLASH at 0x%08X", offs);
+  cli_printf("  now checking for any holes that are large enough for the file");
+  #endif
+
+  offs = ff_findfree(0, filesize); // find the next free space in FLASH
+
+  // if offs is NOTFOUND, then there is no free space in FLASH
+  #ifdef DEBUG
+    cli_printf("  found free space in FLASH at 0x%08X", offs);
+  #endif
+
+
+  if (offs == NOTFOUND) {
+    cli_printf("  no free space in FLASH for this file");
+    f_close(&fil);
+    return;
+  }
+
+
+  if ((FF_SYSTEM_SIZE - offs) < (filesize + 256)) {
+    cli_printf("  not enough space in FLASH for this file");
+    f_close(&fil);
+    return;
+  }
+
+  // offs now contains the address where to start programming
+  // first construct the header
+  ModuleMetaHeader_t header;
+  header.FileType = type;
+  strcpy(header.FileName, fname);
+  header.FileSize = filesize;
+
+  //next file points to the next available file in the filesystem
+  // unless we are at the end of the filesystem
+  // first check the header of the current (*deleted?) file at offs
+  ModuleMetaHeader_t *MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);    // map header to struct
+  uint32_t nextoffs = MetaH->NextFile;  // get the next file offset from the header
+  if (MetaH->FileType == FILETYPE_END) {
+    // this is the end of the filesystem, header can be set to the file size
+    header.NextFile = offs + ((filesize + sizeof(header) + 255) & ~255);
+  } else {
+    // this is not the end of the filesystem, so we can set the next file offset
+    // to the next available file in the filesystem
+    header.NextFile = nextoffs;
+  }
+
+  // check if flash can be programmed at all with ff_erased 
+  uint32_t addr = ff_erased(offs, filesize + sizeof(header), 1);
+  if (addr != NOTFOUND) {
+    cli_printf("  FLASH not erased at 0x%08X", addr);
+    // now erase the FLASH at the offset offs until the next entry in the filesystem
+    // so we need to find the next entry first
+    cli_printf("  erasing FLASH at 0x%08X until 0x%08X", offs, header.NextFile);
+    // disable all interrupts, flash and restore interrupts
+
+    ff_erase(offs, header.NextFile);
+
+  }
+  
+  // show the programming details in the CLI
+  cli_printf("  flashing %-31s, type %04X, size %8d bytes at 0x%08X", header.FileName, header.FileType, header.FileSize, offs);
+
+  // ensure that any unused buffer is all 0xFF
+  memset(buf, 0xFF, 0x1000);
+
+  // copy to header to the buffer
+  memcpy(buf, &header, sizeof(header));
+
+  // and add the first part of the file
+  UINT read;
+
+  // create a pointer inside our buffer to the start of the file data
+  uint8_t* pp = buf + sizeof(header);
+  fr = f_read(&fil, pp, 0x1000 - sizeof(header), &read);
+  if (FR_OK != fr) {
+      cli_printf("  file read error: %s (%d)", FRESULT_str(fr), fr);
+      f_close(&fil);
+      return;
+  }  
+  
+
+  // ensure that a multiple of 256 bytes is programmed including the header
+  // normally this is always 4K, but for small files it can be less
+  int bytestoprogram = read + sizeof(header);
+  bytestoprogram = (bytestoprogram + 0xFF) & ~0xFF;
+
+
+  // disable all interrupts, flash and restore interrupts
+  uint32_t ints = save_and_disable_interrupts();
+  flash_range_program(FF_OFFSET + offs, buf, bytestoprogram);
+  restore_interrupts (ints);
+
+  // program the remaining part of the file
+  int left = filesize - read;                 // bytes left to read from the file
+  while (left > 0) {
+    memset(buf, 0xFF, 0x1000);                // ensure that any unused buffer is all 0xFF
+    fr = f_read(&fil, buf, 0x1000, &read);    // read up tp 4K bytes from the open file
+    offs = offs + bytestoprogram;             // increase the offset from the previous flashing
+
+    if (read != 0) {
+    // work out number of bytes to program and ensure that a multiple of 256 bytes is programmed
+      bytestoprogram = read;
+      bytestoprogram = (bytestoprogram + 0xFF) & ~0xFF;
+
+      // and flash the data
+      ints = save_and_disable_interrupts();
+      flash_range_program(FF_OFFSET + offs, buf, bytestoprogram);
+      restore_interrupts (ints);
+      left -= read;
+    } else {
+      break;
+    }
+  }
+
+  // close the file
+  f_close(&fil);
+}
+
+// import all files in the directory
+// i = 0  import all files in the directory
+// i = 2  import all files in the directory and update existing files
+// i = 3  check all files in the directory and compare with existing files, no import is done
+void uif_import_all(const char *dir, int i)
+{
+
+    if (!ff_isinited()) {
+    cli_printf("  FLASH File system not initialized, please run INIT first");
+    cli_printf("  Total space in FLASH appr %d Kbytes free", FF_SYSTEM_SIZE/1024);
+    
+    return;
+  }
+  // first open the directory
+    char cwdbuf[FF_LFN_BUF] = {0};
+    FRESULT fr; /* Return value */
+    char const *p_dir;
+    if (dir[0]) {
+        p_dir = dir;
+    } else {
+        fr = f_getcwd(cwdbuf, sizeof cwdbuf);
+        if (FR_OK != fr) {
+            cli_printf("  cannot open directory: %s (%d)", FRESULT_str(fr), fr);
+            return;
+        }
+        p_dir = cwdbuf;
+    }
+
+    cli_printf("  Import directory in FLASH: %s", p_dir);
+    DIR dj = {};      /* Directory object */
+    FILINFO fno = {}; /* File information */
+    assert(p_dir);
+    fr = f_findfirst(&dj, &fno, p_dir, "*");
+    if (FR_OK != fr) {
+        cli_printf("  cannot find first file: %s (%d)", FRESULT_str(fr), fr);
+        return;
+    }
+    while (fr == FR_OK && fno.fname[0]) { /* Repeat while an item is found */
+        tud_task();  // must keep the USB port updated
+
+        // create string with full path and filename
+        char fname[80];
+        strcpy(fname, p_dir);
+        strcat(fname, "/");
+        strcat(fname, fno.fname);
+
+        // filename is fno.fname	
+        // first check if this is a real file or a directory
+        // if the file is a directory then skip it
+        if (fno.fattrib & AM_DIR) {
+          cli_printf("  skipping subdirectory %s", fno.fname);
+        } else {
+          // no directory, import the file
+          import_file(fname, 0);
+        }
+        fr = f_findnext(&dj, &fno); /* Search for next item */
+    }
+
+    // all done, close directory and finish
+    f_closedir(&dj);
+}
+
+// import a file and program in FLASH
+// a1 and a2 are passed with the following values:
+// a2/a3 = 0      only filename, regular single file import
+// a2/a3 = 1      ALL option
+// a2/a3 = 2      UPDATE option
+// a2/a3 = 3      COMPARE option
+// a2/a3 = 4      FRAM option (not yet supported)
+void uif_import(const char *fname, int a2, int a3)       
+{
+  if (!uif_pwo_low()) {
+    cli_printf("  function only permitted when HP41 is OFF or STANDBY");  
+    return;    // only do this when calc is not running
+  }
+
+  int i = 0;
+
+  if ((a2 == 1) || (a3 == 1)) {
+    // import all files in the directory
+    if (a2 == 1) {
+      i = a3;
+    } else {
+      i = a2;
+    } 
+    uif_import_all(fname, i);
+    return; 
+  }
+
+
+
+  // we get here for a single file import
+      // a1 and a2 are passed with the following values:
+    // a2/a3 = 0      only filename, regular single file import
+    // a2/a3 = 1      ALL option
+    // a2/a3 = 2      UPDATE option
+    // a2/a3 = 3      COMPARE option
+    // a2/a3 = 4      FRAM option (not yet supported)
+
+  if ((a2 == 4) || a3 == 4) {
+    cli_printf("  FRAM option not yet supported");
+    return;   
+  }
+
+  if ((a2 == 2) || (a3 == 2)) {
+    // UPDATE option
+    i = 2;
+  } else if ((a2 == 3) || (a3 == 3)) {
+    // COMPARE option
+    i = 3;
+  } else {
+    // regular single file import
+    i = 0;
+  }
+
+  import_file(fname, i);   // does all the work for a single file
+}
+
+
+void ShowROMDetails(uint16_t *ROMoffset)
+{
+  // given an offset in FLASH to the ROM contents, show the details of the ROM file
+  uint16_t *myROMImage;               // buffer pointer for the ROM image
+
+  myROMImage = ROMoffset;
+
+  int NumFunctions = swap16(myROMImage[1]);
+  cli_printf("    XROM      %3d", swap16(myROMImage[0]));
+  cli_printf("    # Funcs   %3d", NumFunctions);
+
+  // get a pointer to the ROM name (first function)
+  uint16_t ROMName_offs = ((swap16(myROMImage[3]) & 0xFF)) + ((swap16(myROMImage[2]) & 0xFF) * 256);
+  if (swap16(myROMImage[2]) > 0xFF) 
+  {
+    // usercode ROM, do not decode, just mention it
+    cli_printf("    ROMName    <USERCODE>");
+  }
+  else if ((ROMName_offs > 0x0FFF) && (NumFunctions !=0)){
+    // ROM name in other ROM, do not decode, just mention it
+    cli_printf("    ROMName    <in other Page>");
+  }
+  else if (NumFunctions == 0) {
+    // No functions thus no ROM name
+    cli_printf("    ROMName    <none> (no functions)");
+  }
+  else
+  {
+    char c = swap16(myROMImage[ROMName_offs - 1]);
+    int i = 0;
+    while ( ((c & 0xFF) < 0x40) && (i < 16)) {
+      // only allowed chars
+      ROMname[i] = HPchar[c & 0x3F];
+      i++;
+      c = swap16(myROMImage[ROMName_offs - 1 - i]);
+    }
+    // and add the last character of the ROM name plus a NULL
+    ROMname[i] = HPchar[c & 0x3F];
+    ROMname[i + 1] = 0;
+    cli_printf("    ROMName    \"%s\" - first function entry at 0x%04X", ROMname, ROMName_offs);
+  }
+
+  // now the ROM Revision and checksum
+  cli_printf("    Rev        %c%c-%c%c", HPchar[swap16(myROMImage[0xFFE]) & 0x3F], 
+                                         HPchar[swap16(myROMImage[0xFFD]) & 0x3F], 
+                                         HPchar[swap16(myROMImage[0xFFC]) & 0x3F], 
+                                         HPchar[swap16(myROMImage[0xFFB]) & 0x3F]);
+  cli_printf("    Checksum   0x%03X", swap16(myROMImage[4095]));      
+
+}
+
+void unpack_image(
+  word *ROM,
+  const byte *BIN)
+  {
+  int i;
+  word *ptr=ROM;
+  if ((ROM==NULL)||(BIN==NULL))
+    return;
+  for (i=0;i<5120;i+=5)
+    {
+    *ptr++=((BIN[i+1]&0x03)<<8) | BIN[i];
+    *ptr++=((BIN[i+2]&0x0F)<<6) | ((BIN[i+1]&0xFC)>>2);
+    *ptr++=((BIN[i+3]&0x3F)<<4) | ((BIN[i+2]&0xF0)>>4);
+    *ptr++=(BIN[i+4]<<2) | ((BIN[i+3]&0xC0)>>6);
+    }
+  }
+
+
+/*
+  The format of a packed ROM file (.BIN format) is as follows:
+  BIN - This format is used by Emu41 (J-F Garnier) and HP41EPC (HrastProgrammer).
+      Note: HP41EPC uses BIN format but names them .ROM files.
+      All bits are packed into 5120 bytes, 4 machine words are packed into 5 bytes:
+        Byte0=Word0[7-0]
+        Byte1=Word1[5-0]<<2 | Word0[9-8]
+        Byte2=Word2[3-0]<<4 | Word1[9-6]
+        Byte3=Word3[1-0]<<6 | Word2[9-4]
+        Byte4=Word3[9-2]
+*/
+
+inline uint16_t getfrombin(void* binarray, uint16_t address) {
+  uint8_t *bin = (uint8_t*)binarray;
+  uint16_t res1, res2, result;
+  uint16_t offset = (address * 5) / 4;            // offset in the packed ROM file of the first byte
+  int shift1 = (address & 0x0003) * 2;
+  int shift2 = 8 - shift1;
+  uint16_t mask1 = 0xFF << shift1;
+  uint16_t mask2 = 0xFF >> (shift2 -2);
+  res1 = (bin[offset] & mask1) >> shift1;    // get the first part of the word
+  res2 = (bin[offset + 1] & mask2);
+  res2 = res2 << shift2; // get the second part of the word
+
+  result = res1 + res2;
+  return result;
+
+
+}
+
+
+void ShowMODDetails(ModuleFileHeader_t *MODoffset)
+{
+  // given an offset in FLASH to the ROM contents, show the details of the ROM file
+  ModuleFileHeader_t *myMODImage;               // buffer pointer to the MOD file in FLASH
+  ModuleHeader_t *myPageHeader;                 // pointer to the individual pages header
+  V1_t *myV1;                                   // pointer to the module contents in BIN format (5120 bytes)
+                                                // compressed ROM format
+
+  myMODImage = MODoffset;
+  int ModNumPages = myMODImage->NumPages;
+  cli_printf("    MOD Format %s", myMODImage->FileFormat);
+  cli_printf("    MOD Title  %s", myMODImage->Title);
+  cli_printf("    MOD Pages  %d", myMODImage->NumPages);
+
+  int i = 0;
+  while (i < ModNumPages) {
+    // show details of the individual pages
+    myPageHeader = (ModuleHeader_t*)((uint32_t)MODoffset + sizeof(ModuleFileHeader_t)
+                                                         + i * sizeof(ModuleHeader_t)
+                                                         + i * sizeof(V1_t));
+    cli_printf("   *Page %2d    %s", i, myPageHeader->Name);
+    myV1 = (V1_t*)((uint32_t)myPageHeader + sizeof(ModuleHeader_t));
+
+    int NumFunctions = getfrombin(myV1, 1);
+    
+    cli_printf("    XROM      %3d", getfrombin(myV1, 0));
+    cli_printf("    # Funcs   %3d", NumFunctions);
+
+    // get a pointer to the ROM name (first function)
+    uint16_t ROMName_offs = ((getfrombin(myV1, 3) & 0xFF)) + ((getfrombin(myV1, 2) & 0xFF) * 256);
+    if (getfrombin(myV1, 2) > 0xFF) 
+    {
+      // usercode ROM, do not decode, just mention it
+      cli_printf("    ROMName    <USERCODE>");
+    }
+    else if ((ROMName_offs > 0x0FFF) && (NumFunctions != 0)){
+      // ROM name in other ROM, do not decode, just mention it
+      cli_printf("    ROMName    <in other Page>");
+    }
+    else if (NumFunctions == 0) {
+      // no functions in this ROM
+      cli_printf("    ROMName    <none> (no functions)");
+    } else
+    {
+      char c = getfrombin(myV1, ROMName_offs - 1);
+      int i = 0;
+      while ( ((c & 0xFF) < 0x40) && (i < 16)) {
+        // only allowed chars
+        ROMname[i] = HPchar[c & 0x3F];
+        i++;
+        c = getfrombin(myV1, ROMName_offs - 1 - i);
+      }
+      // and add the last character of the ROM name plus a NULL
+      ROMname[i] = HPchar[c & 0x3F];
+      ROMname[i + 1] = 0;
+      cli_printf("    ROMName    \"%s\" - first function entry at 0x%04x", ROMname, ROMName_offs);
+    }
+    // now the ROM Revision and checksum
+    cli_printf("    Rev        %c%c-%c%c", HPchar[getfrombin(myV1, 0xFFE) & 0x3F], 
+                                           HPchar[getfrombin(myV1, 0xFFD) & 0x3F], 
+                                           HPchar[getfrombin(myV1, 0xFFC) & 0x3F], 
+                                           HPchar[getfrombin(myV1, 0xFFB) & 0x3F]);
+    cli_printf("    Checksum   0x%03X", getfrombin(myV1, 0xFFF));  
+    i++;
+
+
+  }
+
+}
+
+
+void ShowMODDump(ModuleFileHeader_t *MODoffset)
+{
+  // given an offset in FLASH to the ROM contents, dumps the first page of the MOD file
+  ModuleFileHeader_t *myMODImage;               // buffer pointer to the MOD file in FLASH
+  ModuleHeader_t *myPageHeader;                 // pointer to the individual pages header
+  V1_t *myV1;                                   // pointer to the module contents in BIN format (5120 bytes)
+                                                // compressed ROM format
+  char  ShowPrint[250];
+  int   ShowPrintLen = 0;
+  uint16_t addr = 0;                        // address counter
+  uint16_t endaddr = addr + 0x1000;         // end of the dump
+  int i = 0;                                // counter for the number of bytes in a line
+  char c;
+  uint16_t romword;
+  int m;
+
+  myMODImage = MODoffset;
+  int ModNumPages = myMODImage->NumPages;
+  cli_printf("    MOD Format %s", myMODImage->FileFormat);
+  cli_printf("    MOD Title  %s", myMODImage->Title);
+  cli_printf("    MOD Pages  %d", myMODImage->NumPages);
+
+  ModNumPages = 1; // only show the first page
+  while (i < ModNumPages) {
+    // show details of the individual pages
+    myPageHeader = (ModuleHeader_t*)((uint32_t)MODoffset + sizeof(ModuleFileHeader_t)
+                                                         + i * sizeof(ModuleHeader_t)
+                                                         + i * sizeof(V1_t));
+    // cli_printf("   *Page %2d    %s", i, myPageHeader->Name);
+    myV1 = (V1_t*)((uint32_t)myPageHeader + sizeof(ModuleHeader_t));
+
+    // now generate the hex dump
+    cli_printf("  dump of ROM contents");
+    cli_printf("  address  00   01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F        ASCII");
+    cli_printf("  ----    ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----  ----------------");
+
+    do {
+      tud_task();  // keep the USB port updated
+      ShowPrintLen = 0;
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  %04X    ", addr);       // print the address
+
+      // print 16 bytes
+      for (m = 0; m < 16; m++) {
+        romword = getfrombin(myV1, addr);
+        ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%04X ", romword);
+        addr++;
+      }
+      addr = addr - 16;
+      // print byte values as characters
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  ");
+      for (m = 0; m < 16; m++) {
+        c = getfrombin(myV1, addr) & 0xFF;
+        if ((c < 0x20) || (c > 0x7E)) {
+          c = '.';
+        }
+        ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%c", c);
+        addr++;
+      } 
+      cli_printf("%s", ShowPrint);
+        
+    } while (addr < endaddr);   // list 4K bytes by default
+    i++;
+  }
+
+}
+
+void uif_rtc(int i, const char *args)    // RTC test functions
+{
+
+  // #define rtc_status      1
+  // #define rtc_set         2
+  // #define rtc_get         3    
+  // #define rtc_reset       4
+  // #define rtc_dump        5
+  // #define display_test    6
+
+  switch (i) {
+    uint8_t buf[20];          // buffer for RTC data
+    case 1:     // RTC status
+      i2c_scan();
+      return;
+    case 2:     // RTC set, time string in args
+      // args = "YYMMDDhhmmss" 
+      // YY = year, MM = month, DD = day, hh = hour, mm = minute, ss = second
+      // example: 230101120000 = 1 Jan 2023, 12:00:00
+      // set RTC to this time
+      if (strlen(args) != 12) {
+        cli_printf("RTC set function requires 12 digits in YYMMDDhhmmss format");
+        return;
+      }
+
+      buf[0] = 3;                                        // we start with register 3
+      // convert the string in values for the RTC registers in BCD coded decimal
+      buf[7] = ((args[0] - '0') << 4) + (args[1] - '0');   // year
+      buf[6] = ((args[2] - '0') << 4) + (args[3] - '0');   // month
+      buf[4] = ((args[4] - '0') <<4 ) + (args[5] - '0');   // day
+      buf[5] = 0;                                        // day of week, not used
+      buf[3] = ((args[6] - '0') << 4) + (args[7] - '0');   // hour
+      buf[2] = ((args[8] - '0') << 4) + (args[9] - '0');   // minute
+      buf[1] = ((args[10] - '0') << 4) + (args[11] - '0'); // second
+
+      i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 8, false);
+
+      cli_printf(" RTC set");
+      //'no break here, to read the time back
+      // fall through to case 3
+    case 3:     // RTC get
+      pcf8520_read_all(buf);
+      cli_printf("  Date: %02x/%02x/%02x [YY/MM/DD]", buf[9], buf[8], buf[6]);
+      cli_printf("  Time: %02x:%02x:%02x [HH:MM:SS]", buf[5], buf[4], buf[3] & 0x7F);
+
+      // report power management status, should be 0b0010.0000
+      cli_printf(" Reg[2] %02X ", buf[2]);
+
+      if ((buf[2] & 0x04) == 0x00) {
+        //BLF bit in control register 3 is 0, battery 
+        cli_printf("  Battery OK, >2.5V");
+      } else {
+        cli_printf("  Battery LOW, <2.5V");
+      }
+
+      // report clock valid status
+      if ((buf[3] & 0x80) == 0x00) {
+        // bit 7 in the seconds register is 0, so clock is valid
+        cli_printf("  Oscillator OK, RTC status is valid");
+      } else {
+        cli_printf("  Oscillator has been interrupted, RTC clock may not be valid");
+      }
+      return;
+    case rtc_reset:     // RTC reset
+      pcf8520_reset();
+      return;
+    case 5:     // RTC dump
+      pcf8520_read_all(buf);
+      
+      for (int i = 0; i < 20; i++) {
+        cli_printf("  Reg %02d - %02X ", i, buf[i]);
+      }
+
+      cli_printf("  Date: %02x/%02x/%02x [YY/MM/DD]", buf[9], buf[8], buf[6]);
+      cli_printf("  Time: %02x:%02x:%02x [HH:MM:SS]", buf[5], buf[4], buf[3] & 0x7F);
+      
+      return;
+    case 6:     // display test
+      cli_printf("  Display test not implemented yet");
+      // ssd1306_test();
+      return;
+    default:
+      break;
+  }
+
+
+}
+
+
+// list the pluggable ROM and MOD files in FLASH and FRAM
+void uif_list(int i, const char *fname)
+{
+  // list the pluggable ROMs in FLASH and FRAM
+  // format
+  // [name] [type] [size] [location]
+  // 1  all             // list all files, including erased and dummy files
+  // 2  ext             // extended listing with more details per file
+  // 3  flash           // list all files in FLASH
+  // 4  fram            // list all files in FRAM (ignored for now)
+  // -1 no valid argument, assume only filename given
+
+  // first list the ROMs in FLASH (no FRAM support for now)
+  uint32_t offs = 0;
+  uint32_t end = FF_SYSTEM_SIZE;
+  ModuleMetaHeader_t *MetaH;          // pointer to meta header for getting info of next file
+  ModuleFileHeader_t *ModH;           // pointer to MOD header for getting MOD details
+  ModuleHeader_t *myPageHeader;       // pointer to the individual pages header
+  uint32_t ROMoffset;                 // offset to the ROM image in FLASH
+  uint16_t *myROMImage;               // buffer pointer for the ROM image
+  V1_t *myV1;                         // pointer to the module contents in BIN format (5120 bytes)
+  ModuleFileHeader_t *MODoffset;
+  int filecounter = 0;                // counter for the number of files found in the directory
+  
+  if (!ff_isinited()) {
+    cli_printf("  FLASH File system not initialized, please run INIT first");
+    cli_printf("  Total space in FLASH appr %d Kbytes free", FF_SYSTEM_SIZE/1024);
+    
+    return;
+  }
+
+  // locate the file with the name fname
+  if (fname != NULL) {
+    // a filename is given so we only show the details of this file
+    offs = ff_findfile(fname);
+    if (offs == NOTFOUND) {
+      cli_printf("  file \"%s\" not found", fname);
+      return;
+    }
+    // show the file details here
+    MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+    cli_printf("  filename                         type      size  address     next file");
+    cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+    cli_printfn("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+              MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+    if (MetaH->FileType == FILETYPE_DELETED) {
+      // deleted file
+      cli_printf("  ** DELETED FILE **");
+      return;
+    } else if (MetaH->FileType == FILETYPE_DUMMY) {
+      // dummy file
+      cli_printf("  ** DUMMY FILE **");
+      return;
+    }
+
+    cli_printf(" ");
+    // and prepare to print more details from the MOD/ROM content below
+    if (MetaH->FileType == FILETYPE_ROM) {
+      // ROM file, show details
+      ShowROMDetails((uint16_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t)));
+     return;
+    } else if (MetaH->FileType == FILETYPE_MOD1 || MetaH->FileType == FILETYPE_MOD2) {
+      // show MOD file details
+      ShowMODDetails((ModuleFileHeader_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t)));
+
+      ShowMODDump((ModuleFileHeader_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t)));
+      return;
+    } else {
+      cli_printf("  file type not supported");
+      return;
+    }
+  }
+
+  // no filename given, so we list all files
+  // with i = 1 - all we list all files, including deleted and dummy files
+  //      i = 2 - ext we list all files with more details
+  //      i = 3 - flash we list all files in FLASH only
+  //      i = 4 - fram we list all files in FRAM (not yet supported)
+
+  char line[80];
+
+  // layout for listing
+  //  filename                        type   size    address     next
+  // "...............................  ..  ........  ........  ........"
+  cli_printf("  filename                         type      size  address     next file");
+  cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+
+  while (offs < end) {
+    tud_task();  // must keep the USB port updated
+
+    MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+    if (MetaH->FileType == FILETYPE_FFFF) {
+      // end of chain reached
+      uint32_t free = end - offs;
+      cli_printf("  ** Total files found:                            %d", filecounter);
+      cli_printf("  ** END OF FILE SYSTEM **                         0x%08X", offs);
+      cli_printf("  ** UNUSED SPACE UNTIL **                         0x%08X - appr %d Kbytes free", end, free/1024);
+      return;
+    }
+
+    // build the string for showing the listing
+    sprintf(line, "  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+              MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+    cli_printfn(line);
+    filecounter++;  // count the number of files found
+    if (MetaH->FileType == FILETYPE_DELETED) {
+      // deleted file
+      cli_printfn("  ** DELETED FILE **");
+      filecounter--;  // count the number of files found
+    } else if (MetaH->FileType == FILETYPE_DUMMY) {
+      // dummy file
+      cli_printfn("  ** DUMMY FILE **");
+      filecounter--;  // count the number of files found
+    }
+    cli_printf(" ");
+    if (i == 2) {
+      // extended listing, show more details
+      // show more details for the MOD/ROM content
+      // first check if the file is a ROM or MOD file
+      if ((MetaH->FileType == FILETYPE_MOD1) || (MetaH->FileType == FILETYPE_MOD2)) {
+        // MOD file, show the MOD header
+        ModH = (ModuleFileHeader_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t));
+        cli_printf("    MOD Format %s", ModH->FileFormat);
+        cli_printf("    MOD Title  %s", ModH->Title);
+        cli_printf("    MOD Pages  %d", ModH->NumPages);
+
+        // also add details of the ROM contents later
+      } else if (MetaH->FileType == FILETYPE_ROM) {
+        // ROM file, show the ROM header
+        ShowROMDetails((uint16_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t)));
+      } 
+        // allother filetypes, just show the info
+        // to be added later
+    }
+
+    offs = MetaH->NextFile;                                     // go to the next file
+  }    
+}
+
+
+/*    passed from the CLI:
+        #define plug_hpil       1
+        #define plug_ilprinter  2
+        #define plug_printer    3
+        #define plug_module     4
+        #define plug_file       5
+*/
+
+// plug and enable the selected ROM
+void uif_plug(int func, int Page, int Bank, const char *fname)          // plug the selected ROM 
+{
+  char *ffname;
+  uint16_t *myROMImage;               // buffer pointer for the ROM image
+  uint32_t ROMImage_offs;
+  uint32_t ROMName_offs;
+  int NumFunctions;
+  uint32_t offs;
+  int i;
+  ModuleMetaHeader_t *MetaH;
+  uint16_t rom_flags;
+  char *ext;
+  uint16_t *ptr_image;
+
+  char  ShowPrint[250];
+  int   ShowPrintLen = 0;
+  char c;
+
+  if (!uif_pwo_low()) return;    // only do this when calc is not running
+  switch (func)
+  {
+
+    case plug_hpil: 
+            // plug the Embedded HPIL ROM in Page 6
+            // get a pointer to the ROM image in FLASH
+            // const uint16_t  __in_flash()embed_HPIL_rom[]
+            rom_flags = BANK_ACTIVE | BANK_FLASH | BANK_ROM | BANK_ENABLED | BANK_EMBEDDED; // prepare the flags for the ROM
+
+            cli_printf("  plugging Embedded HPIL ROM in Page 7");        
+            TULIP_Pages.plug_embedded(7, 1, rom_flags, embed_HPIL_rom); // plug the ROM in the given page
+            TULIP_Pages.save(); // save the page settings in FRAM
+            globsetting.set(HP82160A_enabled, 1); // enable the HP82160A ROM in the settings
+            Page = 7; // set the page to 7, as this is the page we plugged the ROM in
+            break;
+
+    case plug_ilprinter:
+            // plug the Embedded HPIL Printer ROM in Page 6
+            // get a pointer to the ROM image in FLASH
+            // const uint16_t  __in_flash()embed_HPILPRINTER_rom[]
+            rom_flags = PAGE_ACTIVE | PAGE_FLASH | PAGE_ROM | PAGE_ENABLED | PAGE_EMBEDDED; // prepare the flags for the ROM
+
+            cli_printf("  plugging Embedded IL Printer ROM in Page 6");      
+            TULIP_Pages.plug_embedded(6, 1, rom_flags, embed_ILPRINTER_rom); // plug the ROM in the given page      
+            TULIP_Pages.save(); // save the page settings in FRAM
+            globsetting.set(HP82143A_enabled, 0); // disable the HP82143A ROM in the settings, in case it was plugged
+            Page = 6; // set the page to 6, as this is the page we plugged the ROM in
+            break;
+
+    case plug_printer:
+            // plug the Embedded Printer ROM in Page 6
+            // get a pointer to the ROM image in FLASH
+            // const uint16_t  __in_flash()embed_printer_rom[]
+            rom_flags = PAGE_ACTIVE | PAGE_FLASH | PAGE_ROM | PAGE_ENABLED | PAGE_EMBEDDED; // prepare the flags for the ROM
+
+            cli_printf("  plugging Embedded Printer ROM in Page 6");   
+            TULIP_Pages.plug_embedded(6, 1, rom_flags, embed_PRINTER_rom); // plug the ROM in the given page         
+            TULIP_Pages.save(); // save the page settings in FRAM
+            globsetting.set(HP82143A_enabled, 1);
+            Page = 6;
+            break;
+
+    case plug_file: // plug the give filename in the given Page
+            // check if the file exists in flash
+            offs = ff_findfile(fname);
+            if (offs == NOTFOUND) {
+              cli_printf("  file \"%s\" not found", fname);
+              return;
+            }
+
+            cli_printf("  plugging file %s in Page %d", fname, Page);
+            // file exists and has the correct extension
+            // check if the file is a MOD or ROM file
+
+        
+            MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+            cli_printf("  filename                         type      size  address     next file");
+            cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+            cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+                      MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+
+
+            if (MetaH->FileType == FILETYPE_ROM) {
+              // ROM file, show details
+              // get a pointer to the start of the ROM
+              // and prepare to print more details from the MOD/ROM content below
+              myROMImage = (uint16_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t));
+              ShowROMDetails(myROMImage);
+
+              ROMImage_offs = (uint32_t)myROMImage - (uint32_t)FF_SYSTEM_BASE; // get the offset to the ROM image in FLASH
+
+              // get the offset to the ROM image in FLASH
+              cli_printf("    ROM Image offset 0x%08X, at address 0x%08X", ROMImage_offs, myROMImage);
+
+              // now prepare the flags and do the actual plugging
+              /* enum {
+                PAGE_ACTIVE    = 0x01,       // page is active (has a valid content)
+                PAGE_FLASH     = 0x02,       // page is in FLASH or FRAM
+                PAGE_ROM       = 0x04,       // page is ROM or not
+                PAGE_MOD       = 0x08,       // page is MOD1 or MOD2
+                PAGE_ENABLED   = 0x10,       // page is enabled for reading
+                PAGE_DIRTY     = 0x20,       // page is dirty
+                PAGE_WRITEABLE = 0x40,       // page is write enabled
+                PAGE_SPARE1    = 0x80,       // for future use
+              */ 
+              rom_flags = BANK_ACTIVE | BANK_FLASH | BANK_ROM | BANK_ENABLED;
+              
+              TULIP_Pages.plug(Page, 1, rom_flags, offs); // plug the ROM in the given page
+              TULIP_Pages.save(); // save the page settings in FRAM
+
+            }
+
+            if (MetaH->FileType == FILETYPE_MOD1 || MetaH->FileType == FILETYPE_MOD2) {
+              cli_printf("  only ROM files currently supported");
+              return;
+            }
+            break;
+
+    default: 
+            // no other actions defined here
+            break;
+  }
+
+  // and update the settings in FRAM
+  // after plugging, read the first couple of words for checking the ROM contents
+
+  uint16_t addr = Page * 0x1000; // address of the page in FLASH
+  Bank = 1; // always bank 1 for now, as we only support one bank
+
+  #ifdef DEBUG
+  // read the first 16 words of the ROM image
+  if (TULIP_Pages.isPlugged(Page, Bank)) {
+    // page is plugged, so read the first 16 words
+    // print the address
+    ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%04X  ", addr);
+
+    // print 16 bytes
+    for (int m = 0; m < 16; m++) {
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%03X ", TULIP_Pages.getword(addr + m));
+    }
+    // print byte values as characters
+    ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  ");
+    cli_printf("%s", ShowPrint);
+  } else {
+    // page is not plugged, so show a message
+    cli_printf("  Page %d is not plugged", Page);
+  }
+  #endif
+  
+}
+
+// unplug and disable the selected Page
+void uif_unplug(int p)            // plug the selected ROM
+{
+  if (!uif_pwo_low()) return;     // only do this when calc is not running
+  TULIP_Pages.unplug(p, 1);       // unplug the page p, bank 1
+
+  // must disable emulation of the page
+  if (p == 6) {
+    // Printer Page
+    globsetting.set(HP82143A_enabled, 0); // disable the Printer ROM in the settings
+  } else if (p == 7) {
+    // HPIL Page
+    globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
+  }
+  
+  cli_printf("  unplugged Page %X", p);
+  TULIP_Pages.save();             // save the page settings in FRAM
+}
+
+
+
+// the CAT function shows the current ROM map
+// p=0 means show the current ROM map
+// P= 4..F means show ROM details for that page
+void uif_cat(int p)
+{
+  int flags = 0; // flags for the page settings
+  char rev[8]; // buffer for the revision string
+
+  char FileNm[32];
+
+  #ifdef DEBUG
+  TULIP_Pages.dumpAll(); // dump the current page settings to the console
+  #endif
+
+  if (p == 0) {
+
+    cli_printf("  Current ROM map:");
+    cli_printf("  Page - Bank - XROM -  Rev  - #Funcs -   Flags  - File  ");
+    cli_printf("  ----   ----   ----   -----   ------   --------   ---------------------");
+
+    for (int i = 0; i < 16; i++) {
+      // show the current page settings
+      // check if the page is reserved
+      if (TULIP_Pages.isReserved(i)) {
+        // page is reserved, so show a message and print the stored filename
+
+        TULIP_Pages.getFileName(i, 1, FileNm);           // get the file name of the reserved page
+        cli_printf("  %3d                                              - reserved : %s", i, FileNm);
+
+        continue; // skip the rest of the loop
+      } else {
+        // Page is not reserved, use the generic loop to get the information
+
+        // check if the page is plugged and has a valid ROM image
+        if (!TULIP_Pages.isPlugged(i, 1)) {        
+          TULIP_Pages.getFileName(i, 1, FileNm);           // get the file name
+          // this is an empty page, so show a message
+       // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs -  Flags   - File  ");
+       // cli_printf("  ----   ----   ----   -----   ------   --------   ---------------------");
+          cli_printf("  %3X                                              - available: %s", i, FileNm);
+
+        } else if (TULIP_Pages.isPlugged(i, 1) && !TULIP_Pages.isEmbeddedROM(i, 1)) {
+          // Normal plugged ROM, so show the details
+          TULIP_Pages.getRevision(i, 1, rev);
+       // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs -   Flags   - File  ");
+       // cli_printf("  ----   ----   ----   -----   ------   --------   ---------------------");
+          cli_printf("  %3X      1     %3d   %s       %2d      %04X    * %s  @ offs 0x%08X", i, TULIP_Pages.getXROM(i, 1), 
+                                                                                    rev, 
+                                                                                    TULIP_Pages.getFunctions(i, 1),
+                                                                                    TULIP_Pages.getflags(i, 1),
+                                                                                    TULIP_Pages.Pages[i].m_banks[1].b_img_name,
+                                                                                    TULIP_Pages.image_offs(i,1));
+        } else if (TULIP_Pages.isPlugged(i, 1) && TULIP_Pages.isEmbeddedROM(i, 1)) {
+          // Emmbedded ROM
+          int addr = i * 0x1000; // address of the page in FLASH
+          TULIP_Pages.getRevision(i, 1, rev);
+       // cli_printf("  ----   ----   ----   -----   ------   --------   ---------------------");
+          cli_printf("  %3X      1     %3d   %s       %2d      %04X    * %s  @ offs: 0x%08X ", i, TULIP_Pages.getword(addr + 0x00), 
+                                                                                    rev, 
+                                                                                    TULIP_Pages.getword(addr+1),
+                                                                                    TULIP_Pages.getflags(i, 1),
+                                                                                    TULIP_Pages.Pages[i].m_banks[1].b_img_name,
+                                                                                    TULIP_Pages.Pages[i].m_banks[1].b_img_data);
+        
+        } else {
+          // nothing plugged in this page
+          cli_printf("  %3X                                              - not plugged", i);
+        }
+      }
+    } // end of for loop
+  } else {
+    // P = 4..F means show ROM details for that page
+    if (! TULIP_Pages.isPlugged(p, 1)) {
+      // page is not plugged, so show a message
+      cli_printf("  Page %d is not plugged", p);
+      return; 
+    }
+
+    TULIP_Pages.dumpPage(p);  // dump the current page settings to the console
+    cli_printf("");
+
+    // and now create a hex dump of the entire Page
+    char  ShowPrint[250];
+    int   ShowPrintLen = 0;
+    uint16_t addr = p * 0x1000; // address of the page in FLASH
+    uint16_t endaddr = addr + 0x1000; // end of the dump
+    int i = 0;                                // counter for the number of bytes in a line
+    int m;
+    char c;
+    do {
+
+      ShowPrintLen = 0;
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  %04X    ", addr);       // print the address
+      // print 16 bytes
+      for (m = 0; m < 16; m++) {
+        ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%03X ", TULIP_Pages.getword(addr + m));
+      }
+    
+      // print byte values as characters
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  ");
+      for (m = 0; m < 16; m++) {
+        c = TULIP_Pages.getword(addr + m) & 0xFF;
+        if ((c < 0x20) || (c > 0x7E)) {
+          c = '.';
+        }
+        ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%c", c);
+      } 
+      addr += 16; // increment the address by 16 bytes
+      // print the line
+      cli_printf("%s", ShowPrint);
+
+    } while (addr < endaddr);   // list 4K bytes by default
+
+  }
+}
+
+
+// toggle the emulation of the selected function in the given page
+void uif_emulate(int i) {
+
+  if (!uif_pwo_low()) return;    // only do this when calc is not running{
+
+  switch (i)
+  {
+    case emulate_status:         // list hardware emulation status
+            cli_printf("  Emulation status:");
+            cli_printf("  - HP-IL             %s", globsetting.get(HP82160A_enabled) ? "enabled":"disabled");
+            cli_printf("  - HP82143A Printer  %s", globsetting.get(HP82143A_enabled) ? "enabled":"disabled");         
+            break;
+
+    case emulate_hpil: // toggle HP-IL emulation
+            if (globsetting.get(HP82160A_enabled) == 0) {
+              // HP-IL is not enabled, so enable it
+              globsetting.set(HP82160A_enabled, 1);
+              cli_printf("  HP-IL emulation enabled");
+            } else {
+              globsetting.set(HP82160A_enabled, 0);
+              cli_printf("  HP-IL emulation disabled");
+            }        
+            break;
+    case emulate_printer: // toggle HP82143 Printer emuation
+            if (globsetting.get(HP82143A_enabled) == 0) {
+              // HP-IL printer is not enabled, so enable it
+              globsetting.set(HP82143A_enabled, 1);
+              cli_printf("  HP82143 Printer emulation enabled");
+            } else {
+              globsetting.set(HP82143A_enabled, 0);
+              cli_printf("  HP82143 Printer emulation disabled");
+            }
+            break;  
+    default: 
+            // no other actions defined here
+            break;
+  }
+
+  globsetting.save(); // save the settings in FRAM
+
+}
+
+void uif_delete(const char *fname)
+{
+  // delete the file with the given name from FLASH
+  // check if the file exists in flash
+  uint32_t offs = ff_findfile(fname);
+  if (offs == NOTFOUND) {
+    cli_printf("  file \"%s\" not found", fname);
+    return;
+  }
+
+  // only delete if PWO is low
+  if (!uif_pwo_low()) {
+    cli_printf("  file \"%s\" not deleted, PWO is high", fname);
+    return;
+  } 
+
+  ModuleMetaHeader_t *MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct  
+  // file exists, so delete it
+  cli_printf("  deleting file \"%s\" from FLASH", fname);
+  cli_printf("  DO NOT FORGET TO UNPLUG THE PAGE IF IT IS PLUGGED");
+
+  // show file offset en address and size
+  cli_printf("  filename                         type      size  address     next file"); 
+  cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+  cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+            MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+
+  // delete the file
+  if (ff_write(offs, FILETYPE_DELETED)) {
+    cli_printf("  file \"%s\" marked as deleted", fname);
+  } else {
+    cli_printf("  file \"%s\": ERROR deleting file", fname);
+  };
+}
+
+
+// function for the HP82143A printer
+//    1 - status           // get status
+//    2 - power            // toggle power
+//    3 - trace            // printer mode trace
+//    4 - norm             // printer mode normal
+//    5 - man              // printer mode manual
+//    6 - paper            // toggle Out Of Paper status
+//    7 - print            // push PRINT button
+//    8 - adv              // push ADV button
+
+void uif_printer(int i) {
+
+  uint16_t pr_mode;
+
+  if (i == 9) {
+    // test the infrared LED
+    // simply send a string to the IR led, no throttling
+    for (int i = 'A'; i < 'Z'; i++) {
+      // send the string to the IR led
+      // this is a test, so no throttling
+      PrintIRchar(i);
+      PrintIRchar(13);    // send a carriage return
+      PrintIRchar(10);    // send a line feed
+    }	
+  }
+
+  if (!globsetting.get(HP82143A_enabled)) {
+    cli_printf("  HP82143A Printer not plugged, settings will not be active until the printer is plugged");
+  }
+
+  switch (i) {
+    case 1: // status
+            cli_printf("  printer power: %s", globsetting.get(PRT_power) ? "ON":"OFF");
+            pr_mode = globsetting.get(PRT_mode);
+            switch (pr_mode) {
+              case 0:  cli_printf("  printer mode : MAN"); break;
+              case 1:  cli_printf("  printer mode : NORM"); break;
+              case 2:  cli_printf("  printer mode : TRACE"); break;
+              case 3:  cli_printf("  printer mode : TRACE *"); break;
+              default: cli_printf("  printer mode : <invalid>");
+            }
+            cli_printf("  printer BUSY : %s", SELP9_status_BUSY ? "on":"off");
+            cli_printf("  status word  : %04X", SELP9_status);
+            cli_printf("    SMA  %01d - bit 15 - SMA, TRACE mode when set", (SELP9_status >> 15) & 0x0001);
+            cli_printf("    SMB  %01d - bit 14 - SMB, NORM when set, MAN when bit 14 and 15 are clear", (SELP9_status >> 14) & 0x0001);
+            cli_printf("    PRT  %01d - bit 13 - PRT, PRINT key down", (SELP9_status >> 13) & 0x0001);
+            cli_printf("    ADV  %01d - bit 12 - ADV, PAPER ADVANCE key down", (SELP9_status >> 12) & 0x0001);
+            cli_printf("    OOP  %01d - bit 11 - OOP, Out Of Paper", (SELP9_status >> 11) & 0x0001);
+            cli_printf("    LB   %01d - bit 10 - LB , Low Battery", (SELP9_status >> 10) & 0x0001);
+            cli_printf("    IDL  %01d - bit  9 - IDL, Idle", (SELP9_status >> 9) & 0x0001);
+            cli_printf("    BE   %01d - bit  8 - BE , Buffer Empty", (SELP9_status >> 8) & 0x0001);
+            cli_printf("    LCA  %01d - bit  7 - LCA, Lower Case Alpha", (SELP9_status >> 7) & 0x0001);
+            cli_printf("    SCO  %01d - bit  6 - SCO, Special Column Output (Graphics mode)", (SELP9_status >> 6) & 0x0001);
+            cli_printf("    DWM  %01d - bit  5 - DWM, Double Wide Mode", (SELP9_status >> 5) & 0x0001);
+            cli_printf("    TEO  %01d - bit  4 - TEO, Type of End-Of-Line", (SELP9_status >> 4) & 0x0001);
+            cli_printf("    EOL  %01d - bit  3 - EOL, Last End-Of-Line", (SELP9_status >> 3) & 0x0001);
+            cli_printf("    HLD  %01d - bit  2 - HLD, Hold for Paper", (SELP9_status >> 2) & 0x0001);
+            cli_printf("    bt1  %01d - bit  1 - not used, always returns 0", (SELP9_status >> 1) & 0x0001);
+            cli_printf("    bt0  %01d - bit  0 - not used, always returns 0", (SELP9_status >> 0) & 0x0001);
+            break;
+
+    case 2: // toggle printer power
+            if (globsetting.get(PRT_power)) {
+              globsetting.set(PRT_power, 0);
+            } else {
+              globsetting.set(PRT_power, 1);
+            }
+            cli_printf("  printer power: %s", globsetting.get(PRT_power) ? "ON":"OFF");
+            break;
+    case 3: // set printer to TRACE status, bit 15 set, bit 14 clear
+            SELP9_status = SELP9_status | prt_SMA_mask & ~prt_SMB_mask;
+            globsetting.set(PRT_mode, 2);
+            cli_printf("  printer set to TRACE mode");
+            break;
+    case 4: // set printer to NORM mode, bit 15 clear, bit 14 set
+            SELP9_status = (SELP9_status & ~prt_SMA_mask) | prt_SMB_mask;
+            globsetting.set(PRT_mode, 1);
+            cli_printf("  printer set to NORM mode");
+            break;    
+    case 5: // set printer to MAN status, bit 14 and 15 of printer status are 0
+            SELP9_status = SELP9_status & ~prt_SMA_mask & ~prt_SMB_mask;
+            globsetting.set(PRT_mode, 0);
+            cli_printf("  printer set to MAN mode");
+            break;
+    case 6: // toggle the Out Of Paper status in the printer status word
+            SELP9_status ^= prt_OOP_mask;   // XOR of Out Of Paper status bit
+            if (globsetting.get(PRT_paper)) {
+              globsetting.set(PRT_paper, 0);
+            } else {
+              globsetting.set(PRT_paper, 1);
+            }
+            cli_printf("  printer Out Of Paper status %s", SELP9_status & prt_OOP_mask ? "on":"off");
+            break;
+    case 7: // push the printer PRINT button, short push only, button status is reset after 1 read
+            // this is printer status bit 13
+            if (!globsetting.get(HP82143A_enabled)) {
+              cli_printf("  HP82143A ROM not plugged, function ignored");
+              break;
+            } 
+            SELP9_status = SELP9_status | prt_PRT_mask;
+            keycount_print = 2;
+            wakemeup_41();
+            cli_printf("  printer PRINT key pushed");
+            break;
+    case 8: // push the printer ADV button, short push only, button status is reset after 1 read
+            // this is printer status bit 12
+            if (!globsetting.get(HP82143A_enabled)) {
+              cli_printf("  HP82143A ROM not plugged, function ignored");
+              break;
+            } 
+            SELP9_status = SELP9_status | prt_ADV_mask;
+            keycount_print = 2;
+            wakemeup_41();
+            cli_printf("  printer ADV key pushed");
+            break;
+
+            
+
+    default: 
+            // no other actions defined here
+            ;
+            
+  }  // switch (i)
+
+}
+
+// functions for Extended Memory control
+// values passed:
+//   1  command 1 - status
+//   2  command 2 - dump
+//   3  command 3 - program FRAM test pattern
+//   4  command 4 - clear XMEM and test pattern
+//  10  plug 0 XMEM modules
+//  11  plug 1 XMEM module
+//  12  plug 2 XMEM modules
+void uif_xmem(int i)          
+{
+  int j;
+  uint64_t reg_cont;
+  int num_mods;
+
+  if (!uif_pwo_low()) return;    // only do this when calc is not running
+
+  switch (i) {
+    case 1: // status
+            cli_printf("  XMEM modules plugged: %1d", globsetting.get(xmem_pages));
+            break;
+    case 2: // dump XMEM contents, starting at FRAM 0x1E00
+            cli_printf("  XMEM contents from FRAM (non-zero registers only)");
+            cli_printf("  XMEM modules plugged: %1d", globsetting.get(xmem_pages));
+            for (j = 0; j < 0x200; j++) {
+              fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, (XMEMstart + j * 8), (uint8_t*)&reg_cont, 8);
+
+              // printf(" R%03d = 0x%" PRIx64 "\n", j * 8,);
+              if (reg_cont != 0) {
+                cli_printf("  REG %03X = 0x%" PRIX64 "", j + 0x200, reg_cont);
+              }
+            }
+            break;
+    case 3: // program test pattern in XMEM
+            reg_cont = 0x4041404140414041;      // set reg_cont to init value
+            for (j = 0; j < 0x200; j++) {
+              reg_cont = reg_cont + 0x0101010101010101;
+              fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, (XMEMstart + j * 8), (uint8_t*)&reg_cont, 8);
+            }
+            cli_printf("  FRAM test pattern programmed in Extended Memory");
+            cli_printf("  use xmem dump to verify");
+            break;           
+    case 4: // erase all XMEM
+            reg_cont = 0;      // set reg_cont to 0
+            for (j = 0; j < 0x200; j++) {
+              fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, (XMEMstart + j * 8), (uint8_t*)&reg_cont, 8);
+            }
+            cli_printf("  all Extended Memory registers set to 0");
+            break;    
+    case 10: // unplug all XMEM modules
+            globsetting.set(xmem_pages, 0);
+            globsetting.save();
+            break;
+    case 11: // only 1 XMEM module
+            globsetting.set(xmem_pages, 1);
+            globsetting.save();
+            break;
+    case 12: // 2 XMEM modules
+            globsetting.set(xmem_pages, 2);
+            globsetting.save();
+            break;
+    default:
+            // no other actions defined here
+            ;
+  }
+}
+
+// functions for the bus tracer
+//
+//  1        status        shows the tracer status
+//  2        trace         toggle tracer enable/disable
+//  3        sysloop       toggle tracing of system loops
+//  4        sysrom        toggle system rom tracing (Page 0, 1, 2, 3, 5)
+//  5        ilrom         toggle tracing of Page 6+7
+//  6        hpil          toggle HP-IL tracing to ILSCOPE
+//  7        pilbox        toggle PILBox serial tracing to ILSCOPE
+//  8        ilregs        toggle tracing of HP-Il registers
+
+        // settings for tracer, enable by default
+        // gsettings[tracer_enabled]       = 1;
+        // gsettings[tracer_ilregs_on]     = 1;
+        // gsettings[tracer_sysrom_on]     = 1;
+        // gsettings[tracer_sysloop_on]    = 1;
+        // gsettings[tracer_ilroms_on]     = 1;
+
+        // HP-IL scope settings
+// #define     ilscope_enabled     50          // HP-IL scope enabled
+// #define     ilscope_PIL_enabled 51          // PILBox tracing enabled
+
+                // block some known system loops
+        //   0x0098 - 0x00A1       RSTKB and RST05
+        //   0x0177 - 0x0178       delay for debounce
+        //   0x089C - 0x089D       BLINK01
+
+void uif_tracer(int i) {
+  uint16_t stat;
+
+  switch (i) {
+    case trace_status: // status
+            cli_printf("  HP41 tracer         %s", globsetting.get(tracer_enabled) ? "enabled ":"disabled");
+            cli_printf("  system loop tracing %s (RSTKB, RST05, BLINK01 and debounce)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
+            cli_printf("  system ROM tracing  %s (Page 0..5)", globsetting.get(tracer_sysrom_on) ? "enabled ":"disabled");
+            cli_printf("  tracing of IL roms  %s (Page 6+7)", globsetting.get(tracer_ilroms_on) ? "enabled ":"disabled");
+            cli_printf("  IL scope traffic    %s", globsetting.get(ilscope_IL_enabled) ? "enabled ":"disabled");
+            cli_printf("  PILBox traffic      %s", globsetting.get(ilscope_PIL_enabled) ? "enabled ":"disabled");
+            cli_printf("  tracing of IL regs  %s", globsetting.get(tracer_ilregs_on) ? "enabled ":"disabled");
+            break;
+    case 2: // trace
+            globsetting.set(tracer_enabled, !globsetting.get(tracer_enabled));
+            trace_enabled != tracer_enabled;
+            cli_printf("  HP41 tracer         %s", globsetting.get(tracer_enabled) ? "enabled ":"disabled");
+            break;            
+    case 3: // sysloop
+            globsetting.set(tracer_sysloop_on, !globsetting.get(tracer_sysloop_on));
+            cli_printf("  system loop tracing %s (RSTKB, RST05, BLINK01 and debounce)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
+            break; 
+    case 4: // sysrom
+            globsetting.set(tracer_sysrom_on, !globsetting.get(tracer_sysrom_on));
+            cli_printf("  system ROM tracing  %s (Page 0..5)", globsetting.get(tracer_sysrom_on) ? "enabled ":"disabled");
+            break; 
+    case 5: // ilrom
+            globsetting.set(tracer_ilroms_on, !globsetting.get(tracer_ilroms_on));
+            cli_printf("  tracing of IL roms  %s (Page 6+7)", globsetting.get(tracer_ilroms_on) ? "enabled ":"disabled");
+            break; 
+    case 6: // hpil scope
+            globsetting.set(ilscope_IL_enabled, !globsetting.get(ilscope_IL_enabled));
+            cli_printf("  IL scope traffic    %s", globsetting.get(ilscope_IL_enabled) ? "enabled ":"disabled");
+            break; 
+    case 7: // PILBox scope
+            globsetting.set(ilscope_PIL_enabled, !globsetting.get(ilscope_PIL_enabled));
+            cli_printf("  PILBox traffic      %s", globsetting.get(ilscope_PIL_enabled) ? "enabled ":"disabled");
+            break;  
+    case 8: // ilregs
+            globsetting.set(tracer_ilregs_on, !globsetting.get(tracer_ilregs_on));
+            cli_printf("  tracing of IL regs  %s", globsetting.get(tracer_ilregs_on) ? "enabled ":"disabled");
+            break; 
+    case 9: // save
+            // only if PWO is low
+            if (!uif_pwo_low()) {
+              return;
+            }
+            globsetting.save();
+            cli_printf("  tracer setting saved in FRAM");
+            break; 
+    default:
+            // no other actions defined here
+            ;         
+  }          
+}        
+
+
+#define STORAGE_CMD_TOTAL_BYTES 100
+
+
+// functions for the flash command
+//  1        status        shows the flash status
+//  2        dump          dump the flash contents
+//  3        init          initialize the flash file system
+//  4        nukeall       erase all flash pages
+void uif_flash(int i, uint32_t addr) {
+  uint8_t id[8];
+  int sleepcount = 1000;
+  uint32_t dump_addr = 0; // default dump address
+  flash_devinfo_size_t flash_size = flash_devinfo_get_cs_size(0);
+
+  uint8_t txbuf[STORAGE_CMD_TOTAL_BYTES] = {0x9f};
+  uint8_t rxbuf[STORAGE_CMD_TOTAL_BYTES] = {0};
+  flash_do_cmd(txbuf, rxbuf, STORAGE_CMD_TOTAL_BYTES);
+  int capacity = 1 << rxbuf[3];
+
+  // only do this when PWO is low
+  if (!uif_pwo_low()) return;
+
+  switch (i) {
+    case 1: // status, just show ID from FLASH and reported FLASH size
+            flash_get_unique_id(id);
+            cli_printf("  FLASH ID       : %02X%02X%02X%02X%02X%02X%02X%02X", id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]);
+            cli_printf("  FLASH CS size  : %X size indicator", flash_size);
+            cli_printf("  FLASH size     : %d MByte reported by firmware", PICO_FLASH_SIZE_BYTES / (1024 * 1024));
+            cli_printf("  FLASH capacity : %d bytes / %d MByte reported by device", capacity, capacity / (1024 * 1024));
+
+            break;
+    case 2: // dump
+            if (addr == 0x40414243) {
+              dump_addr = flash_dump_addr;
+              flash_dump_addr = flash_dump_addr + 0x1000;  
+            } else {
+              dump_addr = addr;
+              flash_dump_addr = dump_addr + 0x1000;  
+            } 
+            cli_printf(" dumping FLASH contents from address 0x%08X [next: 0x%08X]", dump_addr, flash_dump_addr);
+            ff_show(dump_addr);
+            break;
+    case 3: // init
+            ff_init();
+            break;
+    case 4: // nukeall
+
+            cli_printf("  ERASING THE FLASH FILE SYSTEM in 4 seconds!! press any key to cancel");
+            while(true) {
+              tud_task();                 // to process IO until the watchdog triggers
+              sleep_ms(2);
+              if (cdc_available(ITF_CONSOLE)) {
+                cdc_read_flush(ITF_CONSOLE);
+                cli_printf("  NUKE cancelled");
+                return;
+              }
+              sleepcount--;
+              if (sleepcount == 0) {  
+                cli_printf("  NUKING FILE SYSTEM");
+                // Erase the FLASH File System when the counter expires
+                ff_nuke();
+                cli_printf("  FLASH FILE SYSTEM ERASED");
+                cli_printf("  use the flash INIT caoomand to initialize the FLASH File system");
+                return;
+              }
+            }
+            break;
+    case 5: // dump FRAM for debugging
+            // this is a special case, dump the FRAM contents
+            if (addr == 0x40414243) {
+              dump_addr = fram_dump_addr;
+              fram_dump_addr = fram_dump_addr + 0x1000;  
+            } else {
+              dump_addr = addr;
+              fram_dump_addr = dump_addr + 0x1000;  
+            } 
+            cli_printf(" dumping FRAM contents from address 0x%05X [next: 0x%05X]", dump_addr, fram_dump_addr);
+            fram_show(dump_addr);
+            break;
+
+    default:
+            // no other actions defined here
+            ;         
+  }          
+}
+
+// functions for the flash command
+// #define fram_status    1
+// #define fram_dump      2
+// #define fram_init      3
+// #define fram_nukeall   4
+
+void uif_fram(int i, uint32_t addr) {
+  uint8_t buf[8];
+  int sleepcount = 1000;
+  uint32_t dump_addr = 0; // default dump address
+  int reported_size;
+  uint16_t init_val;
+
+  // only do this when PWO is low
+  if (!uif_pwo_low()) return;
+
+
+  switch (i) {
+    case fram_status: // status, just show ID from FRAM
+            fr_readid(buf);
+            cli_printf("  FRAM ID      : %02X %02X %02X %02X", buf[0], buf[1], buf[2], buf[3]);
+
+            // calculated reported size from buf[2]
+            reported_size = (buf[2] & 0x1F) / 4; // size in Mbits
+            cli_printf("  FRAM size    : %d Mbit, %d KByte", reported_size, reported_size * 128);
+
+            break;
+    case fram_dump: // dump
+            if (addr == 0x40414243) {
+              dump_addr = fram_dump_addr;
+              fram_dump_addr = fram_dump_addr + 0x1000;  
+            } else {
+              dump_addr = addr;
+              fram_dump_addr = dump_addr + 0x1000;  
+            } 
+            cli_printf(" dumping FRAM contents from address 0x%05X [next: 0x%05X]", dump_addr, fram_dump_addr);
+            fram_show(dump_addr);
+            break;
+    case fram_init: // init ROMMAP only and set to zero
+            cli_printf("  initializing FRAM ROMMAP to zero");
+            init_val = fr_read16(FRAM_INIT_ADDR);
+            cli_printf("  FRAM init value: %04X", init_val);
+            if (TULIP_Pages.is_rommmap_inited()) {
+              cli_printf("  FRAM ROMMAP already initialized, skipping");
+              return;
+            }
+            TULIP_Pages.init_rommap();
+            break;
+    case fram_nukeall: // nukeall
+            cli_printf("  ERASING ALL FRAM in 4 seconds!! press any key to cancel");
+            while(true) {
+              tud_task();                 // to process IO until the watchdog triggers
+              sleep_ms(2);
+              if (cdc_available(ITF_CONSOLE)) {
+                cdc_read_flush(ITF_CONSOLE);
+                cli_printf("  FRAM NUKE cancelled");
+                return;
+              }
+              sleepcount--;
+              if (sleepcount == 0) {  
+                cli_printf("  NUKING FRAM to ZERO");
+                // Erase the FLASH File System when the counter expires
+                fr_nukeall();
+                cli_printf("  FRAM ERASED");
+                return;
+              }
+            }
+            break;
+
+    default:
+            // no other actions defined here
+            ;         
+  }          
+}
+
+//************************************************************ */
+// Below are the functions for the 'old' user interface
+
+void welcome()
+{
+    printf("\n****************************************************************************");
+    printf("\n*   Welcome to TULIP4041 - The ULtimate Intelligent Peripheral for the HP41 ");
+    printf("\n*   Total heap:  %d bytes", getTotalHeap());
+    printf("\n*   Free heap:   %d bytes", getFreeHeap());
+    printf("\n    Tracebuffer: %d samples / %d bytes", TRACELENGTH, sizeof(TraceLine) * TRACELENGTH);
+    printf("\n*   running at:  %d kHz\n", clock_get_hz(clk_sys)/1000);
+    printf("\n****************************************************************************\n");
+    measure_freqs();
+}
+
+void uif_welcome()
+{
+  cli_printf("test message");
+}
+
+
+void pio_welcome()
+{
+    pio_report();
+}
+
+
+void toggle_trace(void)
+{
+  trace_enabled = !trace_enabled;
+  printf("Trace is %s\n", trace_enabled ? "on":"off");
+}
+
+void toggle_traceo(void)
+{
+  trace_outside = !trace_outside;
+  printf("system ROM trace is %s\n", trace_outside ? "on":"off");
+}
+
+// Toggle disassembler (on -> call disassembler if trace is on)
+void toggle_disasm(void)
+{
+  trace_disassembler = ! trace_disassembler;
+  printf("Disassembler is %s\n", trace_disassembler ? "on":"off");
+}
+
+void set_break(void)
+{
+  sample_break = sample_break + 5000;
+  if (sample_break > 100000) sample_break = 0;
+  printf("Breakpoint set to %d traces\n", sample_break);
+}
+
+
+void print_f()
+{
+  // initiate the printer sub functions. print p and a prompt
+  printf("\np_\b"); 
+  state = ST_PRT;
+}
+
+
+void print_busy()
+{
+  // toggle printer BUSY
+  SELP9_status_BUSY = !SELP9_status_BUSY; 
+  printf("b - printer BUSY status is %s\n", SELP9_status_BUSY ? "on":"off");
+}
+
+void print_idle()
+{
+  // toggle printer BUSY
+  SELP9_status ^= prt_IDL_mask;   // XOR of Idle status bit 
+  printf("i - printer IDLE status is %s\n", SELP9_status & prt_IDL_mask ? "on":"off");
+}
+
+void print_empty()
+{
+  // toggle printer Buffer Empty
+  SELP9_status ^= prt_BE_mask;   // XOR of Idle status bit
+  printf("b - printer Buffer Empty status is %s\n", SELP9_status & prt_BE_mask ? "on":"off");
+}
+
+void print_man()
+{
+  // set printer to MAN status, bit 14 and 15 of printer status are 0
+  SELP9_status = SELP9_status & ~prt_SMA_mask & ~prt_SMB_mask;
+  printf("m - printer set to MAN mode\n");
+}
+
+void print_trace()
+{
+  // set printer to TRACE status, bit 15 set, bit 14 clear
+  SELP9_status = SELP9_status | prt_SMA_mask & ~prt_SMB_mask;
+  printf("t - printer set to TRACE mode\n");
+}
+
+void print_norm()
+{
+  // set printer to NORM mode, bit 15 clear, bit 14 set
+  SELP9_status = (SELP9_status & ~prt_SMA_mask) | prt_SMB_mask;
+  printf("n - printer set to NORM mode\n");
+}
+
+void print_adv()
+{
+  // push the printer ADV button, short push only, button status is reset after 1 read
+  // this is printer status but 12
+  SELP9_status = SELP9_status | prt_ADV_mask;
+  keycount_print = 2;
+  wakemeup_41();
+  printf("a - printer ADV key pushed\n");
+}
+
+void print_print()
+{  
+  // push the printer PRINT button, short push only, button status is reset after 1 read
+  // this is printer status but 13
+  SELP9_status = SELP9_status | prt_PRT_mask;
+  keycount_print = 2;
+  wakemeup_41();
+  printf("p - printer PRINT key pushed\n");
+}
+
+void print_bat()
+{
+  // toggle the LOW bat status in the printer status word
+  // this does not seem to be used anywhere in the printer ROM
+  SELP9_status ^= prt_LB_mask;   // XOR of Low Battery status bit
+  printf("l - printer Low Battery status %s\n", SELP9_status & prt_LB_mask ? "on":"off");
+}
+
+void print_paper()
+{
+  // toggle the Out Of Paper status in the printer status word
+  SELP9_status ^= prt_OOP_mask;   // XOR of Out Of Paper status bit
+  printf("o - printer Out Of Paper status %s\n", SELP9_status & prt_OOP_mask ? "on":"off");
+}
+
+
+
+void file_download()
+{
+  int key;
+  int n = 0;     // character counter
+  // start dowload into ROMBuffer
+
+  printf("F - file download - start sending the file now\n");
+
+  while ((n < 0x2000) && (key >= 0)) 
+  {
+    // loop to read bytes 
+    while ((key = getchar_timeout_us(100)) < 0) {}
+    ROMBuffer[n] = key;
+    n++;
+    if ((n % 0x40) == 0) { printf("."); }
+  }
+
+  // correct download
+  printf("\n download finished %d bytes downloaded\n", n);
+
+  // swap the bytes
+  for (int i =0; i < 0x1000; i++)
+  {
+    rom_buf[i] = swap16(rom_buf[i]);
+  }
+
+  // and show the results for the first 8 lines
+  for (int i = 0; i < 31; i++) {
+    printf("\n ROM %04X - ", i * 16); 
+    for (int m = 0; m < 16; m++) {
+      printf("%04X ", rom_buf[i * 16 + m]);        
+    }
+  }
+  printf("\n");
+}
+
+void rom_f()
+// ROM subcomands prompt
+{
+  printf("\nr_\b");
+  state = ST_ROM;
+}
+
+void rom_hex()
+// hex listing of current ROM, only first and last 8 lines
+{
+  printf("h - hex dump, short\n");
+  for (int i = 0; i < 8; i++) {
+    printf("\n ROM %04X - ", i * 16); 
+    for (int m = 0; m < 16; m++) {
+      printf("%04X ", rom_buf[i * 16 + m]);        
+    }
+  }
+
+  printf("\n");
+
+  for (int i = 0xF8; i < 0x100 ; i++) {
+    printf("\n ROM %04X - ", i * 16); 
+    for (int m = 0; m < 16; m++) {
+      printf("%04X ", rom_buf[i * 16 + m]);        
+    }
+  }
+
+  printf("\n");
+}
+
+void rom_hexl()
+// hex listing of current ROM, all lines
+{
+  printf("H - hex dump, complete ROM\n");
+  for (int i = 0x00; i < 0x100 ; i++) {
+    printf("\n ROM %04X - ", i * 16); 
+    for (int m = 0; m < 16; m++) {
+      printf("%04X ", rom_buf[i * 16 + m]);        
+    }
+  }
+  printf("\n");
+}
+
+int rom_checksum()
+{
+  // returns the HP checksum for the current ROM
+  int accumulator = 0;
+
+  for (int i = 0; i < 0x0FFF; i++) {
+    accumulator = accumulator + rom_buf[i];
+    if (accumulator > 0x03FF) {
+      accumulator = (accumulator & 0x03FF) + 1;
+    }
+  }
+
+  accumulator = (-accumulator) & 0x03FF;
+
+  return accumulator;
+
+  /* Accumulator := 0;
+  for i := 0 to Rom4KSize - 1 do begin
+    Accumulator := Accumulator + Swap(MODArray[i]);
+    if Accumulator > $03FF then begin
+      Accumulator := (Accumulator and $03FF) + 1;
+    end;
+  end;
+  Accumulator := (-Accumulator) and $03FF;
+  FrmROMHandler.LblCHK.Caption := Hex3(Swap(MODArray[CHECKSUM_Addr]));
+  FrmROMHandler.LblCALCCHK.Caption := Hex3(Accumulator);
+*/
+}
+
+
+ 
+void rom_check()
+// print ROM checksum
+{
+  printf("c - calculate checksum\n");
+  printf(" calculated checksum = %03X\n", rom_checksum);
+
+  /* Accumulator := 0;
+  for i := 0 to Rom4KSize - 1 do begin
+    Accumulator := Accumulator + Swap(MODArray[i]);
+    if Accumulator > $03FF then begin
+      Accumulator := (Accumulator and $03FF) + 1;
+    end;
+  end;
+  Accumulator := (-Accumulator) and $03FF;
+  FrmROMHandler.LblCHK.Caption := Hex3(Swap(MODArray[CHECKSUM_Addr]));
+  FrmROMHandler.LblCALCCHK.Caption := Hex3(Accumulator);
+*/
+}
+
+// ROM summary structure
+typedef struct
+{
+  int rom_xrom;
+  int rom_funcs;
+  int rom_firstfunc;
+  char *rom_name;
+  char *rom_revision;
+  int rom_checksum;
+  int calc_checksum;
+} ROM_SUMMARY;
+
+ROM_SUMMARY r_summary;
+
+
+void fill_summary()
+{
+
+  char c;
+
+  r_summary.rom_xrom = rom_buf[0];
+  r_summary.rom_funcs = rom_buf[1];
+  r_summary.rom_checksum = rom_buf[0xFFF];
+  r_summary.calc_checksum = rom_checksum();
+  r_summary.rom_firstfunc = (rom_buf[3] & 0xFF) + ((rom_buf[2] & 0xFF) << 8);  // pointer to the name]
+
+  if (rom_buf[2] > 0xFF) 
+  {
+    sprintf(ROMname, "<USERCODE>");
+  }
+  else
+  {
+    c = rom_buf[r_summary.rom_firstfunc -1];
+    int i = 0;
+    while ( ((c & 0xFF) < 0x40) && (i < 16)) {
+      // only allowed chars
+      ROMname[i] = HPchar[c & 0x3F];
+      i++;
+      c = rom_buf[r_summary.rom_firstfunc - 1 - i];
+     }
+     // and add the last character of the ROM name plus a NULL
+     ROMname[i] = HPchar[c & 0x3F];
+     ROMname[i+1] = 0;
+  }
+  ROMrev[0] = HPchar[rom_buf[0xFFE] & 0x3F];
+  ROMrev[1] = HPchar[rom_buf[0xFFD] & 0x3F];
+  ROMrev[2] = '-';
+  ROMrev[3] = HPchar[rom_buf[0xFFC] & 0x3F];
+  ROMrev[4] = HPchar[rom_buf[0xFFB] & 0x3F];
+  ROMrev[5] = 0;
+
+}
+
+
+void rom_name()
+// show ROM name
+{
+
+  fill_summary();
+  printf("n - show ROM name and other characteristics\n");
+  printf("\n XROM        : %d 0x%02X", r_summary.rom_xrom, r_summary.rom_xrom);
+  printf("\n # functions : %d 0x%02X", r_summary.rom_funcs, r_summary.rom_funcs);
+  printf("\n ROM name    : '%s'   @ 0x%04X", ROMname, r_summary.rom_firstfunc);
+  printf("\n ROM rev     : %s", ROMrev);
+  printf("\n checksum    : %03X - calculated: %03X", r_summary.rom_checksum, r_summary.calc_checksum);
+  printf("\n");
+}
+
+void rom_list()
+// show ROM's in FLASH and/or FRAM
+{
+  printf("l - list available ROMs in FLASH and/or FRAM\n");
+
+  printf(" memory | page | XROM | revision | name");
+
+  // first list the FLASH pages
+  for (int page = 0; page < 10; page++) {
+    printf("\n  FLASH |  %02d  |  ", page);
+    if (flash_contents[page * 0x1000] == 0xFFFF) {
+      // page is empty
+      printf("    |         | EMPTY");
+    }
+    else
+    {
+      // valid content, so download and list contents
+      for (int i = 0; i < 0x1000; i++)
+      {
+        rom_buf[i] = flash_contents[page * 0x1000 + i];
+      }
+      fill_summary();
+      printf("%02d  |  %s  | %s", r_summary.rom_xrom, ROMrev, ROMname);
+    }
+  }
+
+  // list the FRAM pages
+  for (int page = 0; page < 10; page++) {
+    printf("\n  FRAM  |  %02d  |  ", page);
+
+    fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, page * 0x2000, (uint8_t*)rom_buf, 0x2000);  
+    if (rom_buf[0] == 0xFFFF)
+    {
+     printf("    |         | EMPTY");
+    }
+    else 
+    {
+      fill_summary();
+      printf("%02d  |  %s  | %s", r_summary.rom_xrom, ROMrev, ROMname);
+    }
+  }
+
+  printf("\n");
+
+}
+
+
+// #define ROM_BASE_OFFSET  0x00080000
+// const uint16_t *flash_contents = (const uint16_t *) (XIP_BASE + ROM_BASE_OFFSET);
+
+
+void rom_program()
+// program ROM in Flash or SRAM according to settings
+{
+  printf("P - program ROM in FLASH or FRAM\n");
+
+  if (((prog_t == P_NONE) || (rom_target < 0)) && !enable_programming)
+  {
+    // no programming enabled
+    enable_programming = false;
+    printf("ROM programming disabled, choose target FLASH or FRAM first or valid target Page!\n");   
+  } 
+  else
+  {
+    printf(" start programming");
+    switch(prog_t) {
+      case P_FLASH:
+        printf(" FLASH - Page %d at FLASH address %08X\n", rom_target, XIP_BASE + ROM_BASE_OFFSET + (rom_target * 0x2000));
+        sleep_ms(2000);               // needs some rest to prevent USB going crazy
+        // first erase FLASH Page
+        flash_range_erase(ROM_BASE_OFFSET + (rom_target * 0x2000), 0x2000);
+        flash_range_program(ROM_BASE_OFFSET + (rom_target * 0x2000), (uint8_t *)rom_buf, 0x2000);
+        break;
+      case P_FRAM:
+        printf(" FRAM - Page %d at FRAM address %06X\n", rom_target, rom_target * 0x2000 );
+        fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, (rom_target * 0x2000), (uint8_t*)rom_buf, 0x2000);
+        break;
+    default:
+      break;
+    }
+  }
+  printf("\n programming disabled, enable again with <rE> for programming a new ROM!\n");
+}
+
+
+void rom_set_fl()
+// set target to FLASH for ROM programming
+{
+  printf("f - set target for programming ROM to FLASH\n");
+  prog_t = P_FLASH;
+  printf("ROM programming mode set to FLASH");
+  if (rom_target < 0) {
+    printf(" - do not forget to set ROM target Page");
+  }
+  else
+  {
+    printf(" - ROM target Page = %d\n", rom_target);
+  }
+}
+
+void rom_set_fr()
+// set target to FLASH for ROM programming
+{
+  printf("r - set target for programming ROM to FRAM\n");
+  prog_t = P_FRAM;
+  printf("ROM programming mode set to FRAM");
+  if (rom_target < 0) {
+    printf(" - do not forget to set ROM target Page");
+  }
+  else
+  {
+    printf(" - ROM target Page = %d\n", rom_target);
+  }
+}
+
+void rom_pr_en()
+// enable programming into FLASH or FRAM
+{
+  printf("E - Enable programming ROM in FLASH or FRAM\n");
+  printf("enable again after programming to program a new ROM !\n");
+
+  if ((prog_t == P_NONE) || (rom_target < 0))
+  {
+    // no programming enabled
+    enable_programming = false;
+    printf("ROM programming NOT enabled, choose target FLASH or FRAM first or valid target Page!");   
+  } 
+  else
+  {
+    switch(prog_t) {
+      case P_FLASH:
+        enable_programming = true;
+        printf("ROM programming enabled, use with caution. Programming target is FLASH - Page %d", rom_target);
+        break;
+      case P_FRAM:
+        enable_programming = true;
+        printf("ROM programming enabled, use with caution. Programming target is FRAM - Page %d", rom_target);
+        break;
+    default:
+      break;
+    }
+  }
+  printf("\n WARNING: THE HP41 MUST BE OFF OR AT LEAST IN LIGHT SLEEP FOR FLASH and FRAM PROGRAMMING \n");
+}
+
+void rom_down()
+{
+
+  printf("d - Download ROM from FLASH or FRAM\n");
+
+  if ((prog_t == P_NONE) || (rom_target < 0))
+  {
+    // no valid target page selected
+    printf("Sorry, please choose target FLASH or FRAM first or valid target Page!\n");   
+  } 
+  else
+  {
+    switch(prog_t) {
+      case P_FLASH:
+        printf("downloading from FLASH - Page %d\n", rom_target);
+        for (int i = 0; i < 0x1000; i++)
+        {
+          rom_buf[i] = flash_contents[rom_target * 0x1000 + i];
+        }
+        break;
+      case P_FRAM:
+        printf("downloading from FRAM - Page %d\n", rom_target);
+        // read the complete ROM in one go
+        fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, rom_target * 0x2000, (uint8_t*)rom_buf, 0x2000);            
+        break;
+    default:
+      break;
+    }
+  }
+  printf("\n");
+
+}
+
+void rom_digit(int c)
+{
+  printf("%c - digit entered for setting ROM target\n", c);
+  if ((c >= '0') && (c <='9')) {
+    // valid digit key pressed
+    rom_target = c - '0';
+  }
+  printf("ROM programming target Page = %d\n", rom_target);
+
+}
+
+void rom_mapping()
+{
+  printf("m - toggle default ROM mapping\n");
+  default_map = !default_map;
+  printf("ROM programming target Page = %d\n", rom_target);
+  printf("ROM mapping default %s\n", default_map ? "on":"off");
+}
+
+void rom_off()
+{
+  printf("o - toggle ROM mapping enable\n");
+  default_map_off = !default_map_off;
+  printf("ROM programming target Page = %d\n", rom_target);
+  printf("ROM mapping %s\n", default_map_off ? "enabled":"disabled");
+}
+
+
+void file_f()
+{
+  // 
+  printf("\nf - press F to start download of ROM file");
+  printf("\n pressing <ESC> will abort the download");
+  state = ST_FILE;
+}
+
+void rp2040_reset()
+{
+  printf("\n RESETTING THE RP2040-TUP !!");
+  sleep_ms(1000);
+  watchdog_enable(1, 1);
+}
+
+void rp2040_bootsel()
+{
+  printf("\n RESETTING THE RP2040-TUP to BOOTSEL mode!!");
+  sleep_ms(1000);
+
+  // reboots the RP2040, uses the standard LED for activity monitoring
+  reset_usb_boot(1<<PICO_DEFAULT_LED_PIN, 0) ;
+
+}
+
+
+void rp2040_sleep()
+{
+
+  printf("NOT IMPLEMENTED\n");
+  // sleep_ms(1000);
+  // uart_default_tx_wait_blocking();
+
+  // go to sleep, wake up on any key press
+  // sleep_run_from_xosc();
+  // sleep_goto_dormant_until_pin(P_PWO, true, true);
+
+  // sleep_power_up();
+  // printf("Now awake \n");
+  // sleep_ms(1000 * 1);
+
+}
+
+
+void hp41_shutdown()
+// command D: HP41 forced shutdown (drive PWO low for 20 us)
+// only do this when no IR led is connected
+{
+  printf("D - forcing HP41 shutdown by driving PWO for 20 us\n");
+  shutdown_41();
+}
+
+void pico_VBUS()
+// command V: show VBUS status (USB power present)
+// used VBUS GPIO, on Pico this is GPIO pin 24
+{
+  printf("V - Pico VBUS status, USB connected: %s\n", gpio_get(PICO_VBUS_PIN) ? "on":"off");
+}
+
+
+
+void print_status()
+{
+  // list the current printer status word
+  printf("s\n");
+  // printf("Printer is %s\n", SELP9_status_ON ? "on":"off");
+  printf("Printer BUSY is %s\n", SELP9_status_BUSY ? "on":"off");
+  printf("Status word %04X\n", SELP9_status);
+  printf(" SMA  %01d - bit 15 - SMA, TRACE mode when set\n", (SELP9_status >> 15) & 0x0001);
+  printf(" SMB  %01d - bit 14 - SMB, NORM when set, MAN when bit 14 and 15 are clear\n", (SELP9_status >> 14) & 0x0001);
+  printf(" PRT  %01d - bit 13 - PRT, PRINT key down\n", (SELP9_status >> 13) & 0x0001);
+  printf(" ADV  %01d - bit 12 - ADV, PAPER ADVANCE key down\n", (SELP9_status >> 12) & 0x0001);
+  printf(" OOP  %01d - bit 11 - OOP, Out Of Paper\n", (SELP9_status >> 11) & 0x0001);
+  printf(" LB   %01d - bit 10 - LB , Low BAttery\n", (SELP9_status >> 10) & 0x0001);
+  printf(" IDL  %01d - bit  9 - IDL, Idle \n", (SELP9_status >> 9) & 0x0001);
+  printf(" BE   %01d - bit  8 - BE , Buffer Empty\n", (SELP9_status >> 8) & 0x0001);
+  printf(" LCA  %01d - bit  7 - LCA, Lower Case Alpha\n", (SELP9_status >> 7) & 0x0001);
+  printf(" SCO  %01d - bit  6 - SCO, Special Column Output (Graphics mode)\n", (SELP9_status >> 6) & 0x0001);
+  printf(" DWM  %01d - bit  5 - DWM, Double Wide Mode\n", (SELP9_status >> 5) & 0x0001);
+  printf(" TEO  %01d - bit  4 - TEO, Type of End-Of-Line\n", (SELP9_status >> 4) & 0x0001);
+  printf(" EOL  %01d - bit  3 - EOL, Last End-Of-Line\n", (SELP9_status >> 3) & 0x0001);
+  printf(" HLD  %01d - bit  2 - HLD, Hold for Paper\n", (SELP9_status >> 2) & 0x0001);
+  printf(" bt1  %01d - bit  1 - not used, always returns 0\n", (SELP9_status >> 1) & 0x0001);
+  printf(" bt0  %01d - bit  0 - not used, always returns 0\n", (SELP9_status >> 0) & 0x0001);
+}
+
+
+
+
+void wandcode(int i)
+// send Wand barcode for testing
+{
+    uint16_t barcode;
+    printf("\nW_\b");
+    state = ST_WAND;
+
+    switch (i)
+    {
+    case 0:       // send digit entry '0'
+      barcode = 0; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0; queue_try_add(&WandBuffer, &barcode);
+      setflag_FI0();
+      wakemeup_41();
+      break;
+
+    case 1:       // send BEEP
+      barcode = 0xE0; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x86; queue_try_add(&WandBuffer, &barcode);
+      setflag_FI0();
+      wakemeup_41();
+      break;
+
+    case 2:       // enter a small program
+      barcode = 0xB6; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x10; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x01; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0xC6; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x00; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0xF2; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x00; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x5A; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x91; queue_try_add(&WandBuffer, &barcode);
+      setflag_FI0();
+      wakemeup_41();
+      break;
+
+    case 3:
+      barcode = 0x3E; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x11; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x10; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x75; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0xC0; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x01; queue_try_add(&WandBuffer, &barcode);
+      barcode = 0x2F; queue_try_add(&WandBuffer, &barcode);
+      setflag_FI0();
+      wakemeup_41();
+      break;
+  
+    default:        // just pressing button, nothing else
+      setflag_FI0();
+      wakemeup_41();
+      break;
+    }
+
+}
+
+// identify CDC serial ports by sending a string  
+void ident_cdc()
+{
+    // for testing 
+    int i;
+    int PrintLen;
+    char  PrintStr[200];
+
+    printf("\n");
+
+    for (i = 0; i < 5; i++)
+    {
+        if (cdc_connected(i))
+        {
+          printf("  CDC Port %d OK  connected: %s\n", i, ITF_str[i]);
+
+            PrintLen = 0;
+            PrintLen += sprintf(PrintStr + PrintLen,"\n*** Testing CDC Port %i: %s ***\n\r", i, ITF_str[i]);
+            cdc_send_string(i, PrintStr, PrintLen);
+            cdc_flush(i);
+        }
+        else
+        {
+          printf("  CDC Port %d NOT connected: %s \n", i, ITF_str[i]);
+        }
+
+    }
+}
+
+void sdcard_test()
+{
+  sd_status();
+}
+
+// supported commands for the user interface, main level
+SERIAL_COMMAND serial_cmds[] = {
+  { 'h', serial_help,     "Serial command help"  },
+  { '?', serial_help,     "Serial command help"  },
+  { 'd', toggle_disasm,   "Toggle disassembler"  },
+  { 't', toggle_trace,    "Toggle trace"  },
+  { 'o', toggle_traceo,   "Toggle system ROM trace"  },
+  { 'b', set_break,       "Set breakpoint after n samples (for loooong traces)"  },
+  { 'P', power_on,        "Power On - drive ISA for 20 us"  },
+  { 'p', print_f,         "Printer functions subcommands"},
+  // { 'x', xmem_set,      "Extended Memory Modules (0/1/2), 3 prints XMEM contents"},  //  void xmem_set(int i)
+  { 'f', file_f,          "File functions (download ROM file)"},
+  { 'r', rom_f,           "ROM functions subcommands"},
+  { 'w', welcome,         "show welcome message"  },
+  { 'i', pio_welcome,     "show PIO status"},
+  // { 'W', wandcode,      "send one of the barcode test commands"},
+  { 's', sdcard_test,     "uSD card test (list directory)"},
+  { 'I', ident_cdc,       "Identify CDC serial ports"},
+  { 'R', rp2040_reset,    "CAUTION: full reset of the RP2040-TUP"},
+  { 'B', rp2040_bootsel,  "CAUTION: reboots the RP2040 in BOOTSEL mode"},
+  { 'S', rp2040_sleep,    "CAUTION: RP2040 goes dormant"},
+  { 'D', hp41_shutdown,   "CAUTION: HP41 forced shutdown (drive PWO low for 20 us)"},
+  { 'V', pico_VBUS,       "show VBUS status (USB power present)"},
+
+};
+
+TRACE_COMMAND trace_cmds[] = {
+  { 'h', serial_help,   "Serial command help"  },
+
+};
+
+// supported commands for the user interface, printer sub-level
+PRINT_COMMAND print_commands[] = {
+  { 'h', print_help,    "Printer commands help" },
+  { '?', print_help,    "Printer commands help" },  
+  // { 'O', print_on,      "toggle printer ON/OFF" },
+  { 'b', print_busy,    "toggle printer BUSY" },
+  { 'i', print_idle,    "toggle printer IDLE" },
+  { 'e', print_empty,   "toggle printer Buffer Empty" },
+  { 'm', print_man,     "set to MAN mode"},
+  { 't', print_trace,   "set to TRACE mode"},        
+  { 'n', print_norm,    "set to NORM mode"},
+  { 'a', print_adv,     "push ADV button (short push only)"},
+  { 'p', print_print,   "push PRINT button (short push only)"},
+  { 'l', print_bat,     "toggle printer LOW BAT status"},
+  { 'o', print_paper,   "toggle Out Of Paper"},
+  { 's', print_status,  "show printer status"},
+};
+
+// supported subcommands for the user interface, ROM sub-level
+ROM_COMMAND rom_commands[] = {
+  { 'h', rom_help,    "ROM commands help" },
+  { '?', rom_help,    "ROM commands help" },  
+  { 'm', rom_mapping, "toggle default ROM mapping" },  
+  { 'o', rom_off,     "toggle ROM emulation" },
+  { 'x', rom_hex,     "hex listing of current ROM, only 5 first and 5 last lines" },
+  { 'X', rom_hexl,    "hex listing of current ROM, all lines"},
+  { 'c', rom_check,   "calculate ROM checksum" },
+  { 'n', rom_name,    "show ROM name"},
+  { 'l', rom_list,    "show ROM's in FLASH and/or FRAM"},
+  { 'd', rom_down,    "download selected ROM to current ROM"},
+  { 'P', rom_program, "program ROM in Flash or SRAM according to settings"},
+  { 'f', rom_set_fl,  "set target to FLASH for ROM programming"},
+  { 'r', rom_set_fr,  "set target to FRAM for ROM programming"},
+  { 'E', rom_pr_en,   "enable programming into FLASH or FRAM"},
+  { '*', rom_help,    "input any digit 0..9 to set the FLASH/FRAM target page"},
+};
+
+const int helpSize = sizeof(serial_cmds) / sizeof(SERIAL_COMMAND);
+const int phelpSize = sizeof(print_commands) / sizeof(PRINT_COMMAND);
+const int rhelpSize = sizeof(rom_commands) / sizeof(ROM_COMMAND);
+
+void serial_help(void)
+{
+  printf("h - help\n");
+  printf("\nCmd | Description");
+  printf("\n----+-----------------");
+  for (int i = 0; i < helpSize; i++)
+  {
+    printf("\n  %c | %s", serial_cmds[i].key, serial_cmds[i].desc);
+  }
+  printf("\n");
+}
+
+void print_help(void)
+{
+  printf("h - help for print subfunctions\n");
+  printf("\nCmd | Description of Printer subcommands");
+  printf("\n----+-----------------------------------");
+  for (int i = 0; i < phelpSize; i++) {
+    printf("\n  %c | %s", print_commands[i].key, print_commands[i].desc);
+  }
+  printf("\n");
+}
+
+void rom_help()
+// ROM commands help
+{
+  printf("h - help for ROM subfunctions\n");
+  printf("Cmd | Description of ROM subcommands");
+  printf("\n----+-----------------------------------");
+  for (int i = 0; i < rhelpSize; i++) {
+    printf("\n  %c | %s", rom_commands[i].key, rom_commands[i].desc);
+  }
+  printf("\n\nIMPORTANT: HP41 MUST BE OFF OR IN LIGHT SLEEP WHEN USING ROM COMMANDS\n");
+}
+
+
+int getHexKey(int ky)
+{
+  int x = -1;
+  if( ky >= '0' && ky <= '9' )
+    x = ky - '0';
+  else if( ky >= 'a' && ky <= 'f' ) 
+    x = ky - ('a'-0xa);
+  else if( ky >= 'A' && ky <= 'F' )
+    x = ky - ('A'-0xa);
+  return x; // Value of hex or -1
+}
+
+
+void serial_loop(void)
+{
+  int key = getchar_timeout_us(0);
+
+  if( key != PICO_ERROR_TIMEOUT ) {
+    if (state != ST_NONE) {
+      // some kind of input expected
+      if( key == 0x1b ) { // ESC - abort any key sequence ...
+        state = ST_NONE;      // reset input state
+        printf("Abort\n");
+      } else 
+      {
+        switch(state) {
+          case ST_PRT:          // printer functions
+            for (int i = 0; i < phelpSize; i++) {
+              if (print_commands[i].key == key) {
+                (*print_commands[i].fn)();
+                state = ST_NONE;
+              }   
+            }     
+            break;
+          case ST_WAND:
+            if ((key >= '0') && (key < '9')) {
+              // and  to list the XMEM contents
+              wandcode(key - 48);
+              state = ST_NONE;
+            }
+            break;
+          case ST_FILE:
+            if (key == 'F') {
+              file_download();
+              state = ST_NONE;
+            }
+          case ST_ROM:      // ROM functions
+            if ((key >= '0') && (key <='9')) {
+            // digit key pressed
+            rom_digit(key);
+            state = ST_NONE;
+            }
+            else
+            {
+              for (int i = 0; i < rhelpSize; i++) {
+                if (rom_commands[i].key == key) {
+                  (*rom_commands[i].fn)();
+                  state = ST_NONE;
+                }
+              }
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+    
+    else {
+      for (int i = 0; i < helpSize; i++) {
+        if (serial_cmds[i].key == key) {
+          (*serial_cmds[i].fn)();
+          break;
+        }
+      }
+    }
+  }
+  // else
+  // {
+    // I have found that I need to send something if the serial USB times out
+    // otherwise I get lockups on the serial communications.
+    // So, if we get a timeout we send a space and backspace it. And
+    // flush the stdio, but that didn't fix the problem but seems like a good idea.
+  //   stdio_flush();
+  //    printf(" \b");
+ //  }
+}
