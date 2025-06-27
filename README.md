@@ -29,7 +29,7 @@ And go back to step 7
 
 Any issues? Best is to report these in the issue tracker here on GitHub.
 
-Details on the TULIP Module version are coming soon.
+Details on the TULIP Module version are coming soon, here is a preview of the module itself on YouTube: https://youtu.be/zgKlAMlz9vY
 
 ![IMG_20240925_110722543](https://github.com/user-attachments/assets/33102d0d-1736-4b8a-81de-e93384321606)
 
