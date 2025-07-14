@@ -5,7 +5,8 @@ This is a major firmware update. The binary is in the build directory.
 
 **ONLY USE THE .UF2 VERSION FOR THE DEVBOARD!**
 
-TULIP4041 Quick Start
+**TULIP4041 Quick Start**
+
 The instructions below will guide you through the steps to get up and running with the new firmware TULIP4041 quickly.
 0.  Please read the documentation. If you have time read it all, if not then start with Chapter 10 and then 11. Follow the instructions in Chapter 12 for the firmware update process
 1.	Format a micro SD card (minimum 2 GByte) with the exFAT (recommended) or FAT file system
