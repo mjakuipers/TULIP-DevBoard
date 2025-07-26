@@ -6,7 +6,7 @@ VERSION 0.9 BETA 1, June 2025
 -   Public beta, second version for the Pico2-RP2350
 -   Updated to the Pico SDK 2.1.0
 -   FatFS no-OS-FatFS-SD-SDIO-SPI-RPi-Pico Version 3.7.0
--   USBD_PID Manufacturer and Product ID updated for TULIP4041
+-   USBD_PID Manufacturere and Product ID updated for TULIP4041
 -   Development tree with versions for DevBoard and Module, two binaries!
 -   uSD card will automatically mount and connect to host computer
 -   Many changes under the hood to prepare for the Module version, MOD files and Bank Switching
