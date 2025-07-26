@@ -1,7 +1,14 @@
 # TULIP-DevBoard and TULIP-Module
 README for the TULIP4041 DevBoard
 
-This is a major firmware update. The binary is in the build directory.
+VERSION 0.91 BETA 2, July 2025, Functional changes:
+-   Support for Bank Switching and loading .ROM files in individual Banks
+-   Support for ZEPROM Sticky Bank Switching (use the CLI emulate command to enable)
+-   Flexible sizing of Trace Buffer (change requires restart)
+-   A ROM can now be plugged with a Page nmber. This works only for Bank 1 and the first available Page is used
+-   The reserve command is added to reserve a Page for a physical Module, plugging without a Page number respects this reservation
+
+**Remember to unplug your embedded ROMs (HP-IL, ILPrinter) when doing a firmware upgrade**
 
 **ONLY USE THE .UF2 VERSION FOR THE DEVBOARD!**
 
@@ -54,7 +61,8 @@ Version history
 - sep 26 2024   - The directory TULIP4041-RP2040-Final contains the archived 2040 sources and the latest binary (.uf2)
 - sep 26 2024   - The direcory TULIP-P2 contains the sources and build for the RP2350 version
 - oct 27 2024   - refreshed sources and firmware to version 00.01.05
-- jun 27 2025   - update to version 0.9 BETA 1. See relaease notes for details
+- jun 27 2025   - update to version 0.9 BETA 1. See release notes for details
+- jul 26 2025   - update to version 0.91 BETA 2. See release notes for details
 
 All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
 
