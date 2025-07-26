@@ -176,43 +176,6 @@ uint32_t cdc_available(int itf)
     return tud_cdc_n_available(itf);
 }
 
-// the functions below shall not be used, will be removed
-void cdc_send_console(char* buffer, int len)
-{
-
-    // while (len) {
-    //     wait_for_write(ITF_CONSOLE, len + 50);
-    //     uint32_t w = tud_cdc_n_write(ITF_CONSOLE, buffer, len);
-    //     buffer += w;
-    //     len -= w;
-    // }
-    int sent;       // number of bytes really sent
-
-
-    wait_for_write(ITF_CONSOLE, len);
-
-    sent = tud_cdc_n_write(ITF_CONSOLE, buffer, len);
-
-    if (sent != len)
-    {
-        // something going on
-        printf("\n** len: %d - sent: %d  %.10s\n", len, sent, buffer);
-
-    }
-    /*
-    if (len >64)
-    {
-        tud_cdc_n_write(ITF_CONSOLE, buffer, 64);
-        wait_for_write(ITF_CONSOLE, len);
-        tud_cdc_n_write(ITF_CONSOLE, buffer + 64, len -64);
-    }
-    else{
-        tud_cdc_n_write(ITF_CONSOLE, buffer, len);
-    }
-    */
-
-    // tud_cdc_n_write_flush(ITF_CONSOLE);
-}
 
 void cdc_flush_console()
 {

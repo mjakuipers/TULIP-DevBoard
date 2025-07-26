@@ -88,10 +88,133 @@
 
 */
 
+// also adding the functions for OTP access
+// OTP is used for storing the serial number only
+// the serial numnber is stired at address 0x400 and 0x410
+// the code follows the example in the pico-sdk
+// the string programmed is "TULIP4041 HW V 1.0 serial #xxxx", 31 chars
+
 const uint8_t  *flash_contents_bt = (const  uint8_t *)(XIP_BASE + FF_OFFSET);    // pointer to FLASH byte array of FLASH File system
 const uint16_t *flash_contents_wd = (const uint16_t *)(XIP_BASE + FF_OFFSET);    // pointer to FLASH word array of FLASH File system
 
 static uint32_t ints;
+
+
+// function to read the serial number from OTP
+// the serial number is a 4 character string
+bool otp_write_serial(char *serial_str)
+{
+  
+  #define serial_length 32
+
+  otp_cmd cmd;
+  int8_t res;
+  uint8_t buf[serial_length];             // buffer for string messages
+
+  uint16_t ecc_row = 0x400;               // row to write ECC data
+  uint16_t raw_row = 0x410;               // row to write raw data 
+
+  cmd.flags = ecc_row;
+  res = rom_func_otp_access(buf, serial_length, cmd);
+  if (res) {
+    cli_printf("  ERROR READING OTP: Initial ECC Row Read failed with error %d", res);
+  }
+
+  // check if range is empty, otherwise we cannot write
+  for (int i = 0; i < serial_length; i++) {
+    if (buf[i] != 0x00) {
+      cli_printf("  ERROR: OTP ECC is not empty, cannot write serial number", raw_row);
+      return false;  // cannot write to OTP
+    }
+  } 
+
+  // copy the serial string to the buffer
+  for (int i = 0; i < serial_length; i++) {
+    if (serial_str[i] == '\0') {
+      // end of string, fill the rest with 0x00
+      buf[i] = 0x00;
+    } else {
+      buf[i] = serial_str[i];
+    }
+  }
+
+  // now write the serial number to the ECC row
+  cmd.flags = ecc_row | OTP_CMD_ECC_BITS | OTP_CMD_WRITE_BITS;
+  res = rom_func_otp_access(buf, serial_length, cmd);
+  if (res) {
+    cli_printf("  ERROR: ECC Serial Number Write failed with error %d", res);
+    return false;
+  } else {
+    cli_printf("  ECC Write Serial Number succeeded: %s", serial_str);
+  }
+
+  // Read it back
+  cmd.flags = ecc_row | OTP_CMD_ECC_BITS;
+  res = rom_func_otp_access(buf, serial_length, cmd);
+  if (res) {
+    cli_printf("  ERROR: ECC Read failed with error %d", res);
+    return false;
+  } else {
+    cli_printf("  ECC Data read is \"%s\"", buf);
+  }
+
+  return true;
+}
+
+bool otp_read_serial(char *serial_str)
+{
+  otp_cmd cmd;
+  int8_t res;
+  uint8_t buf1[64];             // buffer for string from ECC row
+  uint8_t buf2[64];             // buffer for string from RAW row
+
+  uint16_t ecc_row = 0x400;    // row to read ECC data
+  uint16_t raw_row = 0x410;    // row to read raw data 
+
+  // first read the ECC row
+  cmd.flags = ecc_row;
+  res = rom_func_otp_access(buf1, sizeof(buf1), cmd);
+  if (res) {
+    cli_printf("  ERROR READING OTP: ECC Row Read failed with error %d", res);
+    return false;
+  }
+
+  // copy the ECC data to the serial string
+  // the ECC data bytes are grouped per 2 bytes with 1 byte ECC and 1 byte 0x00
+  // copy the bytes and throw away every 3rd and 4th byte
+  // since the serial number string is max 32 bytes long we can count until 32
+  for (int i = 0; i < 31; i += 2) {
+    buf2[i]     = buf1[i*2];
+    buf2[i + 1] = buf1[i*2 + 1]; 
+  } 
+
+  #ifdef DEBUG
+  // show the serial number in hex
+  cli_printfn("  OTP ECC Row in hex   : ");
+  for (int i = 0; i < sizeof(buf1); i++) {
+    cli_printfn("%02X ", buf1[i]);
+  }   
+  cli_printf("");
+
+  // show the compressed string in hex
+  cli_printfn("  OTP ECC String in hex: ");
+  for (int i = 0; i < sizeof(buf2); i++) {
+    cli_printfn("%02X ", buf2[i]);
+  } 
+  cli_printf("");
+  cli_printf("  OTP Serial Number is: %s", buf2);
+
+  #endif
+
+  // copy buf2 to the serial_str
+  for (int i = 0; i < serial_length; i++) {
+    serial_str[i] = buf2[i];
+  }
+  
+  return true;   // success
+}
+
+
 
 // function to wait 0.5 seconds while flushing the console output
 // use this before erasing or programming flash

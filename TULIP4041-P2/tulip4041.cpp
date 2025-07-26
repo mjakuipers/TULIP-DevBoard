@@ -108,10 +108,7 @@ int main() {
 
     sdcard_init();     // initialize the FatFS system and uSD card SPI interface
 
-    // initialize trace and printbuffers 
-    TraceBuffer_init();     // only if used, do this dynamic in the future
-    PrintBuffer_init();     // only if used, do this dynamic in the future
-    WandBuffer_init();      // only if used, do this dynamic in the future
+
  
     // prepare the HP-IL loop
     HPIL_init();
@@ -124,6 +121,11 @@ int main() {
         globsetting.set_default();
         globsetting.save();
     }
+
+    // initialize trace and printbuffers 
+    TraceBuffer_init();     // only if used, do this dynamic in the future
+    PrintBuffer_init();     // only if used, do this dynamic in the future
+    WandBuffer_init();      // only if used, do this dynamic in the future
 
     // for a test version HPIL and the HP-IL printer are plugged
     globsetting.set(HPIL_plugged, 1);               // set the HPIL plugged flag  

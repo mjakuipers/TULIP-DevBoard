@@ -31,9 +31,11 @@ extern "C" {
 #include "hardware/flash.h"
 #include "hardware/watchdog.h"
 #include "pico/multicore.h"
+#include <stdio.h>
+#include "pico/bootrom.h"
+#include "hardware/structs/otp.h"
+
 #include "cli-binding.h"
-
-
 #include "cdc_helper.h"
 #include "emulation.h"
 #include "module.h"
@@ -48,6 +50,9 @@ extern "C" {
 #include "crash.h"
 
 // definitions for the flash memory
+
+bool otp_write_serial(char *serial_string);
+bool otp_read_serial(char *serial_string);
 
 void ff_delay500();
 void ff_show(uint32_t addr);
@@ -66,6 +71,8 @@ bool ff_write(uint32_t offs, uint8_t data);
 bool ff_writeable(uint32_t offs, uint32_t size);
 bool ff_writeableb(uint32_t offs, uint8_t data);
 bool ff_isinited();
+
+
 
 #ifdef __cplusplus 
 } 

@@ -1103,6 +1103,7 @@ char ILmnem[10];
 
 
 queue_t TraceBuffer;
+queue_t PreTrigBuffer;          // buffer for pre-trigger samples
 
 queue_t PowerEventBuffer;           // buffer for power events
 
@@ -1130,8 +1131,24 @@ extern int sample_break;
 // initialize the trace buffer
 void TraceBuffer_init()
 {
-    queue_init(&TraceBuffer, sizeof(TraceLine), TRACELENGTH);        // define trace buffer 
+    int TraceLength = globsetting.get(tracer_mainbuffer);           // get the trace length from the global settings
+    queue_init(&TraceBuffer, sizeof(TraceLine), TraceLength);       // define trace buffer, default 5000 samples
+
+    int PreTrigLength = globsetting.get(tracer_pretrig);            // get the pre-trigger length from the global settings
+    queue_init(&PreTrigBuffer, sizeof(TraceLine), PreTrigLength);   // define pre-trigger buffer, default 32 samples
 }
+
+bool SetPreTrigBuffer(int pretrig)
+{
+    // change the pre-trigger buffer size
+    if (pretrig < 1) return false;          // negative pre-trigger size is not allowed
+    if (pretrig > 256) return false;       // maximum pre-trigger size is 1000 samples
+
+    queue_free(&PreTrigBuffer);                                 // free the old pre-trigger buffer
+    queue_init(&PreTrigBuffer, sizeof(TraceLine), pretrig);     // define pre-trigger buffer
+    return true;
+}
+
 
 void HPIL_instr(uint16_t instr)
 // disassemble HP-IL specific instruction for SELP = 0..7
@@ -1174,6 +1191,7 @@ void Trace_task()
             Tracer_firstconnect = true;
             TracePrintLen = 0;
             cli_printf("  CDC Port 2 [tracer] connected");
+            trace_enabled = true;
             TracePrintLen += sprintf(TracePrint + TracePrintLen, "TRACER CDC PORT connected, trace is %s\n\r", trace_enabled ? "enabled":"disabled");
             cdc_sendbuf(ITF_TRACE, TracePrint, TracePrintLen);
             cdc_flush(ITF_TRACE);
@@ -1193,6 +1211,7 @@ void Trace_task()
     if ((Tracer_firstconnect) && (!cdc_connected(ITF_TRACE))) {
         // CDC interface is disconnected
         cli_printf("  CDC Port 2 [tracer] disconnected");
+        trace_enabled = false;          // disable the tracer
         Tracer_firstconnect = false;
     }
 
@@ -1222,8 +1241,7 @@ void Trace_task()
         if (!trace_enabled) return;
 
         // we could get out here if there is no CDC port connected for the tracer
-        // but we must keep emptying the buffer
-        // if (!cdc_connected(ITF_TRACE)) return;
+        if (!cdc_connected(ITF_TRACE)) return;
 
         // now start analyzing the trace sample
 
@@ -1239,8 +1257,6 @@ void Trace_task()
         DATAsample2 = TraceSample.data2;        // D55..D32, right justified 0xfeffffff
 
         bank = TraceSample.bank;
-
-
 
         data_x  =  DATAsample1 & 0x000000FF;                // DATA exponent, 2 digits
         data_xs = (DATAsample1 & 0x00000F00) >>  8;         // DATA exponent sign, 1 digit
@@ -1359,7 +1375,7 @@ void Trace_task()
                 fi = fi | fi1;                 // combine the two parts, shift to the left to get D55..D32
 
                 // for testing print the complete fi word
-                TracePrintLen += sprintf(TracePrint + TracePrintLen," fi1:%08X fi2:%08X", fi1, fi2);
+                // TracePrintLen += sprintf(TracePrint + TracePrintLen," fi1:%08X fi2:%08X", fi1, fi2);
 
                 // now print the FI bits
                  for (int i = 0; i < 14; i++) {   

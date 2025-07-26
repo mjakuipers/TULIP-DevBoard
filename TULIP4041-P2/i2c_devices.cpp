@@ -91,9 +91,12 @@ void pcf8520_reset() {
     // First do a reset, then set default values, especially the XTAL load capacitance
     // There are a load more options to set up the device in different ways that could be added here
 
+    uint8_t buf[2];
+
+    // no rest is done, not needed
     // write pattern 0x58 to the control register 0x00 for a software reset
-    uint8_t buf[2] = {0x00, 0x58};
-    i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 2, false);
+    // uint8_t buf[2] = {0x00, 0x58};
+    // i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 2, false);
 
     // set Control Register 1 to the initial values
     // 0x58 = 1000 0000b
@@ -103,10 +106,10 @@ void pcf8520_reset() {
     // bit 4 = 0 -> no software reset, already done
     // bit 3 = 0 -> 24 hour mode selected
     // bit 2 = 0 -> second interrupt disabled
-    // bit 1 = 0 -> qlarm interrupt disabled
+    // bit 1 = 0 -> alarm interrupt disabled
     // bit 0 = 0 -> correction interrupt disabled
     buf[0] = 0x00; // control register 1
-    buf[1] = 0x80; // write 0x00 to control register 1 to disable the oscillator
+    buf[1] = 0x80; // write 0x80 to control register 1 
     i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 2, false);
 
     // next is to enable the battery switchover in the control register 3
@@ -120,7 +123,7 @@ void pcf8520_reset() {
     // bit 5..3 COF[2:0] - 110, 1 Hz output
     // all other bits are 0
     buf[0] = 0x0F; // Tmnr_CLKOUT register
-    buf[1] = 0x60; // set COF[2:0] to 110 for 1 Hz output
+    buf[1] = 0x60; // set COF[2:0] to 110 for 1 kHz output
     i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 2, false);
 }
 

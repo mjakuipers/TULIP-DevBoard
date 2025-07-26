@@ -92,6 +92,9 @@ extern "C" {
 #define inst_ENBANK3    0x940
 #define inst_ENBANK4    0x9C0
 
+#define inst_ENBANK     0x9C0                // 0b0000.1001.1100.0000 with SYNC bit set
+#define mask_ENBANK     0xE3F                // 0b1111.1111.0011.1111 with SYNC bit set
+
 // HP-IL instructions
 // instruction type = 0
 // parameter is register

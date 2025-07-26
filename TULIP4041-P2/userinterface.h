@@ -77,47 +77,47 @@ void uif_calcreset();
 void uif_poweron();       
 void uif_configinit();    
 void uif_configlist();
+void uif_serial(const char *str);          // show/program the TULIP serial number
 
 void measure_freqs(void);
 
 void uif_blink(int b);
 
-void uif_dir(const char *dir);            // dir
+void uif_dir(const char *dir);                  // dir
 
 // all sdcard functions
-void uif_sdcard_status();      // uSD card status
-void uif_sdcard_mount();       // mount the uSD card
-void uif_sdcard_unmount();     // unmount the uSD card
+void uif_sdcard_status();                       // uSD card status
+void uif_sdcard_mount();                        // mount the uSD card
+void uif_sdcard_unmount();                      // unmount the uSD card
 void uif_sdcard_mounted();
 
 void uif_import(const char *fname, int a2, int a3);       // import a file and program in FLASH/FRAM
 
-void uif_list(int i, const char *fname);    // list
-void uif_delete(const char *fname);  // delete a file from FLASH/FRAM
+void uif_list(int i, const char *fname);        // list
+void uif_delete(const char *fname);             // delete a file from FLASH/FRAM
 
 void uif_plug(int func, int Page, int Bank, const char *fname);          // plug the selected ROM 
-void uif_unplug(int i);        // unplug the selected ROM
-void uif_cat(int p);                // show the plugged ROMs
+void uif_unplug(int i, int bk);                 // unplug the selected ROM / Bank
+void uif_cat(int p, int b);                     // show the plugged ROMs
+void uif_reserve(int i, int p, const char *comment);     // reserve a Page for a module
 
-void uif_fram(int i, uint32_t addr);       // FRAM functions
+void uif_fram(int i, uint32_t addr);            // FRAM functions
 
-void uif_printer(int i);       // HP82143A printer functions
+void uif_printer(int i);                        // HP82143A printer functions
 
-void uif_xmem(int i);          // functions for Extended Memory control
+void uif_xmem(int i);                           // functions for Extended Memory control
 
-void uif_tracer(int i);        // functions for the bus tracer
+void uif_tracer(int i, int bufsize);            // functions for the bus tracer
 
-void uif_rtc(int i, const char *args);    // RTC test functions
+void uif_rtc(int i, const char *args);          // RTC test functions
 
-void uif_emulate(int i);        // enable/disable hardware emulation functions
+void uif_emulate(int i, int p);                        // enable/disable hardware emulation functions
 
 void uif_welcome();
 void pio_welcome();
 
 extern void usb_sd_eject();
 extern void usb_sd_connect();
-
-   
 
 void welcome();
 

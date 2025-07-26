@@ -36,8 +36,9 @@ extern "C" {
 #include "fram.h"
 
 
-// bit field for the Image flags, used for Banks
+// bit field for the Image flags, used for Pages
 enum {
+    PAGE_none      = 0x0000,       // nothing plugged here
     PAGE_ACTIVE    = 0x0001,       // page is active (has a valid content)
     PAGE_FLASH     = 0x0002,       // page is in FLASH or FRAM
     PAGE_ROM       = 0x0004,       // page is ROM or not
@@ -45,7 +46,7 @@ enum {
     PAGE_ENABLED   = 0x0010,       // page is enabled for reading
     PAGE_DIRTY     = 0x0020,       // page is dirty
     PAGE_WRITEABLE = 0x0040,       // page is write enabled
-    PAGE_PHYS      = 0x0080,       // page reserved by a physical module
+    PAGE_RESERVED  = 0x0080,       // page reserved by a physical module
     PAGE_EMBEDDED  = 0x0100,       // page is embedded in the firmware
                                    // used for the HP-IL and Printer ROMs
 };
@@ -103,9 +104,6 @@ typedef enum {rom, qram, ram} ROM_TYPE;
 #define QUEUE_STATUS  
 
 
-
-
-
 void fram_rommap_init(); 
 
 inline uint16_t swap16(uint16_t b)
@@ -126,9 +124,9 @@ static const char __in_flash("emb1")*PageText[] =
   "HP41 System ROM2",                   // Page 2, always reserved
   "HP41CX XFunctions ROM",              // Page 3, always reserved
   "use for Take Over ROM",              // Page 4, used for Take Over ROMs
-  "use for TIME/CX XFN",               // Page 5, used for TIME/CX XFN
-  "use for Printers",                  // Page 6, used for Printers
-  "use for HP-IL",                     // Page 7, used for HP-IL
+  "use for TIME/CX XFN",                // Page 5, used for TIME/CX XFN
+  "use for Printers",                   // Page 6, used for Printers
+  "use for HP-IL",                      // Page 7, used for HP-IL
   "Page 8 / Port 1 L",                  // Page 8, regular page
   "Page 9 / Port 1 U",                  // Page 9, regular page 
   "Page A / Port 2 L",                  // Page A, regular page  
@@ -159,10 +157,15 @@ struct CBank {
 
 // define a single Page with 4 Banks
 // used by the CModule class
+
+#define bank_mask   0x03    // mask to get the active number from m_bank
+#define bank_sticky 0x80    // sticky bit to prevent resetting bank on light/deep SLEEP
+                            // used for ZEPROM emulation
 struct CPage{
   CBank     m_banks[5];     // The four Banks in the Page, we use 5 because of the 1..4 range used
                             // Bank 0 is used for generic information about the Page                      
   uint8_t   m_bank;         // Current active bank in this page, when 0 this Page is not in use
+                            // defaults to 1 when plugged, use the sticky bit for ZEPROM emulation
 };
 
 // keep in mind that TULIP_Pages.mbanks[0] contains generic information about the Page
@@ -224,10 +227,10 @@ public:
       Pages[i].m_banks[1].b_img_name[sizeof(Pages[i].m_banks[1].b_img_name) - 1] = '\0'; // ensure null termination
     }
 
-    Pages[0].m_banks[0].b_img_flags = BANK_RESERVED;                          // Page 0 is always reserved
-    Pages[1].m_banks[0].b_img_flags = BANK_RESERVED;                          // Page 1 is always reserved
-    Pages[2].m_banks[0].b_img_flags = BANK_RESERVED;                          // Page 2 is always reserved
-    Pages[3].m_banks[0].b_img_flags = BANK_RESERVED;                          // Page 3 is always reserved
+    Pages[0].m_banks[0].b_img_flags = PAGE_RESERVED;                          // Page 0 is always reserved
+    Pages[1].m_banks[0].b_img_flags = PAGE_RESERVED;                          // Page 1 is always reserved
+    Pages[2].m_banks[0].b_img_flags = PAGE_RESERVED;                          // Page 2 is always reserved
+    Pages[3].m_banks[0].b_img_flags = PAGE_RESERVED;                          // Page 3 is always reserved
 
     Pages[0].m_banks[1].b_img_flags = BANK_RESERVED;                          // Page 0 is always reserved
     Pages[1].m_banks[1].b_img_flags = BANK_RESERVED;                          // Page 1 is always reserved
@@ -308,7 +311,7 @@ public:
   //     port: the port number (0..15)
   //     bank: the bank number (1..4)
   void unplug(int port, int bank) {
-    // cannot unplug the reserved banks 0..3
+    // cannot unplug the reserved pages 0..3
     if ((port == 0) || (port == 1) || (port == 2) || (port == 3)) {
       return; 
     }
@@ -322,24 +325,35 @@ public:
     // Pages[port].m_banks[bank].b_img_name[0] = 0;          // image file name
     Pages[port].m_banks[bank].b_img_file = 0;  
     Pages[port].m_banks[bank].b_img_data = NULL;          // clear the pointer to the image in FLASH
+
+    if (bank == 1) {
+      // if we unplug bank 1, we need to reset the active bank and disable ZEPROM emulation
+      Pages[port].m_bank = 0;       // no active bank in the Page
+    }
   }
 
+
   // read a ROM word given the address
-  // always reads from the active bank of the module
   // Does check if a module is plugged
   // the address is the address in the module space (0..0xFFFF)
   // should not be called if a physical module is plugged
   // returns 0 if there is no plugged ROM
-  uint16_t __not_in_flash() getword(uint16_t addr) {
+  // returns the word from Bank 1 of the enabled Bank is not plugged/enabled
+  uint16_t __not_in_flash() getword(uint16_t addr, uint8_t bank) {
     // get the page and bank from the address
     int port = PAGE(addr);            // work out the page from the address
-    int bank = 1;                     // get the active bank from the page
+    uint8_t bk = bank;                // get the bank number from the bank argument
     uint16_t word = 0;                // word to return
+    uint16_t res1, res2, result;
     // we have the following options:
     // embedded image in FLASH
     // first check if the page is active and/or enabled
 
-    if ((Pages[port].m_banks[bank].b_img_flags & PAGE_ACTIVE) == 0) return 0;   // bank is not active
+    if ((bk > 1) && !(Pages[port].m_banks[bank].b_img_flags & PAGE_ENABLED)) {
+      // bank is not enable, return the word for Bank 1
+      bk = 1; // switch to Bank 1 
+    }
+
     if ((Pages[port].m_banks[bank].b_img_flags & PAGE_ENABLED) == 0) return 0;  // bank is not enabled
 
     // get the word if the page is an embedded page
@@ -375,7 +389,7 @@ public:
         // the image is packed in 4 words per 5 bytes, so we need to unpack it
         // need to evaluate the code below for speed and improve where possible
         uint8_t *bin = (uint8_t*)Pages[port].m_banks[bank].b_img_data;
-        uint16_t res1, res2, result;
+
         uint16_t offset = (addr * 5) / 4;            // offset in the packed ROM file of the first byte
         int shift1 = (addr & 0x0003) * 2;
         int shift2 = 8 - shift1;
@@ -405,6 +419,25 @@ public:
     return (Pages[port].m_banks[bank].b_img_flags); // return the flags from the image
   }
 
+  void setComment(int port, int bank, const char *comment) {
+    // set the comment for the Page/Bank
+    // copy the comment to the b_img_name field
+    // shorten the comment to 31 chars
+    if (comment == NULL) {
+      // if no comment is given, set the name to empty
+      Pages[port].m_banks[bank].b_img_name[0] = '\0';
+      return;
+    }
+    strncpy(Pages[port].m_banks[bank].b_img_name, comment, sizeof(Pages[port].m_banks[bank].b_img_name) - 1);
+    Pages[port].m_banks[bank].b_img_name[sizeof(Pages[port].m_banks[bank].b_img_name) - 1] = '\0'; // ensure null termination
+  }
+
+  void setFlags(int port, int bank, uint16_t flags) {
+    // set the flags for the Page/Bank
+    // the flags are a bit field of the BANK_FLAGS
+    Pages[port].m_banks[bank].b_img_flags = flags; // set the flags for the image
+  }
+
   bool __not_in_flash() isEmbeddedROM(int Port, int Bank) {
     // get the page and bank from the address
     return (Pages[Port].m_banks[Bank].b_img_flags & BANK_EMBEDDED); // return true if the image is embedded
@@ -412,7 +445,19 @@ public:
 
   bool isReserved(int port) {
     // check if the Page/Bank is reserved
-    return Pages[port].m_banks[0].b_img_flags & BANK_RESERVED;
+    return ((Pages[port].m_banks[0].b_img_flags & BANK_RESERVED) ||
+            (Pages[port].m_banks[1].b_img_flags & BANK_RESERVED) ||
+            (Pages[port].m_banks[2].b_img_flags & BANK_RESERVED) ||
+            (Pages[port].m_banks[3].b_img_flags & BANK_RESERVED) ||
+            (Pages[port].m_banks[4].b_img_flags & BANK_RESERVED));
+  }
+
+  bool isUsed(int Port, int Bank) {
+    // check if the Page/Bank is used
+    return ((Pages[Port].m_banks[Bank].b_img_flags & BANK_ACTIVE) ||
+            (Pages[Port].m_banks[Bank].b_img_flags & BANK_ENABLED) ||
+            (Pages[Port].m_banks[Bank].b_img_flags & BANK_EMBEDDED) ||
+            isReserved(Port));
   }
 
   bool is_rommmap_inited() {
@@ -561,9 +606,9 @@ void getFileName(int port, int bank, char *filename) {
   void dumpPage(int port) {
     // dump a single page
     if ((port < 0) || (port >= NR_PAGES)) return; // invalid port
-    cli_printf("Page %d: %s", port, Pages[port].m_banks[1].b_img_name);
+    cli_printf("Page %X: %s", port, Pages[port].m_banks[1].b_img_name);
     for (int j = 0; j <= 4; j++) {
-        cli_printf("  Bank %X: %s, flags: 0x%04X, ROM offset: 0x%08X - 0x%08x", j, 
+        cli_printf("  Bank %d: %s, flags: 0x%04X, ROM offset: 0x%08X - 0x%08x", j, 
                                                                         Pages[port].m_banks[j].b_img_name,
                                                                         Pages[port].m_banks[j].b_img_flags, 
                                                                         Pages[port].m_banks[j].b_img_rom,

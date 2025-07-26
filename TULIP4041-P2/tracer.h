@@ -21,59 +21,49 @@
 extern "C" {
 #endif
 
-
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include "tulip.h"
 #include "pico/stdlib.h"
-
-// #include "disassembler.h"
 #include "cdc_helper.h"
 #include "emulation.h"
 #include "userinterface.h"
 #include "fram.h"
-// #include "module.h"
-
-
-
-
-// #include "peripherals.h"
 
 // definition of the structure for the analyzer functions
 // different variations to support dynamic sizing of the tracebuffer
 
 // TLine  is for the maximum possible trace line structure with FI and HP-IL
-// TODO: add line for current bank
 struct TLine {
-    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes
-    uint16_t    isa_address;        // ISA address                                  2 bytes
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes
-    uint8_t     bank;               // current selected bank                        1 byte
-    uint32_t    data1;              // DATA D31..D00                                4 bytes
-    uint32_t    data2;              // DATA D55..D32                                4 bytes
-    uint32_t    fi1;                // for FI line tracing                          4 bytes
-    uint32_t    fi2;                //                                              4 bytes
-    uint16_t    xq_instr;           // instruction decoded                          2 bytes
-    bool        xq_carry;           // when carry is sent                           1 byte
-    uint32_t    ramslct;            // selected RAM chip                            4 bytes
-    uint16_t    frame_in;           // HP-IL frame input                            2 bytes
-    uint16_t    frame_out;          // HP-IL frame output                           2 bytes
-    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4
+    uint32_t    data1;              // DATA D31..D00                                4 bytes      8
+    uint32_t    data2;              // DATA D55..D32                                4 bytes     12
+    uint32_t    fi1;                // for FI line tracing                          4 bytes     16
+    uint32_t    fi2;                //                                              4 bytes     20
+    uint16_t    ramslct;            // selected RAM chip                            4 bytes     24
+    uint16_t    isa_address;        // ISA address                                  2 bytes     26
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     28
+    uint16_t    xq_instr;           // instruction decoded                          2 bytes     30   
+    uint16_t    frame_in;           // HP-IL frame input                            2 bytes     32
+    uint16_t    frame_out;          // HP-IL frame output                           2 bytes     34    
+    uint8_t     bank;               // current selected bank                        1 byte      35
+    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     44 
+    bool        xq_carry;           // when carry is sent                           1 byte      45
 } ;
 
 // TLine  is for basic tracing with FI
 struct TLine_FI {
-    uint32_t    cycle_number;       // to count the cycles since the last PWO
-    uint16_t    isa_address;        // ISA address
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status
-    uint32_t    data1;              // DATA D31..D00
-    uint32_t    data2;              // DATA D55..D32
-    uint32_t    fi1;                // for FI line tracing
-    uint32_t    fi2;     
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       // 4 bytes      4
+    uint32_t    data1;              // DATA D31..D00                                // 4 bytes     12  
+    uint32_t    data2;              // DATA D55..D32                                // 4 bytes     16
+    uint32_t    fi1;                // for FI line tracing                          // 4 bytes     20
+    uint32_t    fi2;                //                                              // 4 bytes     24
+    uint16_t    isa_address;        // ISA address                                  // 2 bytes      6    
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             // 2 bytes      8
+    uint16_t    ramslct;            // selected RAM chip                            // 4 bytes     28
     // uint16_t    xq_instr;           // instruction decoded              
     // bool        xq_carry;           // when carry is sent
-    uint32_t    ramslct;            // selected RAM chip
     // uint16_t    frame_in;           // HP-IL frame input
     // uint16_t    frame_out;          // HP-IL frame output
     // uint8_t     HPILregs[9];        // HP-IL registers
@@ -82,11 +72,11 @@ struct TLine_FI {
 
 // TLine basic is for the smallest possible trace line structure
 struct TLine_basic {
-    uint32_t    cycle_number;       // to count the cycles since the last PWO
-    uint16_t    isa_address;        // ISA address
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status
-    uint32_t    data1;              // DATA D31..D00
-    uint32_t    data2;              // DATA D55..D32
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       // 4 bytes      4
+    uint32_t    data1;              // DATA D31..D00                                // 4 bytes     10   
+    uint32_t    data2;              // DATA D55..D32                                // 4 bytes     14
+    uint16_t    isa_address;        // ISA address                                  // 2 bytes      6
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             // 2 bytes      8       
     // uint32_t    fi1;                // for FI line tracing
     // uint32_t    fi2;   
     // uint16_t    xq_instr;           // instruction decoded                
@@ -99,19 +89,19 @@ struct TLine_basic {
 
 // TLine basic is for the basic trace with HP-IL registers
 struct TLine_IL {
-    uint32_t    cycle_number;       // to count the cycles since the last PWO
-    uint16_t    isa_address;        // ISA address
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status
-    uint32_t    data1;              // DATA D31..D00
-    uint32_t    data2;              // DATA D55..D32
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       // 4 bytes      4
+    uint32_t    data1;              // DATA D31..D00                                // 4 bytes     12
+    uint32_t    data2;              // DATA D55..D32                                // 4 bytes     16
+    uint16_t    isa_address;        // ISA address                                  // 2 bytes      6 
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             // 2 bytes      8
     // uint32_t    fi1;                // for FI line tracing
     // uint32_t    fi2;                
     // uint16_t    xq_instr;           // instruction decoded   
     // bool        xq_carry;           // when carry is sent
-    uint32_t    ramslct;            // selected RAM chip
-    uint16_t    frame_in;           // HP-IL frame input
-    uint16_t    frame_out;          // HP-IL frame output
-    uint8_t     HPILregs[9];        // HP-IL registers
+    uint16_t    ramslct;            // selected RAM chip                            // 4 bytes     20
+    uint16_t    frame_in;           // HP-IL frame input                            // 2 bytes     22
+    uint16_t    frame_out;          // HP-IL frame output                           // 2 bytes     24    
+    uint8_t     HPILregs[9];        // HP-IL registers                              // 9 bytes     33
 };
 
 
@@ -132,136 +122,76 @@ extern const char *mnemonics[];
 void TraceBuffer_init();
 void Trace_task();
 
-const int TRACELENGTH = 5000;       //Trace Buffer length
-
 #define numILmnemonics      49      // number of elements in IL_mnemonics 0.. 48, PILBox commands now included
 
-#define NUMFILTERS          16      // number of entries for filters
 
-struct filter {
-    uint16_t start_adr;             // start of the range to be filtered
-    uint16_t end_adr;               // end of the range to be filtered
-    uint16_t count_adr;             // counter in case of a trigger with sample counter
-    uint8_t bank;                   // not yet supported
-                                    // 0    - any bank
-                                    // 1..4 - specific bank
-    uint8_t type;                   // type of filter
-};
+// *******************************************************************
+// new setup for the filters/triggers
+// using the setup from Thomas Fänge
+// one big array with 2 bits for every HP41 address, no bank discrimination
+// bit meaning        00 -- pass
+//                    01 -- block
+//                    10 -- trigger start
+//                    11 -- trigger end
+// 
+// this vastly reduces the load on the CPU for the tracer since the filtering can be very fast in core1
 
-// filter types below
-#define filter_none         0x00    // filter empty or deleted
-#define filter_valid        0x01    // filter valid
-#define filter_active       0x81    // filter valid and active
+// In addition define a first level filter per Page/Bank to Pass or Block
+// Use a dynamic array per Bank of 4K words * 2 bits per word = 1K per Bank
 
-#define filter_block        0x01
-#define filter_pass         0x02
-#define filter_trig_a       0x03    // trigger with start and end address
-#define filter_trig_c       0x04    // trigger with start adress and count
+#define     ADDR_MASK   0xFFFF
+#define     BRK_SIZE ((ADDR_MASK+1)/(32/2)) // 2 bits per brkpt
 
-#define filter_act_block    0x81
-#define filter_act_pass     0x82
-#define filter_act_trig_a   0x83    // trigger with start and end address
-#define filter_act_trig_c   0x84    // trigger with start adress and count
 
-// bit 7 of type defines if a filter is active or inactive
-// when set the filter is active, otherwise inactive
 
-#define BLOCK_THIS 1
-#define PASS_THIS  2
-#define TRIG_START 3
-#define TRIG_END   4
 
-class Tracer {
+// #define BRK_MASK(a,w) ((m_brkpt[a>>4]w >> ((a & 0xF)<<1)) & 0b11)
+// #define BRK_SHFT(a) ((a & 0xF)<<1)
+// #define BRK_WORD(a) (a >> 4)
+
+
+#define FILTER_BLOCK_THIS   0b00
+#define FILTER_PASS_THIS    0b01
+#define FILTER_TRIG_START   0b10
+#define FILTER_TRIG_END     0b11
+
+
+class Filter {
 
     public:
 
-    filter block_filter[NUMFILTERS];
-    filter pass_filter[NUMFILTERS];
-    filter trig_filter[NUMFILTERS];
+    uint32_t    m_filter[BRK_SIZE];      // BRK_SIZE expands to 4096, with 32 bits per word
+                                    // total size is 16 KByte for the breakpoints
 
-    filter filters[NUMFILTERS];
-
-    Tracer() {
+    Filter() {
         // initialize to default settings
 
-        // clear all filter arrays
-        for (int i = 0; i < NUMFILTERS; i++) 
-        {
-            block_filter[i].start_adr = 0;
-            block_filter[i].end_adr = 0;
-            block_filter[i].count_adr = 0;
-            block_filter[i].bank = 0;          // default is any bank, but not supported in BETA
-            block_filter[i].type = 0;
-
-            pass_filter[i].start_adr = 0;
-            pass_filter[i].end_adr = 0;
-            pass_filter[i].count_adr = 0;
-            pass_filter[i].bank = 0;          // default is any bank, but not supported in BETA
-            pass_filter[i].type = 0;
-
-            trig_filter[i].start_adr = 0;
-            trig_filter[i].end_adr = 0;
-            trig_filter[i].count_adr = 0;
-            trig_filter[i].bank = 0;          // default is any bank, but not supported in BETA
-            trig_filter[i].type = 0;                        
+        // clear the main filter array
+        for (int i = 0; i < BRK_SIZE; i++) {
+            m_filter[i] = 0;
         }
     }
 
 
     // apply the filter, should we pass or block the current address
     // this is called for every sample by the tracer main loop
-    // returns 1 if sample should be blocked
-    //         2 if sample can be passed
-    //         3 if this is a start trigger address
-    //         4 if this is an end trigger address
+    // returns 1 
 
-    int apply(uint16_t adr) {
-        bool pass_active = false;
-        bool pass_potential = false;        // possible pass address
-        bool trig_s_potential = false;      // possible trigger start address
-        bool trig_e_potential = false;      // possible trigger end address
+    uint8_t apply(uint16_t adr) {
 
-        for (int i = 0; i < NUMFILTERS; i++) {
-
-            // test block
-            if ((filters[i].type == filter_act_block) &&
-                (adr >= filters[i].start_adr) &&
-                (adr <= filters[i].end_adr)) {         
-                    // block takes priority, so always block this sample and get out   
-                    return BLOCK_THIS;         
-            }
-            // test pass
-            if ((filters[i].type == filter_act_pass) &&
-                (adr >= filters[i].start_adr) &&
-                (adr <= filters[i].end_adr)) {         
-                    // this may be a pass, if there is no later block
-                    pass_potential = true;
-            }
-
-            // now check for start trigger
-            if (((filters[i].type == filter_act_trig_a) || (filters[i].type == filter_act_trig_c)) && 
-                (adr == filters[i].start_adr)) {
-                    // trigger start address found, if there is no later block
-                    trig_s_potential = true;
-            }
-
-            // now check for end trigger
-            if ((filters[i].type == filter_act_trig_a) && (adr == filters[i].end_adr)) {
-                    // trigger end address found, if there is no later block
-                    trig_e_potential = true;
-            }           
-        }                  
-
-        // if we get here it is because:
-        //      - there was a pass potential, which is not blocked
-        //      - there was a trig potential, which is not blocked
-        //      - there was no block or potential, which is a pass
-
-        if (pass_potential) return PASS_THIS;
-        if (trig_s_potential) return TRIG_START;
-        if (trig_e_potential) return TRIG_END;
-        return PASS_THIS;
+        // get the word and bit position
+        int word = adr >> 4;          // divide by 16
+        int bit = (adr & 0xF) << 1;   // multiply by 2
+        uint32_t mask = 0b11 << bit;  // create the mask for the 2 bits
+        uint32_t fil;
+        fil = m_filter[word] & mask; // get the filter bits for this address
+        // and shift the filter bits out
+        fil >>= bit;               // shift the bits to the right
+        // and return the value
+        return fil; // return the filter bits, 0=pass, 1=block, 2=trigger start, 3=trigger end
     }
+
+
 
     // add a new filter
     // parameters:
@@ -276,17 +206,6 @@ class Tracer {
         // first find a free entry in the array
         int entry = 0; 
 
-        while ((entry < NUMFILTERS) && (block_filter[entry].type != filter_none)) {
-            entry++;
-        }
-
-        if (entry > NUMFILTERS) return -1;              // no free netries found
-
-        // we have a valid entry, add parameters
-        filters[entry].type = tp;
-        filters[entry].start_adr = start_adr;
-        filters[entry].end_adr = end_adr;
-        filters[entry].bank = bank;
 
         return entry;
     }
@@ -297,9 +216,6 @@ class Tracer {
     {
         int result = -1;
 
-        if ((entry < 5) || (entry > NUMFILTERS)) return -1;  // invalid entry number
-
-        filters[entry].type = 0;        // invalidate entry
         return entry;
     }
 
@@ -327,26 +243,7 @@ class Tracer {
     void clear_filters()
     {
         // clear all filter arrays
-        for (int i = 0; i < NUMFILTERS; i++) 
-        {
-            block_filter[i].start_adr = 0;
-            block_filter[i].end_adr = 0;
-            block_filter[i].count_adr = 0;
-            block_filter[i].bank = 0;          // default is any bank, but not supported in BETA
-            block_filter[i].type = 0;
 
-            pass_filter[i].start_adr = 0;
-            pass_filter[i].end_adr = 0;
-            pass_filter[i].count_adr = 0;
-            pass_filter[i].bank = 0;          // default is any bank, but not supported in BETA
-            pass_filter[i].type = 0;
-
-            trig_filter[i].start_adr = 0;
-            trig_filter[i].end_adr = 0;
-            trig_filter[i].count_adr = 0;
-            trig_filter[i].bank = 0;          // default is any bank, but not supported in BETA
-            trig_filter[i].type = 0;                        
-        }
     }
 
     // set items to the default value and save in fram
@@ -356,40 +253,9 @@ class Tracer {
 
         clear_filters();
 
-        // now initialize block_filters
-        block_filter[0].start_adr = 0x0098;         // 0x0098 - 0x00A1       RSTKB and RST05
-        block_filter[0].end_adr   = 0x00A1;
-        block_filter[0].type      = filter_valid;   // valid but not active
+        return 0;
 
-        block_filter[1].start_adr = 0x0177;         // 0x0177 - 0x0178       delay for debounce
-        block_filter[1].end_adr   = 0x0178;
-        block_filter[1].type      = filter_valid;   // valid but not active
 
-        block_filter[2].start_adr = 0x089C;         // 0x089C - 0x089D       BLINK01
-        block_filter[2].end_adr   = 0x089D;                
-        block_filter[2].type      = filter_valid;   // valid but not active
-
-        block_filter[3].start_adr = 0x0000;         // 0x0000 - 0x5FFF       system ROMS (inlcuding Page 4!)  
-        block_filter[3].end_adr   = 0x4FFF;
-        block_filter[3].type      = filter_valid;   // valid but not active
-
-        block_filter[4].start_adr = 0x6000;         // 0x6000 - 0x7FFF       HP-IL ROMs (including the printer!)
-        block_filter[4].end_adr   = 0x7FFF;
-        block_filter[4].type      = filter_valid;   // valid but not active
-
-        if (gpio_get(P_PWO) == 0)
-        {
-            // when PWO = low we can write to FRAM
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start, (uint8_t*)block_filter, sizeof(block_filter));
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start + sizeof(block_filter), (uint8_t*)pass_filter, sizeof(pass_filter));
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start + sizeof(block_filter) + sizeof(pass_filter), (uint8_t*)trig_filter, sizeof(trig_filter));
-            return 1;
-        }
-        else
-        {
-            // PWO was high, calculator is running and cannot write to FRAM
-            return 0;
-        }
     }
 
 
@@ -400,9 +266,7 @@ class Tracer {
         if (gpio_get(P_PWO) == 0)
         {
             // when PWO = low we can write to FRAM
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start, (uint8_t*)block_filter, sizeof(block_filter));
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start + sizeof(block_filter), (uint8_t*)pass_filter, sizeof(pass_filter));
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start + sizeof(block_filter) + sizeof(pass_filter), (uint8_t*)trig_filter, sizeof(trig_filter));
+            
             return 1;
         }
         else
@@ -421,9 +285,7 @@ class Tracer {
             // when PWO = low we can write to FRAM
             // fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_gsettings_start, gsettings, sizeof(gsettings));
             // when PWO = low we can read from FRAM
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start, (uint8_t*)block_filter, sizeof(block_filter));
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start + sizeof(block_filter), (uint8_t*)pass_filter, sizeof(pass_filter));
-            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_tracer_start + sizeof(block_filter) + sizeof(pass_filter), (uint8_t*)trig_filter, sizeof(trig_filter));
+    
             return 1;
         }
         else
@@ -433,7 +295,7 @@ class Tracer {
         }
     }
 
-} ; // end of class GSettings
+} ; // end of class Filter
 
 #ifdef __cplusplus
 }

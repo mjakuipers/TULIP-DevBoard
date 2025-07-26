@@ -145,6 +145,8 @@ typedef struct {
   byte HeaderCustom[32];  // for special hardware attributes
 } ModuleFileHeader_t;
 
+
+
 // page struct for MOD1
 typedef struct {
   byte Image[5120];       // the image in packed format (.BIN file format)
@@ -181,7 +183,25 @@ typedef struct {
   byte RAM;               // 0=ROM, 1=RAM - normally RAM pages are all blank if Original=1
   byte WriteProtect;      // 0=No or N/A, 1=protected - for HEPAX RAM and others that might support it
   byte FAT;               // 0=no FAT, 1=has FAT
+  uint8_t Image[5120];    // the image in packed format (.BIN file format)
+  byte PageCustom[32];    // for special hardware attributes
 } ModuleHeader_t;
+
+// page struct for module
+typedef struct {
+  char Name[20];          // normally the name of the original .ROM file, if any
+  char ID[9];             // ROM ID code, normally two letters and a number are ID and last letter is revision - if all zeros, will show up as @@@@
+  byte Page;              // the page that this image must be in (0-F, although 8-F is not normally used) or defines each page's
+                          // position relative to other images in a page group, see codes below
+  byte PageGroup;         // 0=not grouped, otherwise images with matching PageGroup values (1..8) are grouped according to POSITION code
+  byte Bank;              // the bank that this image must be in (1-4)
+  byte BankGroup;         // 0=not grouped, otherwise images with matching BankGroup values (1..8) are bankswitched with each other
+  byte RAM;               // 0=ROM, 1=RAM - normally RAM pages are all blank if Original=1
+  byte WriteProtect;      // 0=No or N/A, 1=protected - for HEPAX RAM and others that might support it
+  byte FAT;               // 0=no FAT, 1=has FATp
+  word Image[4096];       // the image in upacked format (.ROM file format)
+  byte PageCustom[32];    // for special hardware attributes
+} ModuleHeaderV2_t;
 
 // page struct for module
 typedef struct {

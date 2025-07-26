@@ -52,10 +52,11 @@ bool SELP9_status_VALID = true;             // always true
 
 uint16_t SELP9_status = prtstatus_def;      // contains the HP82143A printer status bits, set to default values
 
-uint8_t enabled_bank = 1;                   // for testing bankswitching. Page 8 only (for OSX)
-
 // Bank Switching, keep trackof enabled Bank for each page
 uint8_t active_bank[16];
+uint8_t enabled_bank = 1;               // the enabled bank
+uint8_t temp_bank = 1;                  // temporary bank 
+bool Banks_dirty = false;            // true when the banks have been changed and need to be updated
 
 uint16_t LocalAdvIgnore = false;            // for ignoring local paper advance  
 
@@ -315,8 +316,7 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
         #if (TULIP_HARDWARE == T_DEVBOARD)
             pio_sm_exec(pio0_pio, fiin_sm, pio_encode_jmp(datain_offset + hp41_pio_datain_offset_data_start));  
         #endif
-
-        enabled_bank = 1;                   // reset enabled bank      
+  
         // initialize bank registers
         for (int i = 0; i < 16; i++) {
             active_bank[i] = 1;
@@ -352,9 +352,15 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
         pio_sm_exec(pio1_pio, fiout_sm, pio_encode_jmp(fiout_offset + hp41_pio_fiout_offset_fiout_start));  
         pio_sm_clear_fifos(pio1_pio, fiout_sm);
 
-        enabled_bank = 1;                   // reset enabled bank  
         for (int i = 0; i < 16; i++) {
-            active_bank[i] = 1;
+            // must check if there is any sticky bank set
+            if (TULIP_Pages.Pages[i].m_bank & bank_sticky) {
+                // if the page is sticky then we set the active bank to the sticky bank
+                active_bank[i] = TULIP_Pages.Pages[i].m_bank & 0x0F;   // get the active bank from the sticky bank
+            }
+            else
+                // no sticky bank, so set the active bank to 1
+                active_bank[i] = 1;
         }  
         cycle_counter = 0;
         ramselected = 0;
@@ -411,7 +417,7 @@ void wakemeup_41()
 void shutdown_41()
 {
     #if (TULIP_HARDWARE == T_DEVBOARD)
-        // drive PWO_OE high, on teh DevBoard this is shared with IR Output
+        // drive PWO_OE high, on the DevBoard this is shared with IR Output
         pio_sm_exec(pio1_pio, irout_sm, pio_encode_set(pio_x, 0) | pio_encode_sideset(1, 0));
         pio_sm_exec(pio1_pio, irout_sm, pio_encode_jmp(irout_offset + hp41_pio_irout_offset_hilo_loop) | pio_encode_sideset(1, 0));
     #else
@@ -540,10 +546,12 @@ void PowerMode_task()
     prev_mode = HP41_powermode;
     if (gpio_get(P_PWO))
     {
+        // PWO is high, HP41 is running
         HP41_powermode = eAwake;    // HP41 is running
     }
     else
     {
+        // PWO is low, HP41 is sleeping (DEEP or LIGHT sleep)
         if (gpio_get(P_SYNC))
         {
             // SYNC is high, PWO is low
@@ -582,6 +590,14 @@ void PowerMode_task()
             TPrintLen += sprintf(TPrint + TPrintLen, "");
         }
         puts(TPrint);
+
+        // if PWO is now low the calculator has stopped running
+        // this means that we need to cleanup some dirty stuff
+        if ((HP41_powermode != eAwake) && Banks_dirty) {
+            // if the banks are dirty we need to save the ROM map to FRAM
+            Banks_dirty = false;            // reset dirty flag
+            TULIP_Pages.save();             // save the ROM map to FRAM
+        }
     }
 }
 
@@ -1211,9 +1227,14 @@ void __not_in_flash_func(core1_pio)()
             rom_pg = (rom_addr & 0xF000) >> 12;                            // right aligned page number
             banktoswitch = 0;                                               // default no bankswitching
 
+            // Bankswitch instructions are:
+            // ENBANK1      0x100   0b0001.0000.0000.0000
+            // ENBANK2      0x180   0b0001.1000.0000.0000
+            // ENBANK3      0x140   0b0001.0100.0000.0000
+            // ENBANK4      0x1C0   0b0001.1100.0000.0000
             switch (rx_inst)
             {
-                case inst_ENBANK1:
+                case inst_ENBANK1:     
                     banktoswitch = 1;
                     break;
                 case inst_ENBANK2:
@@ -1237,66 +1258,47 @@ void __not_in_flash_func(core1_pio)()
                     // HP41CX, ENBANK in Page 3 actually switched Page 5 active bank
                     active_bank[5] = banktoswitch;
                 }
-                else if ((rom_pg == 9) || (rom_pg == 0xB) || (rom_pg == 0xD) || (rom_pg == 0xF))
+                else if ((rom_pg > 8))
                 {
-                    // for Port 8/9, A/B, C/D and E/F both banks are swichted
-                    active_bank[rom_pg] = banktoswitch;
-                    active_bank[rom_pg - 1] = banktoswitch;
+                    // switching for Port 8/9, A/B, C/D and E/F odd and even Pages
+                    active_bank[rom_pg & 0xFFFE]     = banktoswitch;
+                    active_bank[(rom_pg & 0xFFFE) + 1] = banktoswitch;
                 }
-                else if ((rom_pg == 8) || (rom_pg == 0xA) || (rom_pg == 0xC) || (rom_pg == 0xE))
-                {
-                    // for Port 8/9, A/B, C/D and E/F both banks are swichted
-                    active_bank[rom_pg] = banktoswitch;
-                    active_bank[rom_pg + 1] = banktoswitch;
-                }
-                else
-                {
-                    active_bank[rom_pg] = banktoswitch;
+
+                // the bankswitching is done, but a check needs to be dome if this is sticky or not
+                // if the page is not enabled then the bank is not sticky, so no need to
+                if ((TULIP_Pages.Pages[rom_pg].m_bank & bank_sticky) && TULIP_Pages.isEnabled(rom_pg, 1)) {
+                    // set the active bank for both the odd and even pages
+                    Banks_dirty = true;          // mark the banks as dirty, so they need to be updated
+                    TULIP_Pages.Pages[(rom_pg & 0xFFFE)].m_bank     = bank_sticky + banktoswitch;     // set the new sticky bank for the even page
+                    TULIP_Pages.Pages[(rom_pg & 0xFFFE) + 1].m_bank = bank_sticky + banktoswitch;     // and for the odd page
                 }
             }
 
-
-            // we should now add the Bank information to the Traceline
-            TraceLine.bank = active_bank[rom_pg];
+            // we can now add the Bank information to the Traceline
+            enabled_bank = active_bank[rom_pg];          // this is the currently enabled bank for the page
+            TraceLine.bank = enabled_bank;
 
             // gpio_pulse(P_DEBUG, 6);                                  // for debugging 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT4);
 
             // Read the ROM, embedded or from FLASH
-            isa_out_data = 0xffff;              // default if ROM is empty
+            isa_out_data = 0xffff;              // default if ROM is not enabled
 
-            if (TULIP_Pages.isEnabled(rom_pg, 1)) {
-                // check if the page is enabled, if not then return empty data
-                // this is for the TULIP pages, which are not always enabled
-                // this is done in the TULIP_Pages class
-                isa_out_data = TULIP_Pages.getword(rom_addr);
+            // must do an extra check here
+            // if the Page is not enabled and the Bank > 1 a check is needed if there is a Bank 1 plugged
+            if ((enabled_bank > 1) && !TULIP_Pages.isEnabled(rom_pg, enabled_bank) && TULIP_Pages.isEnabled(rom_pg, 1)) {
+                // get the word from Bank 1
+                // special case for the Advantage Module
+                isa_out_data = TULIP_Pages.getword(rom_addr, 1);  // get the word from Bank 1
+            } else {            
+                if (TULIP_Pages.isEnabled(rom_pg, enabled_bank)) {
+                    // check if the page is enabled, if not then return empty data
+                    // this is for the TULIP pages, which are not always enabled
+                    // this is done in the TULIP_Pages class
+                    isa_out_data = TULIP_Pages.getword(rom_addr, enabled_bank);  // get the word from Page/Bank
+                }
             }
-            
-            // old code to read from an Embedded ROM
-            /*
-            switch(rom_pg) {
-                  
-                case 0x6:                       // IL-PRINTER or HP82143A PRINTER
-                    // Printer or HP-IL Printer
-                    if (globsetting.get(ILPRINTER_plugged))
-                    {
-                        isa_out_data = embed_ILPRINTER_rom[rom_addr & 0x0FFF];
-                    }
-
-                    if (globsetting.get(HP82143A_enabled))
-                    {
-                        isa_out_data = embed_PRINTER_rom[rom_addr & 0x0FFF];
-                    }
-                    break;
-
-                case 0x7:                       // HP-IL module       
-                    if (globsetting.get(HPIL_plugged))
-                    {
-                        isa_out_data = embed_HPIL_rom[rom_addr & 0x0FFF];
-                    } 
-                    break;
-            }
-                    */
 
             if (isa_out_data != 0xFFFF)
             // not an empty page so return valid data

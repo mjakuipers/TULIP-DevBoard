@@ -170,7 +170,24 @@ const char* __in_flash()system_cmds[] =
     "calcreset",
     "configinit",
     "configlist",
+    #if (TULIP_HARDWARE == T_MODULE)
+    "serial",       // program/read the TULIP serial number
+    #endif
 };
+
+/*
+        #define help_status     1
+        #define help_pio        2
+        #define help_cdc        3
+        #define help_cdcident   4
+        #define help_reboot     5
+        #define help_bootsel    6
+        #define help_poweron    7
+        #define help_calcreset  8
+        #define help_configinit 9
+        #define help_configlist 10
+        #define help_serial     11
+*/
 
 void onSystemCLI(EmbeddedCli *cli, char *args, void *context)
 {
@@ -201,26 +218,39 @@ void onSystemCLI(EmbeddedCli *cli, char *args, void *context)
 
     // argument found, now execute
     switch (i) {
-      case 1 : uif_status();            // status
-            break;
-      case 2 : uif_pio_status();        // pio
-            break;
-      case 3 : uif_cdc_status();        // cdc
-            break;
-      case 4 : uif_cdc_ident();         // cdcident
-            break;
-      case 5 : uif_reboot();            // REBOOT
-            break;
-      case 6 : uif_bootsel();           // BOOTSEL
-            break;
-      case 7 : uif_poweron();           // poweron
-            break;
-      case 8 : uif_calcreset();         // calcreset
-            break;
-      case 9 : uif_configinit();        // re-initialize persistent settings
-            break;
-      case 10 : uif_configlist();        // re-initialize persistent settings
-            break;            
+      case help_status : 
+                uif_status();            // status
+                break;
+      case help_pio : 
+                uif_pio_status();        // pio
+                break;
+      case help_cdc : 
+                uif_cdc_status();        // cdc
+                break;
+      case help_cdcident : 
+                uif_cdc_ident();         // cdcident
+                break;
+      case help_reboot : 
+                uif_reboot();            // REBOOT
+                break;
+      case help_bootsel : 
+                uif_bootsel();           // BOOTSEL
+                break;
+      case help_poweron : 
+                uif_poweron();           // poweron
+                break;
+      case help_calcreset : 
+                uif_calcreset();         // calcreset
+                break;
+      case help_configinit : 
+                uif_configinit();        // re-initialize persistent settings
+                break;
+      case help_configlist : 
+                uif_configlist();        // re-initialize persistent settings
+                break;            
+      case help_serial :                 
+                uif_serial(arg2);        // program/read the TULIP serial number
+                break;
       default:
           cli_printf("system: unkown command %s\n", arg1);    // unknown command
     }
@@ -415,70 +445,62 @@ const char* __in_flash()plug_cmds[] =
     "hpil",        // plug the embedded HP-IL ROM in Page 7 and enables emulation
     "ilprinter",   // plug the embedded HP-IL Printer ROM in Page 6
     "printer",     // plug the embedded HP82143A Printer ROM in Page 6 and enables emulation
-    // "module",   for later use, to plug a physical module
 };
+
+
+/*
+#define PLUG_HELP_TXT "plug functions\r\n\
+        hpil          plugs the embedded HP-IL ROM in Page 7 and enables emulation\r\n\
+        ilprinter     plugs the embedded HP-IL Printer ROM in Page 6\r\n\
+        printer       plugs the embedded HP82143A Printer ROM in Page 6 and enables emulation\r\n\
+                      [filenm] can be a .ROM or .MOD file present in FLASH\r\n\
+        [filenm] P    plug the named ROM in Page P (hex) and Bank 1\r\n\
+        [filenm] P B  plug the named ROM in Page P (hex) and Bank B (1..4)\r\n\
+        [filenm]      ROM file: no Page number will autoplug and find a free Page from 8..F\r\n\
+                      MOD file: will attempt to plug according to the MOD file parameters\r\n\
+        [filenm] T    Autoplug Test only, will not plug for real\r\n\
+                      just to check where the ROM/MOD will be plugged\r\n"
 
         #define plug_hpil       1
         #define plug_ilprinter  2
         #define plug_printer    3
-        #define plug_module     4
-        #define plug_file       5
-
-const char* __in_flash()plug_module_args[] =
-// list of arguments for the plug module command
-{
-    "cx",
-    "printer",
-    "hpil",
-    "hpil-dis",	
-    "clear",
-};
-/*
- define PLUG_HELP_TXT "plug functions\r\n\
-        [no argument] shows the current plugged ROMs\r\n\
-        status        shows the current plugged ROMs\r\n\
-        module        to inform about plugged physical modules\r\n\
-           pX [name]  X is the Page number in hex, name is descriptive name of the ROM\r\n\
-           cx         resreve Page 3 and 5 if you have an HP41CX\r\n\
-           printer    reserve Page 6 for the printer or IR module\r\n\
-           hpil       reserve Page 6+7 for the HP-IL module and printer\r\n\
-           hpil-dis   reserve Page 7 for the HP-IL module with printer disabled\r\n\
-           clear      clear all reserved physical modules\r\n\
-        [filename]    plug the ROM in the first suitable Page\r\n\
-        [filename] PX plug the ROM in Page X\r\n\
-        [filename] PX bN plug the ROM in Page X and bank N (1..4)\r\n\
-          [filename] is the name of the file in FLASH or FRAM, maybe without extension\r\n\"
-
-
-        uif_plug() takes the following arguments:
-        uif_plug(int cmd, int p, int b, char *name)
-            cmd     according to table above
-            p       page number
-            b       bank number
-            name    filename of ROM/MOD to be plugged, only if cmd = 7
+        #define plug_file_X     4   // file in specific Page
+        #define plug_file_A     5   // Autoplug file in first free Page
+        #define plug_file_T     6   // Autoplug Test only
 */  
 
 
 // plug command, plug a ROM in the system
-// this version only supports plugging a named file and the Page number in hex (must be provided!)
 void onPlugCLI(EmbeddedCli *cli, char *args, void *context)
 {
     const char *arg1 = embeddedCliGetToken(args, 1);        // file name
     const char *arg2 = embeddedCliGetToken(args, 2);        // Page number in hex
-    const char *arg3 = embeddedCliGetToken(args, 3);        // not used for now
+    const char *arg3 = embeddedCliGetToken(args, 3);        // Should be Bank number
     int cmd = -1;
     int num_cmds = sizeof(plug_cmds) / sizeof(char *);
+    int arg_topass = 0;
 
     if ((arg1 == NULL)) {
         // no arguments given, show the plugged ROM as status
-        cli_printf("no arguments given, use: plug [filename] Page (in hex)");   
+        cli_printf("no arguments given, see help");   
         cli_printf("use the cat command to show the plugged ROMs");
         // uif_plug(plug_status, 0, 0, NULL); 
         return;
     }
 
+    // check arg2, could be a Page number, nothing or T
+    if (arg2 == NULL) {
+        // no Page number or arg2 geven, use AutoPlug
+        arg_topass = plug_file_A;  // use the AutoPlug function
+    } else if (strcmp(arg2, "T") == 0) {
+        // arg2 is T, use the AutoPlug Test function
+        arg_topass = plug_file_T;  // use the AutoPlug Test function
+    } else {
+        // arg2 is something else, probably a Page number in hex, so use the plug_file_X function
+        arg_topass = plug_file_X;  // use the plug_file_X function
+    }
+
     // check arg1 for known arguments
-        // scan arg2 for something known, in this case only the ALL is supported
     int a1 = 0;
     while (cmd != 0 && a1 < num_cmds) {
         cmd = strcmp(arg1, plug_cmds[a1]);
@@ -493,62 +515,100 @@ void onPlugCLI(EmbeddedCli *cli, char *args, void *context)
         // arg1 is a known command, so execute it
         switch (a1) {
             case plug_hpil : 
-                uif_plug(plug_hpil, 7, 1, NULL);   // plug the HP-IL ROM in Page 7
+                uif_plug(plug_hpil, 7, 1, NULL);        // plug the HP-IL ROM in Page 7
                 return;
             case plug_ilprinter : 
                 uif_plug(plug_ilprinter, 6, 1, NULL);   // plug the HP-IL Printer ROM in Page 6
                 return;
             case plug_printer : 
-                uif_plug(plug_printer, 6, 1, NULL);   // plug the HP82143A Printer ROM in Page 6
-                return;
-            case plug_module : 
-                // this is not yet implemented
-                cli_printf("plug module not yet implemented");
+                uif_plug(plug_printer, 6, 1, NULL);     // plug the HP82143A Printer ROM in Page 6
                 return;
             default:
                 // proceed with the file name
         }
     }
 
-    if (arg2 == NULL) {
-        // no Page number given, report and show all plugged rOMs
-        cli_printf("no Page number given, use: plug [filename] Page (in hex)");   
-        // uif_plug(plug_status, 0, 0, NULL); 
-        return;
-    }
-
-    // We can now pass the filename and Page number
-
     // check for Px with the Page number in hex
-    int p = 0;
-    int res = sscanf(arg2, "%X", &p);            // if one decimal is found the res = 1
-    if ((res != 1) | (p > 15) | (p < 4)) {
-        // no valid result and no valid command, so get out
-        cli_printf("invalid Page number, must be >4 and <F (hex)", arg2);    // unknown command
-        return;
+    if (arg_topass == plug_file_X) {
+        // arg2 must be a Page number in hex, so check it
+        int p = 0;
+        int res = sscanf(arg2, "%X", &p);            // if one decimal is found the res = 1
+        if ((res != 1) | (p > 15) | (p < 4)) {
+            // no valid result and no valid command, so get out
+            cli_printf("invalid Page number, must be 4..F (hex)");    // unknown command
+            return;
+        } else {
+            // p now contains a valid page number, pass this with the ROM file name
+            // file name checking is done in the uif_plug function
+            // Now check if there is a Bank number given
+            if (arg3 != NULL) {
+                // arg3 is not NULL, so it must be a Bank number
+                int b = 0;
+                res = sscanf(arg3, "%d", &b);          // if one decimal is found then res = 1
+                if ((res != 1) | (b < 1) | (b > 4)) {
+                    // no valid result and no valid command, so get out
+                    cli_printf("invalid Bank number, must be 1..4");    // unknown command
+                    return;
+                }
+                // b now contains a valid bank number, pass this with the ROM file name
+                uif_plug(arg_topass, p, b, arg1);
+                return;
+            }
+            // no Bank number given, so use Bank 1
+            uif_plug(arg_topass, p, 1, arg1);
+            return;
+        }
+    } else {
+        // AutoPlug or AutoPlug Test, so no Page number is needed
+        uif_plug(arg_topass, 0, 1, arg1);   // pass the file name only,
     }
-    // p now contains a valid page number, pass this with the ROM file name
-    // file name checking is done in the uif_plug function
-    // Bank is not used here now
-    uif_plug(plug_file, p, 1, arg1);
 }
 
+/*
+#define UNPLUG_HELP_TXT "unplug functions\r\n\
+        [no argument] shows the current plugged ROMs\r\n\
+        P             unplug the ROM in Page P (hex), including reserved Pages\r\n\
+                      unplug all Banks of that Page\r\n\
+        P B           unplug the ROM in Page P and Bank B\r\n\
+        all           unplug all plugged ROMs except reserved Pages\r\n\
+        ALL           unplug all plugged ROMs including reserved Pages\r\n"
 
+        #define unplug_all     1   // unplug all plugged ROMs except reserved Pages
+        #define unplug_ALL     2   // unplug all plugged ROMs including reserved Pages
+        // all other values 4..F are a valid Page number to unplug
+
+*/
+
+// unplug command, unplug a ROM from the system
 void onUnPlugCLI(EmbeddedCli *cli, char *args, void *context)
 {
     const char *arg1 = embeddedCliGetToken(args, 1);        // only one argument now
     const char *arg2 = embeddedCliGetToken(args, 2);        // 
     int cmd = -1;
     int num_cmds = sizeof(plug_cmds) / sizeof(char *);
+    int bk;
 
     if ((arg1 == NULL)) {
         // no argument given, show the plugged ROM  
-        cli_printf("no arguments given, use: unplug Page (in hex), see help");
+        cli_printf("no arguments given, use: unplug Page <all/ALL>(in hex), see help");
         // uif_unplug(plug_status);  
         return;
     }
 
-        // check for Px with the Page number in hex
+    // check for know arguments all or ALL
+    if (strcmp(arg1, "all") == 0) {
+        // unplug all plugged ROMs except reserved Pages
+        uif_unplug(unplug_all, 0);
+        return;
+    } else if (strcmp(arg1, "ALL") == 0) {
+        // unplug all plugged ROMs including reserved Pages
+        uif_unplug(unplug_ALL, 0);
+        return;
+    }   
+
+
+
+    // check for Px with a valid Page number in hex
     int p = 0;
     int res = sscanf(arg1, "%X", &p);            // if one decimal is found then res = 1
     if ((res != 1) | (p > 15) | (p < 4)) {
@@ -556,10 +616,135 @@ void onUnPlugCLI(EmbeddedCli *cli, char *args, void *context)
         cli_printf("invalid Page number, must be >=4 and <=F (hex)", arg2);    // unknown command
         return;
     }
-    // p now contains a valid page number, pass this with the ROM file name
-    // file name checking is done in the uif_plug function
+    // p now contains a valid page number
+
+    // check for a valid bank number in arg2
+    if (arg2 != NULL) {
+        // arg2 is not NULL, so it must be a Bank number
+        bk = 0;
+        int res = sscanf(arg2, "%d", &bk);          // if one decimal is found then res = 1
+        if ((res != 1) | (bk < 1) | (bk > 4)) {
+            // no valid result and no valid command, so get out
+            cli_printf("invalid Bank number, must be 1..4");    // unknown command
+            return;
+        }
+    } else {
+        bk = 0;  // no Bank number given, so use Bank 0, this will unplug all banks in the Page
+    }
     // Bank is not used here now
-    uif_unplug(p);
+    uif_unplug(p, bk);
+}
+
+/*
+#define RESERVE_HELP_TXT "reserve a Page for a physical module\r\n\
+        [X] <comment> reserve a physical module in Page X\r\n\
+                      X is the Page number in hex (0..F)\r\n\
+                      comment is a descriptive text for the module\r\n\
+                      use no spaces or enclose in quotes\r\n\
+        cx            reserve Page 3 and 5 for the HP41CX\r\n\
+        timer         reserve Page 5 for the HP41 timer module\r\n\
+        printer       reserve Page 6 for a printer\r\n\
+        hpil          reserve Page 7 for the HP-IL module\r\n\
+        clear <X>     cancel reservation for Page X (in hex)\r\n\
+        clear all     cancel all reservations\r\n"
+
+// all values 4..F pass a Page number
+#define reserve_cx      1
+#define reserve_timer   2       
+#define reserve_printer 3
+#define reserve_hpil    4
+#define reserve_clear   5
+#define reserve_page    6   
+*/
+
+const char* __in_flash()reserve_cmds[] =
+// list of arguments for the system command
+{
+    "cx",
+    "timer",
+    "printer",
+    "hpil",
+    "clear",
+};
+
+void onReserveCLI(EmbeddedCli *cli, char *args, void *context)
+{
+    const char *arg1 = embeddedCliGetToken(args, 1);
+    const char *arg2 = embeddedCliGetToken(args, 2);
+    int cmd = -1;
+    int num_cmds = sizeof(reserve_cmds) / sizeof(char *);
+    int p;
+    int res;
+
+    if (arg1 == NULL) {
+        // no argument given, just show the system status
+        // for testing just use the welcome message        
+        cli_printf("type help for more info, use the cat command for a list of plugged/reserved ROM images");    
+        return;
+    }
+
+    // scan the list of arguments for something known
+    int i = 0;
+    while ((cmd != 0) && (i < num_cmds)) {
+      cmd = strcmp(arg1, reserve_cmds[i]);
+      i++;
+    }
+
+    if (cmd != 0) 
+    {
+      i = -1;
+    }
+
+    // argument found, now execute
+    switch (i) {
+        case 1 : uif_reserve(reserve_cx, 0, NULL);           // cx, reserve Pages 3+5
+                 return;
+        case 2 : uif_reserve(reserve_timer, 0, NULL);        // timer, reserve Page 5
+                 return;
+        case 3 : uif_reserve(reserve_printer, 0, NULL);      // printer, reserve Page 6
+                 return;
+        case 4 : uif_reserve(reserve_hpil, 0, NULL);         // hpil, reserve Page 7
+                 return;          
+        case 5 : // cancel reservation, check for a Page number or all
+                 if (arg2 == NULL) {
+                    // no Page number given, so show the help
+                    cli_printf("no Page number given, use: reserve clear [P] or <all>");
+                    return;
+                 }
+
+                 if (strcmp(arg2, "all") == 0) {
+                     uif_reserve(reserve_clear, 0, NULL);    // cancel all reservations
+                     return;
+                 }
+                 // check for a Page number in hex in arg2
+                 p = 0;
+                 res = sscanf(arg2, "%X", &p);            // if one decimal is found then res = 1
+                 if ((res != 1) | (p > 15) | (p < 4)) {
+                    // no valid result and no valid command, so get out
+                    cli_printf("invalid Page number, must be >=4 and <=F (hex)", arg2);    // unknown command
+                    return;
+                 } else {
+                    // p now contains a valid page number, cancel the reservation
+                     uif_reserve(reserve_clear, p, NULL);        // cancel reservation for Page X
+                     return;
+                 }
+
+      default:
+                 break;
+    }
+
+    // if we are here, then this can be a reservation for a Page
+    // check for Px with the Page number in hex in arg1
+    p = 0;
+    res = sscanf(arg1, "%X", &p);            // if one decimal is found then res = 1
+    if ((res != 1) | (p > 15) | (p < 4)) {
+        // no valid result and no valid command, so get out
+        cli_printf("invalid Page number, must be >=4 and <=F (hex)", arg1);    // unknown command
+        return;
+    }
+    // p now contains a valid page number, pass this with the comment
+    // if arg2 is NULL, then no comment is given, so pass NULL
+    uif_reserve(reserve_page, p, arg2);       // reserve Page p with comment in arg2
 
 }
 
@@ -567,13 +752,13 @@ void onCatCLI(EmbeddedCli *cli, char *args, void *context)
 {
     // check for a hex argument in the range 4..F
     const char *arg1 = embeddedCliGetToken(args, 1);        // only one argument now
-    const char *arg2 = embeddedCliGetToken(args, 2);        //
+    const char *arg2 = embeddedCliGetToken(args, 2);        // could be Bank
     int cmd = -1;
     int num_cmds = sizeof(plug_cmds) / sizeof(char *);
     if ((arg1 == NULL)) {
         // no argument given, show the plugged ROM  
         cli_printf("no arguments given, use: cat Page (in hex), see help");   
-        uif_cat(0);           // show a summary of the plugged ROMs
+        uif_cat(0, 0);           // show a summary of the plugged ROMs
         return;
     }
     // check for Px with the Page number in hex
@@ -581,11 +766,26 @@ void onCatCLI(EmbeddedCli *cli, char *args, void *context)
     int res = sscanf(arg1, "%X", &p);            // if one decimal is found then res = 1
     if ((res != 1) | (p > 15) | (p < 4)) {
         // no valid result and no valid command, so get out
-        cli_printf("invalid Page number, must be >=4 and <=F (hex)", arg1);    // unknown command
+        cli_printf("invalid Page number, must be >=4 and <=F (hex)", arg1);    // invalid Page
         return;
     }
+
+    // now check for a Bank number as 2nd argument
+    int b = 1;
+    if (arg2 != NULL) {
+        // arg2 is not NULL, so it must be a Bank number
+        res = sscanf(arg2, "%d", &b);          // if one decimal is found then res = 1
+        if ((res != 1) | (b < 1) | (b > 4)) {
+            // no valid result and no valid command, so get out
+            cli_printf("invalid Bank number, must be 1..4", arg2);    // invalid Bank
+            return;
+        }
+    } else {
+        // no Bank number given, so use Bank 1
+        b = 1;
+    }
     // p now contains a valid page number, pass this with the ROM file name
-    uif_cat(p);   
+    uif_cat(p, b);   
 }
 
 
@@ -697,21 +897,33 @@ void onXMEMCLI(EmbeddedCli *cli, char *args, void *context)
 #define TRACER_HELP_TXT "tracer functions\r\n\
         [no argument] shows the tracer status\r\n\
         status        shows the tracer status\r\n\
+        buffer        shows the trace buffer size\r\n\
+        buffer <size> set the tracer buffer size in number of samples\r\n\
+                      default is 5000, maximum is about 10.000 samples\r\n\
+                      requires a reboot to take effect!\r\n\
+        pretrig      shows the pre-trigger buffer size and status\r\n\
+        pretrig <size> set the pre-trigger buffer size in number of samples\r\n\
+                      default is 32, maximum is 256 samples\r\n\
         trace         toggle tracer enable/disable\r\n\
-        sysrom        toggle system rom tracing (Page 0, 1, 2, 3, 5)\r\n\
-        ilrom         toggle tracing of Page 6 + 7\r\n\
-        sysloop       toggle tracing of system loops\r\n\
-        block [a1] [a2] block tracing of range between a1 and a2 (hex addresses 0000-FFFF)\r\n\
-        block [n]     toggle tracing of designated block entry, n=0..15\r\n\
-        block [Pn]    block Page n (n= hex 0..F)\r\n\
-        block del [n] delete entry [n]
-        block [no arg] show block entries\r\n\
-        pass [a1] [a2] pass only tracing of range between a1 and a2 (hex addresses 0000-FFFF)\r\n\
-        pass [n]      toggle tracing of designated pass entry, n=0..15\r\n\
-        pass [Pn]     pass only tracing of Page n (n= hex 0..F)\r\n\
-        pass [no arg] show pass entries\r\n\
-        hpil          toggle HP-IL tracing to ILSCOPE USB port\r\n\
-        pilbox        toggle PILBox serial tracing to ILSCOPE serial port\r\n"
+        sysloop       toggle tracing of system loops (RSTKB, RST05, BLINK01 and debounce)\r\n\
+        sysrom        toggle system rom tracing (Page 0 - 5)\r\n\
+        ilrom         toggle tracing of Page 6+7\r\n\
+        hpil          toggle HP-IL tracing to ILSCOPE USB serial port\r\n\
+        pilbox        toggle PILBox serial tracing to ILSCOPE USB serial port\r\n\
+        ilregs        toggle tracing of HP-IL registers\r\n\
+        save          save tracer settings\r\n"
+
+        #define trace_status      1
+        #define trace_buffer      2
+        #define trace_pretrig     3
+        #define trace_trace       4
+        #define trace_sysloop     5    
+        #define trace_sysrom      6
+        #define trace_ilrom       7
+        #define trace_hpil        8
+        #define trace_pilbox      9
+        #define trace_ilregs     10
+        #define trace_save       11
 */
 
 const char* __in_flash()tracer_cmds[] =
@@ -719,6 +931,8 @@ const char* __in_flash()tracer_cmds[] =
 // 
 {
     "status",           // get status
+    "buffer",           // get/set tracer buffer size
+    "pretrig",          // get/set pre-trigger buffer size
     "trace",            // toggle tracer enable/disable
     "sysloop",          // toggle tracing of system loops
     "sysrom",           // toggle system rom tracing (Page 0, 1, 2, 3, 5)
@@ -735,7 +949,7 @@ const char* __in_flash()tracer_cmds[] =
 void onTracerCLI(EmbeddedCli *cli, char *args, void *context)
 {
     const char *arg1 = embeddedCliGetToken(args, 1);        // command
-    // const char *arg2 = embeddedCliGetToken(args, 2);        // start address
+    const char *arg2 = embeddedCliGetToken(args, 2);        // start address
     // const char *arg3 = embeddedCliGetToken(args, 3);        // end address
     int cmd = -1;
     int num_cmds = sizeof(tracer_cmds) / sizeof(char *);
@@ -743,7 +957,7 @@ void onTracerCLI(EmbeddedCli *cli, char *args, void *context)
     if ((arg1 == NULL)) {
         // no argument given, show the plugged ROM  
         cli_printf("no arguments given, use: tracer [command], see help");   
-        uif_tracer(1); 
+        uif_tracer(1, 0); 
         return;
     }
 
@@ -758,9 +972,48 @@ void onTracerCLI(EmbeddedCli *cli, char *args, void *context)
         i = -1;
     }
 
+    // check for arguments buffer and pretrig
+    if (i == trace_buffer) {
+        // buffer command, check for a size in arg2
+        if (arg2 == NULL) {
+            // no size given, just show the current buffer size
+            uif_tracer(i, 0);
+            return;
+        } else {
+            // check for a valid number in arg2
+            int size = 0;
+            int res = sscanf(arg2, "%d", &size);          // if one decimal is found then res = 1
+            if ((res != 1) | (size < 100) | (size > 10000)) {
+                // no valid result and no valid command, so get out
+                cli_printf("invalid buffer size %s: must be between 100 and 10000", arg2);    // unknown command
+                return;
+            }
+            uif_tracer(i, size);   // pass the new buffer size
+            return;
+        }
+    } else if (i == trace_pretrig) {
+        // pretrig command, check for a size in arg2
+        if (arg2 == NULL) {
+            // no size given, just show the current pre-trigger buffer size
+            uif_tracer(i, 0);
+            return;
+        } else {
+            // check for a valid number in arg2
+            int size = 0;
+            int res = sscanf(arg2, "%d", &size);          // if one decimal is found then res = 1
+            if ((res != 1) | (size < 1) | (size > 256)) {
+                // no valid result and no valid command, so get out
+                cli_printf("invalid pre-trigger size %s: must be between 1 and 256", arg2);    // unknown command
+                return;
+            }
+            uif_tracer(i, size);   // pass the new pre-trigger size
+            return;
+        }
+    }
+
     if (i >= 0) {
         // cli_printf("argument %s, %d", arg1, i);
-        uif_tracer(i);
+        uif_tracer(i, 0);
     }
     else {
         cli_printf("invalid argument %s: use: tracer [command], see help", arg1);    // unknown command
@@ -1052,9 +1305,11 @@ void onRTCCLI(EmbeddedCli *cli, char *args, void *context) {
 #define emulate_status    1
 #define emulate_hpil      2
 #define emulate_printer   3
-#define emulate_xmem      4
-#define emulate_blinky    5
-#define emulate_timer     6
+#define emulate_zeprom    4
+#define emulate_xmem      5
+#define emulate_blinky    6
+#define emulate_timer     7
+
 */
 
 const char* __in_flash()emulate_cmds[] =
@@ -1063,7 +1318,8 @@ const char* __in_flash()emulate_cmds[] =
 {
     "status",        
     "hpil",          
-    "printer",               
+    "printer",
+    "zeprom",               
 };  
 
 void onEmulateCLI(EmbeddedCli *cli, char *args, void *context) {
@@ -1076,7 +1332,7 @@ void onEmulateCLI(EmbeddedCli *cli, char *args, void *context) {
     if ((arg1 == NULL)) {
         // no arguments given, show status
         cli_printf("no arguments given, use: emulate [device], see help");
-        uif_emulate(emulate_status); 
+        uif_emulate(emulate_status, 0); 
         return;
     }
 
@@ -1091,8 +1347,29 @@ void onEmulateCLI(EmbeddedCli *cli, char *args, void *context) {
         i = -1;
     }
 
+    int p = 0;
+    if (i == emulate_zeprom) {
+        // emulate zeprom, check for a valid Page number in arg2
+        if (arg2 == NULL) {
+            // no address given, use 0 to disable
+            uif_emulate(i, p);      // default address
+            return;
+        } else {
+            // check for a valid Page address in arg2
+
+            int res = sscanf(arg2, "%X", &p);            // if one decimal is found then res = 1
+            if ((res != 1) | (p < 4) | (p > 15)) {
+                // no valid result and no valid command, so get out
+                cli_printf("invalid Page %s, must be between 4 and F (hex)", arg2);    // unknown command
+                return;
+            }
+            uif_emulate(i, p);       // pass the address
+            return;
+        }
+    }
+
     if (i >= 0) {
-        uif_emulate(i);          // valid argument
+        uif_emulate(i, 0);          // valid argument
         return;
     }
 
@@ -1223,6 +1500,15 @@ void initCliBinding() {
             .context = NULL,
             .binding = onPlugCLI
     };
+
+    // Command binding for the plug command
+    CliCommandBinding reserve_binding = {
+            .name = "reserve",
+            .help = RESERVE_HELP_TXT,
+            .tokenizeArgs = true,
+            .context = NULL,
+            .binding = onReserveCLI
+    };    
 
     // Command binding for the unplug command
     CliCommandBinding unplug_binding = {
@@ -1358,6 +1644,7 @@ void initCliBinding() {
 
     embeddedCliAddBinding(cli, plug_binding);
     embeddedCliAddBinding(cli, unplug_binding);
+    embeddedCliAddBinding(cli, reserve_binding);
 
     embeddedCliAddBinding(cli, cat_binding);
     embeddedCliAddBinding(cli, emulate_binding);

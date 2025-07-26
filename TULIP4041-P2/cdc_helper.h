@@ -53,8 +53,6 @@ extern const char* __in_flash() ITF_str[];
 
 void cdc_sendbuf(int itf, char* buffer, int len);
 
-
-void cdc_send_console(char* buffer, int len);
 void cdc_send_string(int itf, char* buffer, int len);
 void cdc_send_char(int itf, char c);
 void cdc_send_char_flush(int itf, char c);

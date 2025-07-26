@@ -83,11 +83,14 @@
         	                                //      0x0177 - 0x0178       delay for debounce
         	                                //      0x089C - 0x089D       BLINK01
 #define     tracer_ilroms_on    41          // tracing of IL ROMs enabled, Page 6+7
+#define     tracer_mainbuffer   42          // size of main trace buffer queue
+#define     tracer_pretrig      43          // size of pre-trigger trace buffer queue
+#define     tracer_posttrig     44          // post trigger counter, number of samples after the trigger
 
 // HP-IL scope settings
 #define     ilscope_IL_enabled  51          // PILBox tracing enabled
 #define     ilscope_PIL_enabled 52          // PILBox tracing enabled
-#define     ilscope_traceIDY    53          // Enabel IDY tracing in the HPIL Scope
+#define     ilscope_traceIDY    53          // Enable IDY tracing in the HPIL Scope
 
 // XMEM/User memory settings
 #define     xmem_pages          60          // number of XMEM pages (0, 1, 2)
@@ -172,6 +175,8 @@ class GSettings {
         gsettings[tracer_sysrom_on]     = 1;
         gsettings[tracer_sysloop_on]    = 1;
         gsettings[tracer_ilroms_on]     = 1;
+        gsettings[tracer_mainbuffer]    = 5000;     // default size of main trace buffer
+        gsettings[tracer_pretrig]       = 32;       // default size 
 
         if (gpio_get(P_PWO) == 0) {
             // when PWO = low we can write to FRAM

@@ -61,6 +61,14 @@ void fr_read(uint32_t addr, uint8_t *buf, size_t len)
     fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, addr, buf, len);
 }
 
+uint8_t fr_read8(uint32_t addr)
+{
+    // read a single byte from the FRAM device at address addr
+    uint8_t result = 0;
+    fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, addr, (uint8_t*)&result, 2);
+    return result;
+}
+
 uint32_t fr_read32(uint32_t addr)
 {
     // read 32-bit words from the FRAM device
@@ -85,6 +93,12 @@ void fr_write(uint32_t addr, uint8_t *buf, size_t len)
     fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, addr, buf, len);
 }
 
+void fr_write8(uint32_t addr, uint8_t bt)
+{
+    // write a single byte to the FRAM device
+    // addr is the address in the FRAM device
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, addr, (uint8_t*)&bt, 1);
+}
 void fr_write16(uint32_t addr, uint16_t word)
 {
     // write 16-bit words to the FRAM device
@@ -251,3 +265,55 @@ void fr_nukeall()
     }
     cli_printf("  All FRAM erased to zero");
 }
+
+
+// and adding all functions like the ffmanager now for FRAM
+// this is a copy of the ffmanager functions, adapted for FRAM
+
+
+// write num bytes in buf to the FRAM address starting at offs
+// and returns true if the write was successful
+bool fr_write_range(uint32_t offs, uint8_t *buf, int num)
+{
+    uint8_t bt = 0; // for reading
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, offs, buf, num);     // write the block back
+
+    // now check of programming was succesful
+    bool succes = true;
+    int i = 0;
+    do {
+      fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, offs + i, &bt, 1); // read the byte back
+      succes = (buf[i] == bt);
+      i++;
+    } while ((i < num) && succes);
+
+    return succes;
+}
+
+// check if the FRAM is fully erased
+// num indicates granularity, 1 every byte is checked, 256 means every 256nd byte is checked
+// checks the range starting with offs for size bytes
+uint32_t fr_erased(uint32_t offs, uint32_t size, int num)
+{
+    uint32_t addr = offs;             // our address counter, 
+                                      // start at the beginning of the file system
+    uint32_t end = FRAM_SIZE;         // end of the file system
+    bool erased = true;               // assume FRAM is erased
+
+    // check for correct range
+    if ((offs + size) > end) return false;
+
+    do {
+      uint8_t bt = 0;
+      erased = (bt == 0x00);          // check if byte is erased
+      fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, addr, &bt, 1); // read the byte
+      addr += num;                   // next byte to check
+    } while ((addr < (offs + size)) && erased);     // until end of file system or not erased
+
+    if (erased) return NOTFOUND;                    // all is erased
+    return (addr - num);                            // return the first non-erased address
+}
+
+
+
+

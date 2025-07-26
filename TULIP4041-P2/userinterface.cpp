@@ -44,7 +44,7 @@ const char* __in_flash("flash_constants")glob_set_[] = {
     "Bankswitching enabled",                    // 10   bankswitch instructions enabled  
     "Expanded Memory enabled",                  // 11   Expandend Memory enabled (MAXX emulation)
     "Tiny41 Instructions enabled",              // 12   enable decoding of TT specific instructions for device control
-    "All QROM write protected",                 // 13   Write Protect all QROM (same effact as #8 ??)
+    "",                                         // 13   Write Protect all QROM (same effact as #8 ??)
 
     "",                                         // 14   placeholder
 
@@ -89,10 +89,10 @@ const char* __in_flash("flash_constants")glob_set_[] = {
     "",                                         // 38   placeholder
     "",                                         // 39   placeholder
     "",                                         // 40   placeholder
-    "",                                         // 41   placeholder
-    "",                                         // 42   placeholder
-    "",                                         // 43   placeholder
-    "",                                         // 44   placeholder
+    "Tracing IL ROM (Page 6+7)",                // 41   placeholder
+    "Main Trace Buffer size (samples)",         // 42   placeholder
+    "PreTrig buffer size (samples)",            // 43   placeholder
+    "PostTrig Counter",                         // 44   placeholder
     "",                                         // 45   placeholder
     "",                                         // 46   placeholder
     "",                                         // 47   placeholder
@@ -311,7 +311,27 @@ State_e state = ST_NONE;
 #include "hardware/structs/pll.h"
 #include "hardware/structs/clocks.h"
 
+// program a delay as a busy wait while updating the USB CDC interface
+// returns true if the delay was cancelled by a keypress
+bool uif_delay_cancel(int ms)
+{
+  int sleepcount = ms / 2;  // 2 ms per loop, so divide by 2
 
+  while(true) {
+    tud_task();                       // to process IO until the watchdog triggers
+    sleep_ms(2);
+    if (cdc_available(ITF_CONSOLE)) {
+      cdc_read_flush(ITF_CONSOLE);
+      cli_printf("  key pressed, delay cancelled");
+      return true;
+    }
+    sleepcount--;
+    if (sleepcount < 0) {  
+      return false;  // delay expired  
+    }
+  }
+  return true; // delay was cancelled
+}
 
 
 void measure_freqs(void) {
@@ -362,10 +382,12 @@ void uif_status()
 
     float speed = clock_get_hz(clk_sys)/MHZ;
 
-      // clk_sys)/1000000;
     float totalheap = getTotalHeap() / 1024;
     float freeheap = getFreeHeap() / 1024;
-    float tracebytes = (sizeof(TraceLine) * TRACELENGTH) / 1024;
+
+    // show the current tracer status
+    int TraceSize = globsetting.get(tracer_mainbuffer);
+    float tracebytes = (sizeof(TraceLine) * TraceSize) / 1024;
 
     pico_unique_board_id_t board_id;
     pico_get_unique_board_id(&board_id);
@@ -375,16 +397,6 @@ void uif_status()
         sprintf(board_id_str + i * 2, "%02X", board_id.id[i]);
     }
 
-
-/*  /\    /\
-   /  \/\/  \
-  (    \ \   )
-   (        )
-    -     /
-     \    /
-	    \  /
-
-    */
     cli_printf("****************************************************************************");
     cli_printf("*    __   ___    __");
     cli_printf("*   /  | |   |  /  | /|  Welcome to TULIP4041");   
@@ -395,10 +407,25 @@ void uif_status()
     } else {
       cli_printf("*                        Firmware for the Module version!");
     }
-    cli_printf("*  Version %s -- Compiled %s %s", Version_Number, __DATE__, __TIME__);
+    cli_printf("*  Firmware: %s -- Compiled %s %s", Version_Number, __DATE__, __TIME__);
+
     #ifdef DEBUG
       cli_printf("*  *** DEBUG build, not for production use! ***");
     #endif
+
+    char ser_string[32] = {0}; // buffer for serial string
+    if (otp_read_serial(ser_string)) {
+      // reading OK, check if strin is empty
+      if (strlen(ser_string) == 0) {
+        cli_printf("*  no serial string programmed");
+      } else {
+        // print the serial number
+        cli_printf("*  Hardware: %s", ser_string);
+      }
+    } else {
+      cli_printf("*  error reading serial string");
+    }
+
     cli_printf("*");
     cli_printf("*  Clock overview");
     cli_printf("*    TULIP freq : %7.2lf MHz", speed);
@@ -413,10 +440,11 @@ void uif_status()
     cli_printf("*      board id :  %s (unique RP2350 CPU identifier)", board_id_str);
     cli_printf("*"); 
     cli_printf("*  Memory usage");
-    cli_printf("*    Total RAM  : %7.2lf KBytes", 520);
+    int totalram = 520*1024; // total RAM in the RP2350 is 520 KBytes
+    cli_printf("*    Total RAM  : %7.2lf KBytes", totalram);
     cli_printf("*    Total heap : %7.2lf KBytes", totalheap);
     cli_printf("*    Free heap  : %7.2lf KBytes", freeheap);
-    cli_printf("*    Tracebuffer: %7.2lf KBytes, %d samples = %d bytes/traceline", tracebytes, TRACELENGTH, sizeof(TraceLine));
+    cli_printf("*    Tracebuffer: %7.2lf KBytes, %d samples = %d bytes/traceline", tracebytes, TraceSize, sizeof(TraceLine));
     cli_printf("*");    
     cli_printf("****************************************************************************");
 }
@@ -570,6 +598,89 @@ void uif_configlist() {
       }
     }
 }
+
+void uif_serial(const char *str)
+{
+  // program/read the TULIp serial number
+  // program if str has the correct format, otherwise just read the serial number
+  // the string programmed is "TULIP4041 HW V0.9 serial #xxxx", 31 chars
+  // the string must be 4 characters with teh serial, the star of the string is fixed
+  char ser_string[32] = "TULIP4041 HW V0.9 serial #xxxx";   // this string is 30 characters long
+                                                            // xxx is the placeholder for the serial number
+
+  if (str == NULL) {
+    // read the serial number
+    cli_printf("  reading TULIP4041 serial string from OTP memory");
+    if (otp_read_serial(ser_string)) {
+      // reading OK, check if strin is empty
+      if (strlen(ser_string) == 0) {
+        cli_printf("  serial string is empty, no serial string programmed");
+      } else {
+        // print the serial number
+        cli_printf("  serial string: %s", ser_string);
+      }
+    } else {
+      cli_printf("  error reading TULIP4041 serial string");
+    }
+    return;
+  }
+
+  // there was an argument passed, the intention is to program a serial number
+
+  // check the string length
+  if (strlen(str) != 4) {
+    cli_printf("  error: serial number must be 4 characters long");
+    return;
+  }
+
+  // string must be 4 numbers, so check if all characters are digits
+  for (int i = 0; i < 4; i++) {
+    if ((str[i] < '0') || (str[i] > '9')) {
+      cli_printf("  error: serial number must be 4 digits");
+      return;
+    }
+  }
+
+  // now happy with the string, program it
+  // append the number to the fixed string replacing the xxxx in the string
+
+  // find the xxxx in the string and replace it with the serial number
+
+  char *pos = strstr(ser_string, "xxxx");
+  if (pos == NULL) {
+    // this should never happen, but just in case
+    cli_printf("  error: serial number string does not contain 'xxxx' placeholder");
+    return;
+  }
+  // replace the xxxx with the serial number
+  strncpy(pos, str, 4);  // copy the serial number to the string
+  pos[4] = '\0';         // terminate the string after the serial number
+
+  cli_printf("  programming serial string: %s", ser_string);
+
+  // give the user 4 seconds to cancel the operation
+  cli_printf("  press any key within 5 seconds to cancel the operation");
+  if (uif_delay_cancel(5000)) {
+    cli_printf("  serial string programming cancelled");
+    return;
+  }
+
+  if (otp_write_serial(ser_string)) {
+    // writing OK
+    cli_printf("  serial string programmed: %s", ser_string);
+  } else {
+    cli_printf("  error programming TULIP4041 serial number");
+  }
+
+  // read the serial number again to verify
+  if (otp_read_serial(ser_string)) {
+    // reading OK
+    cli_printf("  serial string: %s", ser_string);
+  } else {
+    cli_printf("  error reading serial string");
+  }
+}
+
 
 void uif_dir(const char *dir)
 {
@@ -1442,7 +1553,7 @@ void uif_rtc(int i, const char *args)    // RTC test functions
       i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 8, false);
 
       cli_printf(" RTC set");
-      //'no break here, to read the time back
+      // no break here, to read the time back
       // fall through to case 3
     case 3:     // RTC get
       pcf8520_read_all(buf);
@@ -1632,14 +1743,295 @@ void uif_list(int i, const char *fname)
   }    
 }
 
+// The Plug function relies on the LoadMOD function, based on LoadMOD in the V41 sources in HP41File.cpp
+// Copyright (c) 1989-2002  Warren Furlow   
 
-/*    passed from the CLI:
+
+/****************************/
+// return if page is used, W&W RAMBOX RAM is not marked as used!
+/****************************/
+/* bool isPageUsed(uint page, uint bank)
+{
+  const ModulePage *pPage = PageMatrix[page][bank-1];
+  return pPage!=NULL && !(pPage->fWWRAMBOX && pPage->fRAM);
+}
+*/
+
+/****************************/
+// Returns 0 for success, 1 for open fail, 2 for read fail, 3 for invalid file, 4 for load conflict or no space
+// Use the ModuleMetaHeader_t structure to get the file information
+
+/*
+int LoadMOD(ModuleMetaHeader_t *MetaH)
+{
+
+  ModuleFileHeader_t *pMFH;       // pointer to the Module structure
+  uint page,hep_page=0;
+  uint FileSize;
+  bool fLoad = false;
+
+  pMFH = (ModuleFileHeader_t *)(MetaH + sizeof(ModuleMetaHeader_t));
+
+
+  // get file format and the most important MOD file parameters
+  // there is no check on the file size etc
+
+  // nFileFormat is 1 for MOD1 and 2 for MOD2, 0 for an unsupported type
+  const int nFileFormat = MetaH->FileType;
+  if ((MetaH->FileType != FILETYPE_MOD1) && (MetaH->FileType != FILETYPE_MOD2)) {
+    return(3);  // not a MOD file, cannot do anything with it
+  }
+
+  FileSize = MetaH->FileSize;  // get the file size from the meta header, just to check if we are not reading past the end
+  
+  // first check if the hardware is supported by the TULIP firmware
+  if ((pMFH->Hardware != HARDWARE_NONE) && 
+      (pMFH->Hardware != HARDWARE_PRINTER) && 
+      (pMFH->Hardware != HARDWARE_CARDREADER) &&
+      (pMFH->Hardware != HARDWARE_HEPAX)) {
+    return(3);  // unsupported hardware type, cannot load this MOD file
+  }
+
+  byte ImageNo = 0;                         // image no. in MOD file
+
+  // these are arrays indexed on the page group number (1-8) (unique only within each mod file)
+  // dual use: values are either a count stored as a negative number or a (positive) page number 1-f
+  int LowerGroup[8]   = {0,0,0,0,0,0,0,0};      // <0, or =page # if lower page(s) go in group
+  int UpperGroup[8]   = {0,0,0,0,0,0,0,0};      // <0, or =page # if upper page(s) go in group
+  int OddGroup[8]     = {0,0,0,0,0,0,0,0};      // <0, or =page # if odd page(s) go in group
+  int EvenGroup[8]    = {0,0,0,0,0,0,0,0};      // <0, or =page # if even page(s) go in group
+  int OrderedGroup[8] = {0,0,0,0,0,0,0,0};      // <0, or =page # if ordered page(s) go in group
+
+  // load ROM pages with three pass process
+  for (int pass = 1; pass <= 3; pass++) {
+    for (int pageIndex=0; pageIndex < pMFH->NumPages; pageIndex++) {
+      ModuleHeader_t *pMFP;                 // pointer to the page header in the MOD file 
+      if (1 == nFileFormat) {               // MOD1
+         pMFP = &((ModuleHeader_t *)&pMFH[1])[pageIndex];
+      } else {                              // MOD2
+        pMFP = (ModuleHeader_t *)(&((ModuleHeaderV2_t *)&pMFH[1])[pageIndex]);
+      }
+      fLoad = false;
+      switch(pass) {
+        case 1:                             // pass 1: validate page variables, flag grouped pages
+          if ((pMFP->Page>0x0f && pMFP->Page<POSITION_MIN) || pMFP->Page>POSITION_MAX || pMFP->PageGroup>8 ||
+            pMFP->Bank==0 || pMFP->Bank>4 || pMFP->BankGroup>8 || pMFP->RAM>1 || pMFP->WriteProtect>1 || pMFP->FAT>1 ||  //out of range values
+            (pMFP->PageGroup && pMFP->Page<=POSITION_ANY) ||    // group pages cannot use non-grouped position codes 
+            (!pMFP->PageGroup && pMFP->Page>POSITION_ANY))      // non-grouped pages cannot use grouped position codes
+            {
+              return(3);
+            }
+          if (pMFP->PageGroup == 0)             // if not grouped do nothing in this pass
+            break;
+          if (pMFP->Page == POSITION_LOWER)
+            LowerGroup[pMFP->PageGroup-1] -= 1; // save the count of pages with each attribute as a negative number
+          else if (pMFP->Page == POSITION_UPPER)
+            UpperGroup[pMFP->PageGroup-1] -= 1;
+          else if (pMFP->Page == POSITION_ODD)
+            OddGroup[pMFP->PageGroup-1] -= 1;
+          else if (pMFP->Page == POSITION_EVEN)
+            EvenGroup[pMFP->PageGroup-1] -= 1;
+          else if (pMFP->Page == POSITION_ORDERED)
+            OrderedGroup[pMFP->PageGroup-1] -= 1;
+          break;
+
+        case 2:                             // pass 2: find free location for grouped pages
+          if (pMFP->PageGroup == 0)             // if not grouped do nothing in this pass
+            break;
+          // a matching page has already been loaded
+          if (pMFP->Page==POSITION_LOWER && UpperGroup[pMFP->PageGroup-1]>0)       // this is the lower page and the upper page has already been loaded
+            page=UpperGroup[pMFP->PageGroup-1]-1;
+          else if (pMFP->Page==POSITION_LOWER && LowerGroup[pMFP->PageGroup-1]>0)  // this is another lower page
+            page=LowerGroup[pMFP->PageGroup-1];
+          else if (pMFP->Page==POSITION_UPPER && LowerGroup[pMFP->PageGroup-1]>0)  // this is the upper page and the lower page has already been loaded
+            page=LowerGroup[pMFP->PageGroup-1]+1;
+          else if (pMFP->Page==POSITION_UPPER && UpperGroup[pMFP->PageGroup-1]>0)  // this is another upper page
+            page=UpperGroup[pMFP->PageGroup-1];
+          else if (pMFP->Page==POSITION_ODD && EvenGroup[pMFP->PageGroup-1]>0)
+            page=EvenGroup[pMFP->PageGroup-1]+1;
+          else if (pMFP->Page==POSITION_ODD && OddGroup[pMFP->PageGroup-1]>0)
+            page=OddGroup[pMFP->PageGroup-1];
+          else if (pMFP->Page==POSITION_EVEN && OddGroup[pMFP->PageGroup-1]>0)
+            page=OddGroup[pMFP->PageGroup-1]-1;
+          else if (pMFP->Page==POSITION_EVEN && EvenGroup[pMFP->PageGroup-1]>0)
+            page=EvenGroup[pMFP->PageGroup-1];
+          else if (pMFP->Page==POSITION_ORDERED && OrderedGroup[pMFP->PageGroup-1]>0)
+            page=++OrderedGroup[pMFP->PageGroup-1];
+          // find first page in group
+          else {     // find free space depending on which combination of positions are specified
+            if (LowerGroup[pMFP->PageGroup-1]!=0 && UpperGroup[pMFP->PageGroup-1]!=0) {        // lower and upper
+              page=8;
+              while (page<=0xe && (TULIP_Pages.isUsed(page,pMFP->Bank) || TULIP_Pages.isUsed(page+1,pMFP->Bank)))
+                page++;
+            } else if (LowerGroup[pMFP->PageGroup-1]!=0) {                                       // lower but no upper
+              page=8;
+              while (page<=0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
+                page++;
+            } else if (UpperGroup[pMFP->PageGroup-1]!=0) {                                       // upper but no lower
+              page=8;
+              while (page<=0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
+                page++;
+            } else if (EvenGroup[pMFP->PageGroup-1]!=0 && OddGroup[pMFP->PageGroup-1]!=0) {      // even and odd
+            page=8;
+            while (page<=0xe && (TULIP_Pages.isUsed(page,pMFP->Bank) || TULIP_Pages.isUsed(page+1,pMFP->Bank)))
+              page+=2;
+            } else if (EvenGroup[pMFP->PageGroup-1]!=0) {                                        // even only
+            page=8;
+            while (page<=0xe && TULIP_Pages.isUsed(page,pMFP->Bank))
+              page+=2;
+            } else if (OddGroup[pMFP->PageGroup-1]!=0) {                                        // odd only
+              page=8; // return even page number, page no. is incremented when setting OddGroup
+              while (page<=0xe && TULIP_Pages.isUsed(page+1,pMFP->Bank))
+                page+=2;
+            } else if (OrderedGroup[pMFP->PageGroup-1]!=0) {                                     // a block
+              uint count=-OrderedGroup[pMFP->PageGroup-1];
+              for (page=8;page<=0x10-count;page++) {
+                uint nFree=0;
+                uint page2;
+                for (page2=page;page2<=0x0f;page2++) { // count up free spaces
+                  if (!TULIP_Pages.isUsed(page2,pMFP->Bank))
+                    nFree++;
+                  else
+                    break;
+                }
+                if (count<=nFree)            // found a space
+                  break;
+              }
+            } else {
+              page=8;
+              while (page<=0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
+                page++;
+            }
+
+            // save the position that was found in the appropriate array
+            if (pMFP->Page==POSITION_LOWER)
+              LowerGroup[pMFP->PageGroup-1]=page;
+            else if (pMFP->Page==POSITION_UPPER) {
+              ++page;                                 // found two positions - take the upper one
+              UpperGroup[pMFP->PageGroup-1]=page;
+            } else if (pMFP->Page==POSITION_EVEN)
+              EvenGroup[pMFP->PageGroup-1]=page;
+            else if (pMFP->Page==POSITION_ODD) {
+              ++page;                                 // found two positions - take the odd one
+              OddGroup[pMFP->PageGroup-1]=page;
+            } else if (pMFP->Page==POSITION_ORDERED)
+              OrderedGroup[pMFP->PageGroup-1]=page;
+          }
+          fLoad = true;
+          break;
+
+        case 3:      // pass 3 - find location for non-grouped pages
+          if (pMFP->PageGroup)
+            break;
+          if (pMFP->Page==POSITION_ANY) {          // a single page that can be loaded anywhere 8-F
+            page=8;
+            // look for an empty page or a page with W&W RAMBOX RAM
+            while (page<=0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
+              page++;
+          } else                                    // page number is hardcoded
+            page=pMFP->Page;
+          fLoad = true;
+          break;
+        }   // end of switch(pass)
+
+      if (fLoad) {   
+        // load the image
+        // the page is ready to be loaded, but we can skip this since the Page is in FLASH
+        size_t nPageCustomOffset;
+
+        ModulePage *pNewPage=new ModulePage;
+        pNewPage->pModule=pModuleNew;
+        pNewPage->pAltPage=NULL;
+        strcpy(pNewPage->szName,pMFP->Name);
+        strcpy(pNewPage->szID,pMFP->ID);
+        pNewPage->ImageNo=ImageNo++;            // save module position in MOD file
+        pNewPage->Page=pMFP->Page;
+        pNewPage->ActualPage=page;
+        pNewPage->Bank=pMFP->Bank;
+        pNewPage->PageGroup=pMFP->PageGroup;
+        pNewPage->BankGroup=pMFP->BankGroup;
+        if (pMFP->BankGroup)
+          pNewPage->ActualBankGroup=pMFP->BankGroup+NextActualBankGroup*8;  // ensures each bank group has a number that is unique to the entire simulator
+        else
+          pNewPage->ActualBankGroup=0;
+        pNewPage->fRAM=pMFP->RAM;
+        pNewPage->fWriteProtect=pMFP->WriteProtect;
+        pNewPage->fFAT=pMFP->FAT;
+        pNewPage->fHEPAX=(pMFH->Hardware==HARDWARE_HEPAX);
+        pNewPage->fWWRAMBOX=(pMFH->Hardware==HARDWARE_WWRAMBOX);
+        if (1==nFileFormat)                   // MOD1
+          {
+          unpack_image(pNewPage->Image,pMFP->Image);
+          nPageCustomOffset=offsetof(ModuleFilePage,PageCustom);
+          }
+        else                                  // MOD2
+          {
+          word *pwImage=(word *)pMFP->Image;
+          for (size_t i = 0; i < sizeof(pNewPage->Image)/sizeof(pNewPage->Image[0]); ++i)
+            {
+            // swap bytes
+            pNewPage->Image[i]=(pwImage[i] >> 8)|(pwImage[i] << 8);
+            }
+          nPageCustomOffset=offsetof(ModuleFilePageV2,PageCustom);
+          }
+        memcpy(pNewPage->PageCustom,(byte *)pMFP+nPageCustomOffset,sizeof(pNewPage->PageCustom));
+        // patch the NULL timeout value to be longer - not known if this works for all revisions
+        if (page==0 && (0==strcmpi(pNewPage->szName,"NUT0-D") || 0==strcmpi(pNewPage->szName,"NUT0-G") || 0==strcmpi(pNewPage->szName,"NUT0-N")))
+          {
+          pNewPage->Image[0x0ec7]=0x3ff;                               // original value =0x240
+          pNewPage->Image[0x0fff]=compute_checksum(pNewPage->Image);   // fix the checksum so service rom wont report error
+          }
+        // HEPAX special case
+        if (hep_page && pNewPage->fHEPAX && pNewPage->fRAM)            // hepax was just loaded previously and this is the first RAM page after it
+          {
+          pNewPage->ActualPage=hep_page;
+          pNewPage->pAltPage=PageMatrix[hep_page][pMFP->Bank-1]->pAltPage;
+          PageMatrix[hep_page][pMFP->Bank-1]->pAltPage=pNewPage;       // load this RAM into alternate page
+          }
+        // there is no free space or some load conflict exists (only W&W RAMBOX pages can be overloaded)
+        else if (page>0xf || (PageMatrix[page][pMFP->Bank-1]!=NULL && !PageMatrix[page][pMFP->Bank-1]->fWWRAMBOX))
+          {
+          free(pMFH);
+          delete pNewPage;
+          UnloadMOD(pModuleNew);
+          return(4);
+          }
+        else                                                           // otherwise load into primary page
+        {
+          pNewPage->pAltPage=PageMatrix[page][pMFP->Bank-1];           // save actual content to alternate page
+          PageMatrix[page][pMFP->Bank-1]=pNewPage;
+        }
+        hep_page=0;
+        if (pNewPage->fHEPAX && !pNewPage->fRAM)                       // detect HEPAX ROM
+          hep_page=page;
+        }
+      }
+    }
+
+  free(pMFH);
+  NextActualBankGroup++;
+  return(0);
+  }                                                  
+
+*/
+
+/*
+#define PLUG_HELP_TXT "plug functions\r\n\
+        hpil          plugs the embedded HP-IL ROM in Page 7 and enables emulation\r\n\
+        ilprinter     plugs the embedded HP-IL Printer ROM in Page 6\r\n\
+        printer       plugs the embedded HP82143A Printer ROM in Page 6 and enables emulation\r\n\
+        [filename] X  plug the ROM in Page X (hex)\r\n\
+          [filename]   is the name of the file in FLASH with extension\r\n\
+        [filename]    no Page number will autoplug and find a free Page from 8..F\r\n\
+        [filename] T  Autoplug Test only, will not plug for real\r\n"
+
         #define plug_hpil       1
         #define plug_ilprinter  2
         #define plug_printer    3
-        #define plug_module     4
-        #define plug_file       5
-*/
+        #define plug_file_X     4   // file in specific Page
+        #define plug_file_A     5   // Autoplug file in first free Page
+        #define plug_file_T     6   // Autoplug Test only
+*/  
 
 // plug and enable the selected ROM
 void uif_plug(int func, int Page, int Bank, const char *fname)          // plug the selected ROM 
@@ -1659,17 +2051,39 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
   char  ShowPrint[250];
   int   ShowPrintLen = 0;
   char c;
+  int Pg = 0; // Page number 
+  bool PgFound = false; // Page found flag
 
   if (!uif_pwo_low()) return;    // only do this when calc is not running
+
+  // check if Page is already plugged or reserved
+  if ((func != plug_file_A) || (func != plug_file_T)) {
+    // only check if the Page is occupied when we are not autoplugging
+    if (TULIP_Pages.isPlugged(Page, Bank)) {
+      cli_printf("  Page %X Bank %d is already occupied, please unplug first", Page, Bank);
+      return;
+    } else {
+      if (TULIP_Pages.isReserved(Page)) {
+        cli_printf("  Page %X is reserved, please cancel reservation first", Page);
+        return;
+      } 
+    } 
+  }
+
   switch (func)
   {
-
     case plug_hpil: 
             // plug the Embedded HPIL ROM in Page 6
             // get a pointer to the ROM image in FLASH
             // const uint16_t  __in_flash()embed_HPIL_rom[]
-            rom_flags = BANK_ACTIVE | BANK_FLASH | BANK_ROM | BANK_ENABLED | BANK_EMBEDDED; // prepare the flags for the ROM
 
+            // check if Page is occupied
+            if (TULIP_Pages.isPlugged(Page, 1)) {
+              cli_printf("  Page %X is already occupied, please unplug first", Page);
+              return;
+            }
+
+            rom_flags = BANK_ACTIVE | BANK_FLASH | BANK_ROM | BANK_ENABLED | BANK_EMBEDDED; // prepare the flags for the ROM
             cli_printf("  plugging Embedded HPIL ROM in Page 7");        
             TULIP_Pages.plug_embedded(7, 1, rom_flags, embed_HPIL_rom); // plug the ROM in the given page
             TULIP_Pages.save(); // save the page settings in FRAM
@@ -1681,8 +2095,14 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
             // plug the Embedded HPIL Printer ROM in Page 6
             // get a pointer to the ROM image in FLASH
             // const uint16_t  __in_flash()embed_HPILPRINTER_rom[]
-            rom_flags = PAGE_ACTIVE | PAGE_FLASH | PAGE_ROM | PAGE_ENABLED | PAGE_EMBEDDED; // prepare the flags for the ROM
 
+            // check if Page is occupied
+            if (TULIP_Pages.isPlugged(Page, 1)) {
+              cli_printf("  Page %X is already occupied, please unplug first", Page);
+              return;
+            }
+
+            rom_flags = PAGE_ACTIVE | PAGE_FLASH | PAGE_ROM | PAGE_ENABLED | PAGE_EMBEDDED; // prepare the flags for the ROM
             cli_printf("  plugging Embedded IL Printer ROM in Page 6");      
             TULIP_Pages.plug_embedded(6, 1, rom_flags, embed_ILPRINTER_rom); // plug the ROM in the given page      
             TULIP_Pages.save(); // save the page settings in FRAM
@@ -1694,8 +2114,14 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
             // plug the Embedded Printer ROM in Page 6
             // get a pointer to the ROM image in FLASH
             // const uint16_t  __in_flash()embed_printer_rom[]
-            rom_flags = PAGE_ACTIVE | PAGE_FLASH | PAGE_ROM | PAGE_ENABLED | PAGE_EMBEDDED; // prepare the flags for the ROM
 
+            // check if Page is occupied
+            if (TULIP_Pages.isPlugged(Page, 1)) {
+              cli_printf("  Page %X is already occupied, please unplug first", Page);
+              return;
+            }
+
+            rom_flags = PAGE_ACTIVE | PAGE_FLASH | PAGE_ROM | PAGE_ENABLED | PAGE_EMBEDDED; // prepare the flags for the ROM
             cli_printf("  plugging Embedded Printer ROM in Page 6");   
             TULIP_Pages.plug_embedded(6, 1, rom_flags, embed_PRINTER_rom); // plug the ROM in the given page         
             TULIP_Pages.save(); // save the page settings in FRAM
@@ -1703,15 +2129,22 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
             Page = 6;
             break;
 
-    case plug_file: // plug the give filename in the given Page
+    case plug_file_X: // plug the give filename in the given Page
             // check if the file exists in flash
+
+            // check if Page is occupied
+            if (TULIP_Pages.isPlugged(Page, Bank)) {
+              cli_printf("  Page %X Bank %d is already occupied, please unplug first", Page, Bank);
+              return;
+            }
+
             offs = ff_findfile(fname);
             if (offs == NOTFOUND) {
               cli_printf("  file \"%s\" not found", fname);
               return;
             }
 
-            cli_printf("  plugging file %s in Page %d", fname, Page);
+            cli_printf("  plugging file %s in Page %X Bank %d", fname, Page, Bank);
             // file exists and has the correct extension
             // check if the file is a MOD or ROM file
 
@@ -1748,13 +2181,114 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
               */ 
               rom_flags = BANK_ACTIVE | BANK_FLASH | BANK_ROM | BANK_ENABLED;
               
-              TULIP_Pages.plug(Page, 1, rom_flags, offs); // plug the ROM in the given page
+              TULIP_Pages.plug(Page, Bank, rom_flags, offs); // plug the ROM in the given page
               TULIP_Pages.save(); // save the page settings in FRAM
 
             }
 
             if (MetaH->FileType == FILETYPE_MOD1 || MetaH->FileType == FILETYPE_MOD2) {
               cli_printf("  only ROM files currently supported");
+              return;
+            }
+            break;
+
+    case plug_file_A: // autoplug the given filename in the first free Page
+    case plug_file_T: // autoplug the given filename in the first free Page, Test option
+            // check if the file exists in flash
+            offs = ff_findfile(fname);
+            if (offs == NOTFOUND) {
+              cli_printf("  file \"%s\" not found", fname);
+              return;
+            }
+            // file exists and has the correct extension
+            MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+            cli_printf("  filename                         type      size  address     next file");
+            cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+            cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+                      MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+            if (MetaH->FileType == FILETYPE_ROM) {
+              // ROM file, show details
+              // get a pointer to the start of the ROM
+              // and prepare to print more details from the MOD/ROM content below
+              myROMImage = (uint16_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t));
+              ShowROMDetails(myROMImage);
+              ROMImage_offs = (uint32_t)myROMImage - (uint32_t)FF_SYSTEM_BASE; // get the offset to the ROM image in FLASH
+              // get the offset to the ROM image in FLASH
+              cli_printf("    ROM Image offset 0x%08X, at address 0x%08X, now AutoPlugging", ROMImage_offs, myROMImage);
+              // now prepare the flags and do the actual plugging
+              /* enum {
+                BANK_ACTIVE    = 0x01,       // bank is active (has a valid content)
+                BANK_FLASH     = 0x02,       // bank is in FLASH or FRAM
+                BANK_ROM       = 0x04,       // bank is ROM or not
+                BANK_MOD       = 0x08,       // bank is MOD1 or MOD2
+                BANK_ENABLED   = 0x10,       // bank is enabled for reading
+                BANK_DIRTY     = 0x20,       // bank is dirty
+                BANK_WRITEABLE = 0x40,       // bank is write enabled
+                BANK_EMBEDDED  = 0x80,       // bank contains an embedded ROM
+              */
+              rom_flags = BANK_ACTIVE | BANK_FLASH | BANK_ROM | BANK_ENABLED; // prepare the flags for the ROM
+
+              // now find the first free Page from 8..F
+              Pg = 8;
+              PgFound = false;
+
+              while ((Pg < 16) && !PgFound) {
+                // check if the Page is free
+                if (TULIP_Pages.isPlugged(Pg, 1) || TULIP_Pages.isReserved(Pg)) {
+                  // Page is occupied, so try the next one
+                  Pg++;
+                } else {
+                  // Page is free, so use this one
+                  PgFound = true;
+                }
+              }
+
+              if (!PgFound) {
+                // no free Page found
+                cli_printf("  No free pages available, please unplug a page first");
+                return;
+              } 
+
+              cli_printf("  Free Page %X found for %s", Pg, fname);
+
+              if (func == plug_file_T) {
+                // Test option, so do not plug the ROM, just show the details
+                cli_printf("  Autoplug Test only, not plugged for real");
+                return;
+              }
+
+              // Page is found, so use this Page
+              Page = Pg; // set the Page to the found Page
+
+              // do the actual plugging
+              TULIP_Pages.plug(Page, 1, rom_flags, offs); // plug the ROM in the given page
+              TULIP_Pages.save(); // save the page settings in FRAM
+            } else if (MetaH->FileType == FILETYPE_MOD1 || MetaH->FileType == FILETYPE_MOD2) {
+              cli_printf("  only ROM files currently supported");
+
+              // plug a MOD file with the following algorithm
+
+            /*
+              MODULE FILE LOADER - for emulators etc
+              The exact loading procedure will be dependent on the emulator's implementation.  V41 uses a
+              three pass process to find empty pages and ensure that the ROM attributes are correctly followed.
+              Feel free to copy and adapt the algorithm in LoadMOD() to your software.
+
+              First Pass:  Validate variables, go through each page in the mod file.  If there any PageGroups,
+              count the number of pages in each group using the appropriate array (LowerGroup[8], UpperGroup[0], etc).
+              This count is stored as a negative number.  In the second pass this value will be replaced with
+              a positive number which will represent the actual page to be loaded
+
+              Second Pass: Go through each page again and find free locations for any that are grouped.
+              If a page is the first one encountered in a group, find a block of free space for the group.
+              For instance, Odd/Even will require two contiguous spaces.  If a page is the second or subsequent
+              one encountered in a group, then we already have the block of space found and simply need to
+              stick it in the right place.  For instance, the lower page has already been loaded, then the upper
+              page goes right after it.
+
+              Third Pass: Find a free location for any non-grouped pages.  This includes system pages which have
+              their page number hardcoded.
+              */
               return;
             }
             break;
@@ -1779,7 +2313,7 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
 
     // print 16 bytes
     for (int m = 0; m < 16; m++) {
-      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%03X ", TULIP_Pages.getword(addr + m));
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%03X ", TULIP_Pages.getword(addr + m), 1);
     }
     // print byte values as characters
     ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  ");
@@ -1792,11 +2326,87 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
   
 }
 
+
+/*
+#define UNPLUG_HELP_TXT "unplug functions\r\n\
+        [no argument] shows the current plugged ROMs\r\n\
+        X (hex)       unplug the ROM in Page X, including reserved Pages\r\n\
+        all           unplug all plugged ROMs except reserved Pages\r\n\
+        ALL           unplug all plugged ROMs including reserved Pages\r\n"
+
+        #define unplug_all     1   // unplug all plugged ROMs except reserved Pages
+        #define unplug_ALL     2   // unplug all plugged ROMs including reserved Pages
+        // all other values 4..F are a valid Page number to unplug
+
+*/
+
 // unplug and disable the selected Page
-void uif_unplug(int p)            // plug the selected ROM
+void uif_unplug(int p, int bk)            // plug the selected ROM / bank
 {
   if (!uif_pwo_low()) return;     // only do this when calc is not running
-  TULIP_Pages.unplug(p, 1);       // unplug the page p, bank 1
+
+  if (p == unplug_all) {
+    // unplug all plugged ROMs and banks except reserved Pages
+    for (int i = 4; i < 16; i++) {
+      for (int b = 1; b < 5; b++) {
+        // check if the Page is plugged
+        if (TULIP_Pages.isPlugged(i, b) && !TULIP_Pages.isReserved(i)) {
+          // page is plugged and not reserved, so unplug it
+          TULIP_Pages.unplug(i, b);
+        }
+      }
+    }
+    globsetting.set(HP82143A_enabled, 0); // disable the Printer ROM in the settings
+    globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
+    TULIP_Pages.save();             // save the page settings in FRAM
+    cli_printf("  Unplugged all plugged ROMs except reserved Pages");
+    return;
+
+  } else if (p == unplug_ALL) {
+    // unplug all plugged ROMs and Banks including reserved Pages
+    cli_printf("  Unplugging all plugged ROMs including reserved Pages");
+    for (int i = 4; i < 16; i++) {
+      for (int b = 1; b < 5; b++) {
+        // check if the Page is plugged
+        if (TULIP_Pages.isPlugged(i, b)) {
+          // page is plugged, so unplug it
+          TULIP_Pages.unplug(i, b);
+        }
+      }
+    }
+    globsetting.set(HP82143A_enabled, 0); // disable the Printer ROM in the settings
+    globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
+    TULIP_Pages.save();                   // save the page settings in FRAM
+    cli_printf("  All ROMs unplugged and all reservations cancelled");
+    return;
+  }
+
+  if (TULIP_Pages.isReserved(p)) {
+    // Page is reserved, so we cannot unplug it
+    cli_printf("  Page %X is reserved, please cancel with reserve clear [P]", p);
+    return; // exit the function
+  }
+
+  // unplug a specific Page or Bank
+  if (bk == 0) {
+    // unplug the Page and all Banks
+    for (int b = 1; b < 5; b++) {
+      if (TULIP_Pages.isPlugged(p, b)) {
+        TULIP_Pages.unplug(p, b); // unplug the Page p, bank b 
+      }
+    }
+    cli_printf("  unplugged Page %X, all Banks", p);
+  } else {
+    // unplug the specific Page and Bank
+    if (TULIP_Pages.isPlugged(p, bk)) {
+      TULIP_Pages.unplug(p, bk); // unplug the Page p, bank bk
+      cli_printf("  unplugged Page %X Bank %d", p, bk);
+    } else {
+      cli_printf("  Page %X Bank %d was not plugged", p, bk);
+      return; // exit the function
+    }
+  }
+
 
   // must disable emulation of the page
   if (p == 6) {
@@ -1807,16 +2417,115 @@ void uif_unplug(int p)            // plug the selected ROM
     globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
   }
   
-  cli_printf("  unplugged Page %X", p);
   TULIP_Pages.save();             // save the page settings in FRAM
 }
 
 
+// reserve a Page for a physical module
+// i is the function number
+// p is the Page number to reserve (4..15)
+// fname is the comment string to be used
+//  #define reserve_cx      1
+//  #define reserve_timer   2       
+//  #define reserve_printer 3
+//  #define reserve_hpil    4
+//  #define reserve_clear   5
+//  #define reserve_page    6   
+
+void uif_reserve(int i, int p, const char *comment)
+{
+
+  const char P3_txt[] = "RESERVED for HP41CX Extended Functions Module";
+  const char P5_txt[] = "RESERVED for HP41CX/TIME Module";
+  const char P6_txt[] = "RESERVED for Printer (HP82143, IL Printer or Blinky)";
+  const char P7_txt[] = "RESERVED for HPIL Module";
+
+  if (!uif_pwo_low()) return;     // only do this when calc is not running
+
+  // Page number should be check already, but who knows ...
+  if ((i == reserve_page) && (p < 4 || p > 15)) {
+    cli_printf("  Page number must be >=3 and <=15");
+    return;
+  }
+
+  // check if the Page is already plugged or reserved, we cannot reserve it
+  if (TULIP_Pages.isPlugged(p, 1)) {
+    cli_printf("  Page %X is already plugged, please unplug first", p);
+    return; // exit the function
+  }
+
+  switch (i) {
+    case reserve_cx:      // reserve Page 3+5 for HP41-CX module, but 3 is always reserved
+    case reserve_timer:   // reserve Page 5 for Timer module
+      if (TULIP_Pages.isReserved(5)) {
+        cli_printf("  Page 5 is already reserved, please clear the reservation first", p);
+      }
+      TULIP_Pages.plug(5, 1, PAGE_RESERVED, 0); // plug Page 5 for TIME module
+      TULIP_Pages.setComment(5, 1, P5_txt); // set the comment 
+      break;
+    case reserve_printer: // reserve Page 6 for Printer module
+      if (TULIP_Pages.isReserved(5)) {
+        cli_printf("  Page 6 is already reserved, please clear the reservation first", p);
+      }
+      TULIP_Pages.plug(6, 1, PAGE_RESERVED, 0); // plug Page 6 for a Printer module
+      TULIP_Pages.setComment(6, 1, P6_txt); // set the comment 
+      break;
+    case reserve_hpil:    // reserve Page 7 for HPIL module
+      if (TULIP_Pages.isReserved(7)) {
+        cli_printf("  Page 7 is already reserved, please clear the reservation first", p);
+      }
+      TULIP_Pages.plug(7, 1, PAGE_RESERVED, 0); // plug Page 7 for HP-IL
+      TULIP_Pages.setComment(7, 1, P7_txt); // set the comment 
+      break;
+    case reserve_clear:   // clear the reservation of the given Page
+      if (p == 0) {
+        // clear all reservations
+        // cli_printf("  Clearing all Page reservations");
+        for (int i = 4; i < 16; i++) {
+          if (TULIP_Pages.isReserved(i)) {
+            TULIP_Pages.unplug(i, 1); // unplug the Page
+            TULIP_Pages.unplug(i, 0);
+          }
+        }
+        cli_printf("  All Page reservation cancelled");
+        return; // exit the function
+      }
+      if (TULIP_Pages.isReserved(p)) {
+        TULIP_Pages.unplug(p, 1); // unplug the Page
+        TULIP_Pages.unplug(p, 0);
+        cli_printf("  Reservation of Page %X cleared", p);
+        return;
+      } else {
+        cli_printf("  Page %X is not reserved, nothing to clear", p);
+        return; // exit the function
+      }
+      break;
+    case reserve_page:    // reserve a specific Page with a comment
+      // check if the Page is reserved, we cannot reserve it
+      if (TULIP_Pages.isReserved(p)) {
+        cli_printf("  Page %X is already reserved, please clear the reservation first", p);
+        return; // exit the function
+      }
+        TULIP_Pages.plug(p, 1, PAGE_RESERVED, 0); // plug the Page for reservation
+        TULIP_Pages.setComment(p, 1, comment); // set the comment for the Page
+        // cli_printf("  Reserved Page %X for comment: %s", p, comment);
+      break;
+    default:
+      cli_printf("  Invalid reservation function");
+      return; // exit the function
+  }
+
+  // reserve the page for the given file name
+  // TULIP_Pages.reserve(p, fname);
+  TULIP_Pages.save();             // save the page settings in FRAM
+  cli_printf("  Page %X reserved for %s", p, comment);
+}
+
 
 // the CAT function shows the current ROM map
 // p=0 means show the current ROM map
-// P= 4..F means show ROM details for that page
-void uif_cat(int p)
+// P= 4..F means show ROM details for that Page and Bank
+void uif_cat(int p, int b)
 {
   int flags = 0; // flags for the page settings
   char rev[8]; // buffer for the revision string
@@ -1830,64 +2539,99 @@ void uif_cat(int p)
   if (p == 0) {
 
     cli_printf("  Current ROM map:");
-    cli_printf("  Page - Bank - XROM -  Rev  - #Funcs -   Flags  - File  ");
-    cli_printf("  ----   ----   ----   -----   ------   --------   ---------------------");
+    cli_printf("  Page - Bank - XROM -  Rev  - #Funcs - Flags - File  ");
+    cli_printf("  ----   ----   ----   -----   ------   -----   ---------------------");
 
-    for (int i = 0; i < 16; i++) {
-      // show the current page settings
-      // check if the page is reserved
-      if (TULIP_Pages.isReserved(i)) {
-        // page is reserved, so show a message and print the stored filename
-
-        TULIP_Pages.getFileName(i, 1, FileNm);           // get the file name of the reserved page
-        cli_printf("  %3d                                              - reserved : %s", i, FileNm);
-
-        continue; // skip the rest of the loop
-      } else {
-        // Page is not reserved, use the generic loop to get the information
-
-        // check if the page is plugged and has a valid ROM image
-        if (!TULIP_Pages.isPlugged(i, 1)) {        
-          TULIP_Pages.getFileName(i, 1, FileNm);           // get the file name
-          // this is an empty page, so show a message
-       // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs -  Flags   - File  ");
-       // cli_printf("  ----   ----   ----   -----   ------   --------   ---------------------");
-          cli_printf("  %3X                                              - available: %s", i, FileNm);
-
-        } else if (TULIP_Pages.isPlugged(i, 1) && !TULIP_Pages.isEmbeddedROM(i, 1)) {
-          // Normal plugged ROM, so show the details
-          TULIP_Pages.getRevision(i, 1, rev);
-       // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs -   Flags   - File  ");
-       // cli_printf("  ----   ----   ----   -----   ------   --------   ---------------------");
-          cli_printf("  %3X      1     %3d   %s       %2d      %04X    * %s  @ offs 0x%08X", i, TULIP_Pages.getXROM(i, 1), 
-                                                                                    rev, 
-                                                                                    TULIP_Pages.getFunctions(i, 1),
-                                                                                    TULIP_Pages.getflags(i, 1),
-                                                                                    TULIP_Pages.Pages[i].m_banks[1].b_img_name,
-                                                                                    TULIP_Pages.image_offs(i,1));
-        } else if (TULIP_Pages.isPlugged(i, 1) && TULIP_Pages.isEmbeddedROM(i, 1)) {
-          // Emmbedded ROM
-          int addr = i * 0x1000; // address of the page in FLASH
-          TULIP_Pages.getRevision(i, 1, rev);
-       // cli_printf("  ----   ----   ----   -----   ------   --------   ---------------------");
-          cli_printf("  %3X      1     %3d   %s       %2d      %04X    * %s  @ offs: 0x%08X ", i, TULIP_Pages.getword(addr + 0x00), 
-                                                                                    rev, 
-                                                                                    TULIP_Pages.getword(addr+1),
-                                                                                    TULIP_Pages.getflags(i, 1),
-                                                                                    TULIP_Pages.Pages[i].m_banks[1].b_img_name,
-                                                                                    TULIP_Pages.Pages[i].m_banks[1].b_img_data);
+    for (int pg = 0; pg < 16; pg++) {
+      //go through all Pages 0..15
+      for (int bk = 1; bk < 5; bk++) {
+        // go through all Banks 1..4
         
+        // check if the page is reserved
+        if (TULIP_Pages.isReserved(pg) && (bk == 1)) {
+          // page is reserved, so show a message and print the stored filename
+          // only check for Bank 1, other Banks are not relevant for reserved pages
+          TULIP_Pages.getFileName(pg, bk, FileNm);           // get the file name of the reserved page
+       // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs - Flags   - File  ");
+       // cli_printf("  ----   ----   ----   -----   ------   -----   ---------------------");
+          cli_printf("  %3X                                   %04X    - reserved : %s", pg, TULIP_Pages.getflags(pg, bk), FileNm);
+          break; // break the inner loop, as we only show the first Bank for reserved pages
         } else {
-          // nothing plugged in this page
-          cli_printf("  %3X                                              - not plugged", i);
+
+        // Page is not reserved, use the generic loop to get the information. It is empty or something is there
+        // check if the page is plugged and has a valid ROM image
+          if (!TULIP_Pages.isPlugged(pg, bk)) {        
+            TULIP_Pages.getFileName(pg, bk, FileNm);           // get the file name, if any
+            // this is an empty page, so show a message
+;
+            if (bk ==1) {
+              // we only print bank 1 if it is not plugged
+              // other unplugged banks are skipped
+           // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs - Flags   - File  ");
+           // cli_printf("  ----   ----   ----   -----   ------   -----   ---------------------");
+              cli_printf("  %3X    %3d                            %04X    - available: %s", pg, bk, TULIP_Pages.getflags(pg, bk), FileNm);
+            } else {
+              // we do not print empty other banks, as they are not relevant for empty pages
+              // cli_printf("          %3d                                      - empty", bk);
+            }
+
+          } else if (TULIP_Pages.isPlugged(pg, bk) && !TULIP_Pages.isEmbeddedROM(pg, bk)) {
+            // Normal plugged ROM, so show the details
+            TULIP_Pages.getRevision(pg, bk, rev);
+           // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs - Flags   - File  ");
+           // cli_printf("  ----   ----   ----   -----   ------   -----   ---------------------");
+            if (bk == 1) {
+              cli_printf("  %3X    %3d    %3d    %s     %2d     %04X    * %s  @ 0x%08X", pg, bk, TULIP_Pages.getXROM(pg, bk), 
+                                                                                    rev, 
+                                                                                    TULIP_Pages.getFunctions(pg, bk),
+                                                                                    TULIP_Pages.getflags(pg, bk),
+                                                                                    TULIP_Pages.Pages[pg].m_banks[bk].b_img_name,
+                                                                                    TULIP_Pages.image_offs(pg,bk));
+            } else {
+              // do not print Page number for readability
+              cli_printf("         %3d    %3d    %s     %2d     %04X    * %s  @ 0x%08X", bk, TULIP_Pages.getXROM(pg, bk), 
+                                                                                    rev, 
+                                                                                    TULIP_Pages.getFunctions(pg, bk),
+                                                                                    TULIP_Pages.getflags(pg, bk),
+                                                                                    TULIP_Pages.Pages[pg].m_banks[bk].b_img_name,
+                                                                                    TULIP_Pages.image_offs(pg,bk));
+            }
+          } else if (TULIP_Pages.isPlugged(pg, bk) && TULIP_Pages.isEmbeddedROM(pg, bk)) {
+            // Emmbedded ROM
+            int addr = pg * 0x1000; // address of the page in FLASH
+            TULIP_Pages.getRevision(pg, bk, rev);
+           // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs - Flags   - File  ");
+           // cli_printf("  ----   ----   ----   -----   ------   -----   ---------------------");
+            if (bk ==1) {
+              cli_printf("  %3X    %3d    %3d    %s     %2d     %04X    * %s  @ 0x%08X ", pg, bk, TULIP_Pages.getword(addr + 0x00, bk), 
+                                                                                    rev, 
+                                                                                    TULIP_Pages.getword(addr + 0x01, bk),
+                                                                                    TULIP_Pages.getflags(pg, bk),
+                                                                                    TULIP_Pages.Pages[pg].m_banks[bk].b_img_name,
+                                                                                    TULIP_Pages.Pages[pg].m_banks[bk].b_img_data);
+            } else {
+            // do not print Page number for readability
+              cli_printf("         %3d    %3d    %s     %2d     %04X    * %s  @ 0x%08X ", bk, TULIP_Pages.getword(addr + 0x00, bk), 
+                                                                                    rev, 
+                                                                                    TULIP_Pages.getword(addr + 0x01, bk),
+                                                                                    TULIP_Pages.getflags(pg, bk),
+                                                                                    TULIP_Pages.Pages[pg].m_banks[bk].b_img_name,
+                                                                                    TULIP_Pages.Pages[pg].m_banks[bk].b_img_data);
+            }
+          } else {
+            // nothing plugged in this page/bank
+            cli_printf("  %3X     %3d                                      - nothing plugged here", pg, bk);
+         }
         }
       }
-    } // end of for loop
+    } 
+
   } else {
-    // P = 4..F means show ROM details for that page
-    if (! TULIP_Pages.isPlugged(p, 1)) {
+    // p = 4..F means show ROM details for that page
+    // b is the bank number, 1..4, when 0 only Bank 1 is shown
+    if (! TULIP_Pages.isPlugged(p, b)) {
       // page is not plugged, so show a message
-      cli_printf("  Page %d is not plugged", p);
+      cli_printf("  Page %X - Bank %d is not plugged", p, b);
       return; 
     }
 
@@ -1908,13 +2652,13 @@ void uif_cat(int p)
       ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  %04X    ", addr);       // print the address
       // print 16 bytes
       for (m = 0; m < 16; m++) {
-        ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%03X ", TULIP_Pages.getword(addr + m));
+        ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%03X ", TULIP_Pages.getword(addr + m, b));
       }
     
       // print byte values as characters
       ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  ");
       for (m = 0; m < 16; m++) {
-        c = TULIP_Pages.getword(addr + m) & 0xFF;
+        c = TULIP_Pages.getword(addr + m, b) & 0xFF;
         if ((c < 0x20) || (c > 0x7E)) {
           c = '.';
         }
@@ -1931,7 +2675,7 @@ void uif_cat(int p)
 
 
 // toggle the emulation of the selected function in the given page
-void uif_emulate(int i) {
+void uif_emulate(int i, int p) {
 
   if (!uif_pwo_low()) return;    // only do this when calc is not running{
 
@@ -1940,9 +2684,16 @@ void uif_emulate(int i) {
     case emulate_status:         // list hardware emulation status
             cli_printf("  Emulation status:");
             cli_printf("  - HP-IL             %s", globsetting.get(HP82160A_enabled) ? "enabled":"disabled");
-            cli_printf("  - HP82143A Printer  %s", globsetting.get(HP82143A_enabled) ? "enabled":"disabled");         
+            cli_printf("  - HP82143A Printer  %s", globsetting.get(HP82143A_enabled) ? "enabled":"disabled");       
+            
+            for (int j = 4; j < 16; j++) {
+              // go through all Pages 4..F to check the ZEPROM emulation status
+              if (TULIP_Pages.isPlugged(j, 1) && (TULIP_Pages.Pages[j].m_bank & bank_sticky)  ) {
+                // Found Page with ZEPROM emulation enabled
+                cli_printf("  - ZEPROM Page %X     enabled (Sticky Bankswitching)", j);
+              }
+            }
             break;
-
     case emulate_hpil: // toggle HP-IL emulation
             if (globsetting.get(HP82160A_enabled) == 0) {
               // HP-IL is not enabled, so enable it
@@ -1963,6 +2714,26 @@ void uif_emulate(int i) {
               cli_printf("  HP82143 Printer emulation disabled");
             }
             break;  
+    case emulate_zeprom: // toggle ZEPROM emulation in the given Page
+            // toggle the bank_sticky bit, but only if a mpudle is plugged there
+            if (!TULIP_Pages.isPlugged(p, 1)) {
+              cli_printf("  Page %X is not plugged, cannot toggle ZEPROM emulation", p);
+              return; // exit the function
+            }
+            if (TULIP_Pages.Pages[p].m_bank & bank_sticky) {
+              // bank_sticky bit is set, so clear it
+              TULIP_Pages.Pages[(p & 0xFE)    ].m_bank &= ~bank_sticky;
+              TULIP_Pages.Pages[(p & 0xFE) + 1].m_bank &= ~bank_sticky;
+              cli_printf("  ZEPROM emulation (sticky Bankswitching) disabled in Page %X + %X", p & 0xFE, (p & 0xFE) + 1);
+              TULIP_Pages.save(); // save the page settings in FRAM
+            } else {
+              // bank_sticky bit is clear, so set it
+              TULIP_Pages.Pages[(p & 0xFE)    ].m_bank |= bank_sticky;
+              TULIP_Pages.Pages[(p & 0xFE) + 1].m_bank |= bank_sticky;
+              cli_printf("  ZEPROM emulation (sticky Bankswitching) enabled in Page %X + %X", p & 0xFE, (p & 0xFE) + 1);
+              TULIP_Pages.save(); // save the page settings in FRAM
+            }
+            break;
     default: 
             // no other actions defined here
             break;
@@ -2201,16 +2972,38 @@ void uif_xmem(int i)
   }
 }
 
-// functions for the bus tracer
-//
-//  1        status        shows the tracer status
-//  2        trace         toggle tracer enable/disable
-//  3        sysloop       toggle tracing of system loops
-//  4        sysrom        toggle system rom tracing (Page 0, 1, 2, 3, 5)
-//  5        ilrom         toggle tracing of Page 6+7
-//  6        hpil          toggle HP-IL tracing to ILSCOPE
-//  7        pilbox        toggle PILBox serial tracing to ILSCOPE
-//  8        ilregs        toggle tracing of HP-Il registers
+/*
+#define TRACER_HELP_TXT "tracer functions\r\n\
+        [no argument] shows the tracer status\r\n\
+        status        shows the tracer status\r\n\
+        buffer        shows the trace buffer size\r\n\
+        buffer <size> set the tracer buffer size in number of samples\r\n\
+                      default is 5000, maximum is about 10.000 samples\r\n\
+                      requires a reboot to take effect!\r\n\
+        pretrig      shows the pre-trigger buffer size and status\r\n\
+        pretrig <size> set the pre-trigger buffer size in number of samples\r\n\
+                      default is 32, maximum is 256 samples\r\n\
+        trace         toggle tracer enable/disable\r\n\
+        sysloop       toggle tracing of system loops (RSTKB, RST05, BLINK01 and debounce)\r\n\
+        sysrom        toggle system rom tracing (Page 0 - 5)\r\n\
+        ilrom         toggle tracing of Page 6+7\r\n\
+        hpil          toggle HP-IL tracing to ILSCOPE USB serial port\r\n\
+        pilbox        toggle PILBox serial tracing to ILSCOPE USB serial port\r\n\
+        ilregs        toggle tracing of HP-IL registers\r\n\
+        save          save tracer settings\r\n"
+
+        #define trace_status      1
+        #define trace_buffer      2
+        #define trace_pretrig     3
+        #define trace_trace       4
+        #define trace_sysloop     5    
+        #define trace_sysrom      6
+        #define trace_ilrom       7
+        #define trace_hpil        8
+        #define trace_pilbox      9
+        #define trace_ilregs     10
+        #define trace_save       11
+*/
 
         // settings for tracer, enable by default
         // gsettings[tracer_enabled]       = 1;
@@ -2228,49 +3021,94 @@ void uif_xmem(int i)
         //   0x0177 - 0x0178       delay for debounce
         //   0x089C - 0x089D       BLINK01
 
-void uif_tracer(int i) {
+void uif_tracer(int i, int bufsize) {
   uint16_t stat;
+  int size;
 
   switch (i) {
     case trace_status: // status
-            cli_printf("  HP41 tracer         %s", globsetting.get(tracer_enabled) ? "enabled ":"disabled");
-            cli_printf("  system loop tracing %s (RSTKB, RST05, BLINK01 and debounce)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
-            cli_printf("  system ROM tracing  %s (Page 0..5)", globsetting.get(tracer_sysrom_on) ? "enabled ":"disabled");
-            cli_printf("  tracing of IL roms  %s (Page 6+7)", globsetting.get(tracer_ilroms_on) ? "enabled ":"disabled");
-            cli_printf("  IL scope traffic    %s", globsetting.get(ilscope_IL_enabled) ? "enabled ":"disabled");
-            cli_printf("  PILBox traffic      %s", globsetting.get(ilscope_PIL_enabled) ? "enabled ":"disabled");
-            cli_printf("  tracing of IL regs  %s", globsetting.get(tracer_ilregs_on) ? "enabled ":"disabled");
+
+            // show the current tracer status
+            cli_printf("  Main Trace buffer       %5d samples (%d KByte)", globsetting.get(tracer_mainbuffer), 
+                       globsetting.get(tracer_mainbuffer) * sizeof(TraceLine) / 1024 );
+            cli_printf("  PreTrig buffer          %5d samples (%d KByte)", globsetting.get(tracer_pretrig), 
+                       globsetting.get(tracer_pretrig) * sizeof(TraceLine) / 1024 );
+            cli_printf("  HP41 tracer             %s", globsetting.get(tracer_enabled) ? "enabled ":"disabled");
+            cli_printf("  system loop tracing     %s (RSTKB, RST05, BLINK01 and debounce)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
+            cli_printf("  system ROM tracing      %s (Page 0..5)", globsetting.get(tracer_sysrom_on) ? "enabled ":"disabled");
+            cli_printf("  tracing of IL roms      %s (Page 6+7)", globsetting.get(tracer_ilroms_on) ? "enabled ":"disabled");
+            cli_printf("  IL scope traffic        %s", globsetting.get(ilscope_IL_enabled) ? "enabled ":"disabled");
+            cli_printf("  PILBox traffic          %s", globsetting.get(ilscope_PIL_enabled) ? "enabled ":"disabled");
+            cli_printf("  tracing of IL regs      %s", globsetting.get(tracer_ilregs_on) ? "enabled ":"disabled");
             break;
-    case 2: // trace
+    case trace_buffer: // buffer
+            // show and/or set the current buffer size
+            if (!uif_pwo_low()) {
+              cli_printf("  PreTrigger Buffer size can only be set when PWO is low");
+              return; // exit the function
+            }
+            size = globsetting.get(tracer_mainbuffer);
+            cli_printf("  TraceBuffer %d samples using %d KBytes", size, size * sizeof(TraceLine));
+            if (bufsize > 0) {
+              // set the new buffer size
+              if (bufsize < 1000 || bufsize > 10000) {
+                cli_printf("  TraceBuffer must be between 1000 and 10000 samples");
+                return;
+              }
+              globsetting.set(tracer_mainbuffer, bufsize);
+              cli_printf("  TraceBuffer set to %d samples, requires a reboot to take effect: system REBOOT", bufsize);
+              globsetting.save(); // save the settings in FRAM
+            }
+            break;
+    case trace_pretrig: // pre-trigger buffer
+            // show and /or set the current pre-trigger buffer size
+            if (!uif_pwo_low()) {
+              cli_printf("  PreTrigger Buffer size can only be set when PWO is low");
+              return; // exit the function
+            }
+            size = globsetting.get(tracer_pretrig);
+            cli_printf("  PreTrigger Buffer %d samples using %d KBytes", size, size * sizeof(TraceLine));
+            if (bufsize > 0) {
+              // set the new pre-trigger buffer size
+              if (bufsize < 32 || bufsize > 256) {
+                cli_printf("  PreTrigger Buffer must be between 1 and 256 samples");
+                return;
+              }
+              globsetting.set(tracer_pretrig, bufsize);
+
+              cli_printf("  PreTrigger Buffer set to %d samples", bufsize);
+            }
+            break;
+    case trace_trace: // trace
             globsetting.set(tracer_enabled, !globsetting.get(tracer_enabled));
             trace_enabled != tracer_enabled;
             cli_printf("  HP41 tracer         %s", globsetting.get(tracer_enabled) ? "enabled ":"disabled");
             break;            
-    case 3: // sysloop
+    case trace_sysloop: // sysloop
             globsetting.set(tracer_sysloop_on, !globsetting.get(tracer_sysloop_on));
             cli_printf("  system loop tracing %s (RSTKB, RST05, BLINK01 and debounce)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
             break; 
-    case 4: // sysrom
+    case trace_sysrom: // sysrom
             globsetting.set(tracer_sysrom_on, !globsetting.get(tracer_sysrom_on));
             cli_printf("  system ROM tracing  %s (Page 0..5)", globsetting.get(tracer_sysrom_on) ? "enabled ":"disabled");
             break; 
-    case 5: // ilrom
+    case trace_ilrom: // ilrom
             globsetting.set(tracer_ilroms_on, !globsetting.get(tracer_ilroms_on));
             cli_printf("  tracing of IL roms  %s (Page 6+7)", globsetting.get(tracer_ilroms_on) ? "enabled ":"disabled");
             break; 
-    case 6: // hpil scope
+    case trace_hpil: // hpil scope
             globsetting.set(ilscope_IL_enabled, !globsetting.get(ilscope_IL_enabled));
             cli_printf("  IL scope traffic    %s", globsetting.get(ilscope_IL_enabled) ? "enabled ":"disabled");
             break; 
-    case 7: // PILBox scope
+    case trace_pilbox: // PILBox scope
             globsetting.set(ilscope_PIL_enabled, !globsetting.get(ilscope_PIL_enabled));
             cli_printf("  PILBox traffic      %s", globsetting.get(ilscope_PIL_enabled) ? "enabled ":"disabled");
             break;  
-    case 8: // ilregs
+    case trace_ilregs: // ilregs
             globsetting.set(tracer_ilregs_on, !globsetting.get(tracer_ilregs_on));
             cli_printf("  tracing of IL regs  %s", globsetting.get(tracer_ilregs_on) ? "enabled ":"disabled");
             break; 
-    case 9: // save
+    case trace_save: // save
             // only if PWO is low
             if (!uif_pwo_low()) {
               return;
@@ -2455,7 +3293,6 @@ void welcome()
     printf("\n*   Welcome to TULIP4041 - The ULtimate Intelligent Peripheral for the HP41 ");
     printf("\n*   Total heap:  %d bytes", getTotalHeap());
     printf("\n*   Free heap:   %d bytes", getFreeHeap());
-    printf("\n    Tracebuffer: %d samples / %d bytes", TRACELENGTH, sizeof(TraceLine) * TRACELENGTH);
     printf("\n*   running at:  %d kHz\n", clock_get_hz(clk_sys)/1000);
     printf("\n****************************************************************************\n");
     measure_freqs();

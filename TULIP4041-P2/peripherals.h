@@ -69,6 +69,11 @@ void HPIL_task();
 extern int m_eMode;          // HP-IL controller/device mode
 extern uint32_t cycles();
 
+
+
+
+// prepare for dynamic buffers for user memory
+
 #ifdef __cplusplus
 }
 #endif
