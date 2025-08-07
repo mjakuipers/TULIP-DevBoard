@@ -43,7 +43,8 @@ extern "C" {
         poweron       drive ISA for 20 usecs to switch HP41 on\r\n\
         calcreset     drive PWO to reset HP41\r\n\
         configinit    re-initialize the FRAM persistent settings configuration\r\n\
-        configlist    list all configuration settings\r\n"
+        configlist    list all configuration settings\r\n\
+        gpio          show the GPIO status\r\n"
 
 #elif TULIP_HARDWARE == T_MODULE
         #define SYSTEM_HELP_TXT "TULIP4041 system status and control\r\n\
@@ -59,6 +60,7 @@ extern "C" {
         calcreset     drive PWO to reset HP41\r\n\
         configinit    re-initialize the FRAM persistent settings configuration\r\n\
         configlist    list all configuration settings\r\n\
+        gpio          show the GPIO status\r\n\
         serial        show/program the TULIP serial number\r\n\
                       the serial number is programmed in OTP and can be programmed only once\r\n\
                       TULIP module gets its serial number during assembly testing\r\n"
@@ -74,7 +76,8 @@ extern "C" {
         #define help_calcreset  8
         #define help_configinit 9
         #define help_configlist 10
-        #define help_serial     11
+        #define help_gpio       11
+        #define help_serial     12
 
 #define SDCARD_HELP_TXT "uSD card functions\r\n\
         [no argument] shows the uSD card status and mounts the card\r\n\
@@ -133,7 +136,8 @@ extern "C" {
         paper         toggle Out Of Paper status\r\n\
         print         push PRINT button\r\n\
         adv           push ADV button\r\n\
-        irtest        test the infrared LED\r\n"
+        irtest        test the infrared LED\r\n\
+        irtog         toggle infrared LED\r\n"
 
         #define printer_status  1
         #define printer_power   2
@@ -144,6 +148,7 @@ extern "C" {
         #define printer_print   7
         #define printer_adv     8
         #define printer_irtest  9
+        #define printer_irtog   10
 
 
 #define TRACER_HELP_TXT "tracer functions\r\n\
@@ -371,6 +376,7 @@ extern "C" {
   extern void uif_configinit();         // reinitialize peristent settings
   extern void uif_configlist();         // list all settings
   extern void uif_serial(const char *str);    // show/program the TULIP serial number
+  extern void uif_gpio_status();        // show the GPIO status
 
 // all dir functions
   extern void uif_dir(const char *dir);                // dir root

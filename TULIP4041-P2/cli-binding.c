@@ -170,6 +170,7 @@ const char* __in_flash()system_cmds[] =
     "calcreset",
     "configinit",
     "configlist",
+    "gpio",
     #if (TULIP_HARDWARE == T_MODULE)
     "serial",       // program/read the TULIP serial number
     #endif
@@ -186,7 +187,8 @@ const char* __in_flash()system_cmds[] =
         #define help_calcreset  8
         #define help_configinit 9
         #define help_configlist 10
-        #define help_serial     11
+        #define help_gpio       11
+        #define help_serial     12
 */
 
 void onSystemCLI(EmbeddedCli *cli, char *args, void *context)
@@ -250,6 +252,9 @@ void onSystemCLI(EmbeddedCli *cli, char *args, void *context)
                 break;            
       case help_serial :                 
                 uif_serial(arg2);        // program/read the TULIP serial number
+                break;
+      case help_gpio : 
+                uif_gpio_status();       // show the GPIO status
                 break;
       default:
           cli_printf("system: unkown command %s\n", arg1);    // unknown command
@@ -802,6 +807,7 @@ const char* __in_flash()printer_cmds[] =
     "print",            // push PRINT button
     "adv",              // push ADV button
     "irtest",           // test the infrared LED
+    "irtog",            // toggle infrared LED
 };
 
 void onPrinterCLI(EmbeddedCli *cli, char *args, void *context)

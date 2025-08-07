@@ -709,7 +709,11 @@ static inline void hp41_pio_fiout_program_init(PIO pio, uint sm, uint offset,
 .define SYNC_TIME       27
 
 .side_set 1                                     ; just one sideset for the IR output
-
+public ir_high:
+        out x,1                 side 1          ; wait until data arrives
+                                                ; use for IR LED power testing to set it ON all the time
+                                                ; send any data to switch the LED off
+                                                ; or jump to ir_start
 lolo:                                           ; send out the first lo cycle
         nop                     side 0  [13]    ; delay to be timed at 14* 15,2588 usec
 
@@ -736,14 +740,14 @@ public hilo_loop:
 
 % c-sdk {
 static inline void hp41_pio_irout_program_init(PIO pio, uint sm, uint offset, 
-        uint out_base_pin,              // base for output pin (not used)
+        uint out_base_pin,              // base for output pin, not used
         uint sideset_base_pin,          // base for sideset outputs IR_LED
         uint jmp_pin)                   // not used
     
 {
     pio_sm_config c = hp41_pio_irout_program_get_default_config(offset);
 
-    // set correct pin direction for outputs
+    // set correct pin direction for sideset IR output
     pio_sm_set_consecutive_pindirs(pio, sm, sideset_base_pin, 1, true);         // pin direction for IR_LED
 
     sm_config_set_sideset_pins(&c, sideset_base_pin);                           // side set is our IR_LED
@@ -757,7 +761,7 @@ static inline void hp41_pio_irout_program_init(PIO pio, uint sm, uint offset,
         true,   // Autopull = true
         30      // Autopull threshold = 27 !!
                 // normally total 27 half-bits are sent
-                // allow 3 additional half bits for the inter-frame delay
+                // plus 3 additional half bits for the inter-frame delay
     );
 
     // CPU speed is 125.000.000 Hz (125 MHz)
@@ -773,7 +777,7 @@ static inline void hp41_pio_irout_program_init(PIO pio, uint sm, uint offset,
     pio_gpio_init(pio, sideset_base_pin);               // IR_LED
 
     // load the configuration and jump to the start of the program
-    pio_sm_init(pio, sm, offset + hp41_pio_irout_offset_ir_start, &c);          // must use the ir_start entry
+    pio_sm_init(pio, sm, offset + hp41_pio_irout_offset_ir_start, &c);          // must use the ir_start entry!
 
     // and start the pio state machine
     pio_sm_set_enabled(pio, sm, true);

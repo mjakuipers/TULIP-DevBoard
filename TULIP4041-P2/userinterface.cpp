@@ -177,6 +177,52 @@ const char* __in_flash("flash_constants")glob_set_[] = {
     "",                                         // 100  guard
 };
 
+// Global settings strings for human readable settings
+const char* __in_flash("flash_constants")gpio_names_[] = {
+    "UART TX",                    //  GPIO 0   
+    "UART RX",                    //  GPIO 1   
+    #if (TULIP_HARDWARE == T_DEVBOARD)
+      "FI input",                   //  GPIO 2   // for I2C, OLED, RTC, FI input
+      "IR OUT/PWO OUT",             //  GPIO 3   // for IR output and PWO output enable
+    #elif (TULIP_HARDWARE == T_MODULE)
+      "I2C1 SDA - RTC",             //  GPIO 2   // RTC SDA
+      "I2C1 SCL - RTC",             //  GPIO 3   // RTC SCL
+    #endif
+    "SPI0 SO - FRAM",             //  GPIO 4   // SPI0 SO - FRAM
+    "SPI0 CS - FRAM",             //  GPIO 5   // SPI0 CS - FRAM
+    "SPI0 CK - FRAM",             //  GPIO 6   // SPI0 CK - FRAM
+    "SPI0 SI - FRAM",             //  GPIO 7   // SPI0 SI - FRAM
+    "SPI1 DO - uSD",              //  GPIO 8   // SPI1 DO - uSD
+    "SPI1 CS - uSD",              //  GPIO 9   // SPI1 CS - uSD
+    "SPI1 SI - uSD",              //  GPIO 10  // SPI1 SI - uSD  
+    "SPI1 DO - uSD",              //  GPIO 11  // SPI1 DO - uSD
+    "HP41 CLK1",                  //  GPIO 12  // HP41 CLK1
+    "HP41 CLK2",                  //  GPIO 13  // HP41 CLK2
+    "HP41 ISA",                   //  GPIO 14  // HP41 ISA
+    "HP41 SYNC",                  //  GPIO 15  // HP41 SYNC
+    "HP41 DATA",                  //  GPIO 16  // HP41 DATA
+    "HP41 PWO",                   //  GPIO 17  // HP41 PWO
+    "HP41 ISA OUT",               //  GPIO 18  // HP41 ISA OUT
+    "HP41 ISA OE",                //  GPIO 19  // HP41 ISA OE
+    "HP41 DATA OUT",              //  GPIO 20  // HP41 DATA OUT
+    "HP41 DATA OE",               //  GPIO 21  // HP41 DATA OE
+    "HP41 FI OE",                 //  GPIO 22  // HP41 FI OE
+    #if (TULIP_HARDWARE == T_DEVBOARD)
+      "not used",                   //  GPIO 23  // not used
+    #elif (TULIP_HARDWARE == T_MODULE)
+      "SPARE1",                     //  GPIO 23  // Onboard LED pin number
+    #endif
+    "VBUS present",               //  GPIO 24  // VBUS pin number
+    "Onboard LED",                //  GPIO 25  // Onboard LED pin number
+    "T0_TIME",                    //  GPIO 26  // T0 time, also
+    "SYNC_TIME",                  //  GPIO 27  // SYNC time, during SYNC and ISA instruction (always)
+    "P_DEBUG",                    //  GPIO 28  // P_DEBUG pin, for debugging
+    #if (TULIP_HARDWARE == T_DEVBOARD)
+      "not used",                   //  GPIO 29  // not used
+    #elif (TULIP_HARDWARE == T_MODULE)
+      "IR LED",                     //  GPIO 29  IR LED
+    #endif
+};
 
 // emulation control, this will be in GlobalSettings soon
 int trace_enabled          = 1;     // real-time tracing is enable
@@ -440,7 +486,7 @@ void uif_status()
     cli_printf("*      board id :  %s (unique RP2350 CPU identifier)", board_id_str);
     cli_printf("*"); 
     cli_printf("*  Memory usage");
-    int totalram = 520*1024; // total RAM in the RP2350 is 520 KBytes
+    float totalram = 520; // total RAM in the RP2350 is 520 KBytes
     cli_printf("*    Total RAM  : %7.2lf KBytes", totalram);
     cli_printf("*    Total heap : %7.2lf KBytes", totalheap);
     cli_printf("*    Free heap  : %7.2lf KBytes", freeheap);
@@ -674,10 +720,20 @@ void uif_serial(const char *str)
 
   // read the serial number again to verify
   if (otp_read_serial(ser_string)) {
-    // reading OK
+    // reading OKp
     cli_printf("  serial string: %s", ser_string);
   } else {
     cli_printf("  error reading serial string");
+  }
+}
+
+
+// show the status of all GPIO pins
+void uif_gpio_status()
+{
+  cli_printf("  GPIO status:");
+  for (int i = 0; i < 30; i++) {
+      cli_printf("  GPIO %2d: %s  -  %s", i, gpio_get(i) ? "HI" : "LO", gpio_names_[i]);
   }
 }
 
@@ -1329,9 +1385,7 @@ void ShowROMDetails(uint16_t *ROMoffset)
 
 }
 
-void unpack_image(
-  word *ROM,
-  const byte *BIN)
+void unpack_image(word *ROM, const byte *BIN)
   {
   int i;
   word *ptr=ROM;
@@ -2057,7 +2111,7 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
   if (!uif_pwo_low()) return;    // only do this when calc is not running
 
   // check if Page is already plugged or reserved
-  if ((func != plug_file_A) || (func != plug_file_T)) {
+  if ((func != plug_file_A) && (func != plug_file_T)) {
     // only check if the Page is occupied when we are not autoplugging
     if (TULIP_Pages.isPlugged(Page, Bank)) {
       cli_printf("  Page %X Bank %d is already occupied, please unplug first", Page, Bank);
@@ -2793,7 +2847,7 @@ void uif_printer(int i) {
 
   uint16_t pr_mode;
 
-  if (i == 9) {
+  if (i == printer_irtest) {
     // test the infrared LED
     // simply send a string to the IR led, no throttling
     for (int i = 'A'; i < 'Z'; i++) {
@@ -2803,6 +2857,16 @@ void uif_printer(int i) {
       PrintIRchar(13);    // send a carriage return
       PrintIRchar(10);    // send a line feed
     }	
+    return;
+  }
+
+  if (i == printer_irtog) {
+    // test the IR LED power consumption by toggling it
+    IR_toggle(); // toggle the IR LED
+    // wait for 10 ms
+    sleep_ms(10); // wait for 10 ms
+    cli_printf("  IR LED (GPIO %d) is %s", P_IR_LED, gpio_get(P_IR_LED) ? "ON" : "OFF");
+    return;
   }
 
   if (!globsetting.get(HP82143A_enabled)) {
@@ -2817,7 +2881,7 @@ void uif_printer(int i) {
               case 0:  cli_printf("  printer mode : MAN"); break;
               case 1:  cli_printf("  printer mode : NORM"); break;
               case 2:  cli_printf("  printer mode : TRACE"); break;
-              case 3:  cli_printf("  printer mode : TRACE *"); break;
+              case 3:  cli_printf("  printer mode : TRACE*"); break;
               default: cli_printf("  printer mode : <invalid>");
             }
             cli_printf("  printer BUSY : %s", SELP9_status_BUSY ? "on":"off");
@@ -2839,7 +2903,6 @@ void uif_printer(int i) {
             cli_printf("    bt1  %01d - bit  1 - not used, always returns 0", (SELP9_status >> 1) & 0x0001);
             cli_printf("    bt0  %01d - bit  0 - not used, always returns 0", (SELP9_status >> 0) & 0x0001);
             break;
-
     case 2: // toggle printer power
             if (globsetting.get(PRT_power)) {
               globsetting.set(PRT_power, 0);
@@ -2893,9 +2956,7 @@ void uif_printer(int i) {
             keycount_print = 2;
             wakemeup_41();
             cli_printf("  printer ADV key pushed");
-            break;
-
-            
+            break;            
 
     default: 
             // no other actions defined here

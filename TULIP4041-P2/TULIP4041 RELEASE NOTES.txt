@@ -2,6 +2,24 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
+VERSION 0.92 BETA 2, July 2025
+-   Fixed issue with autoplug
+-   Added command 'printer irtog' to toggle IR LED on or off constanty to facilitate current measurement
+-   Added command 'system gpio' to list all GPIO's
+-   Updated to Pico SDK V2.2.0
+
+VERSION 0.91 BETA 2, July 2025
+-   Various changes under the hood to prepare for MOD files and Tracer enhancements
+
+Functional changes:
+-   Support for Bank Switching and loading .ROM files in individual Banks
+-   Support for ZEPROM Sticky Bank Switching (use the CLI emulate command to enable)
+-   Flexible sizing of Trace Buffer (change requires restart)
+-   A ROM can now be plugged with a Page nmber. This works only for Bank 1
+    and the first available Page is used
+-   The reserve command is added to reserve a Page for a physical Module
+    Plugging without a Page number respects this reservation
+
 VERSION 0.9 BETA 1, June 2025
 -   Public beta, second version for the Pico2-RP2350
 -   Updated to the Pico SDK 2.1.0

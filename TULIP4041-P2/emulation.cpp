@@ -368,6 +368,24 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
 }
 
 
+// toggle the status of the IR LED, and return if it is ON (1) or off (0)
+// must control via the state machine 
+bool IR_toggle() {
+    // be aware that reading the GPIO for the return value may come too soon after the state machine has executed the jump
+    if (!gpio_get(P_IR_LED)) {
+        // IR LED is off, so turn it on
+        // jump to the label ir_high in the state machine
+        pio_sm_exec(pio1_pio, irout_sm, pio_encode_jmp(irout_offset + hp41_pio_irout_offset_ir_high) ); // execute jump to ir_high 
+        // the state machine will now wait for any data to arrive in the TX FIFO or a jump to the normal start to turn it off
+    } else {
+        // IR LED is on, so turn it off
+        // jump to the normal start of the state machine at the ir_start label
+        pio_sm_exec(pio1_pio, irout_sm, pio_encode_jmp(irout_offset + hp41_pio_irout_offset_ir_start) ); // execute jump to ir_start
+    }
+    return gpio_get(P_IR_LED);  // return actual LED status, but this may be wrong
+}
+
+
 // function to return the cycle counter
 uint32_t cycles() {
     return cycle_counter;

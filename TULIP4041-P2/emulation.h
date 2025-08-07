@@ -77,10 +77,7 @@ extern queue_t HPIL_RecvBuffer;             // buffer for HP-IL send and receive
 
 extern int xmem_mods;                       // number of Extended Memory modules active (0, 1 or 2)
 
-
-
 uint32_t cycles();
-
 
 void send_ir_frame(uint32_t frame);
 void setflag_FI0();
@@ -99,8 +96,9 @@ extern int trace_enabled;
 extern uint32_t fi_out1;                    // for flag output driver
 
 extern enum HP41powermode HP41_powermode;
-void InitEmulation();
 
+void InitEmulation();
+bool IR_toggle();
 void PowerMode_task();
 
 #define ROM_BASE_OFFSET  0x00080000

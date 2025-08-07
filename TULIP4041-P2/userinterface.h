@@ -38,7 +38,7 @@ extern "C" {
 #include "fram.h"
 #include "tracer.h"
 #include "ffmanager.h"
-// #include "powermodes.h"
+#include "powermodes.h"
 
 #include "hardware/pll.h"
 #include "hardware/clocks.h"
@@ -78,6 +78,7 @@ void uif_poweron();
 void uif_configinit();    
 void uif_configlist();
 void uif_serial(const char *str);          // show/program the TULIP serial number
+void uif_gpio_status();   // show the GPIO status
 
 void measure_freqs(void);
 
