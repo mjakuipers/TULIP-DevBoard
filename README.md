@@ -1,6 +1,13 @@
 # TULIP-DevBoard and TULIP-Module
 README for the TULIP4041 DevBoard
 
+VERSION 0.92 BETA 2, July 2025, Functional changes
+-   Fixed issue with autoplug in the plug function
+-   Added command 'printer irtog' to toggle IR LED on or off constanty to facilitate current measurement
+-   Added command 'system gpio' to list all GPIO's
+Other changes:
+-   Updated to Pico SDK V2.2.0
+
 VERSION 0.91 BETA 2, July 2025, Functional changes:
 -   Support for Bank Switching and loading .ROM files in individual Banks
 -   Support for ZEPROM Sticky Bank Switching (use the CLI emulate command to enable)
