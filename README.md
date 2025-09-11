@@ -1,6 +1,13 @@
 # TULIP-DevBoard and TULIP-Module
 README for the TULIP4041 DevBoard
 
+VERSION 0.93 BETA 2, September 2025
+-   Fixed issue with reserving Page 5, 6, 7
+-   Increased GPIO drive strength for IR LED to 12 mA
+-   Added support for MOD file plugging
+-   Added import UPDATE and compare functions for mass update from a directory on the uSD card into FLASH
+-   Cosmetic changes to the cat listing
+
 VERSION 0.92 BETA 2, July 2025, Functional changes
 -   Fixed issue with autoplug in the plug function
 -   Added command 'printer irtog' to toggle IR LED on or off constanty to facilitate current measurement
