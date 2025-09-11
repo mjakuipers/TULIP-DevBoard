@@ -79,6 +79,7 @@ void uif_configinit();
 void uif_configlist();
 void uif_serial(const char *str);          // show/program the TULIP serial number
 void uif_gpio_status();   // show the GPIO status
+void uif_owner(const char *str);          // show/program the owner of the device
 
 void measure_freqs(void);
 

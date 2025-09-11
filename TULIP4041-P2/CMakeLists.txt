@@ -100,7 +100,7 @@ add_executable( tulip4041_module        # main application
 )
 target_compile_definitions(tulip4041_module PUBLIC 
                            TULIP_HARDWARE=1                           # define the TULIP_HARDWARE macro
-                           VERSION_STRING="0.92 BETA 2"
+                           VERSION_STRING="0.93 BETA 2"
 )
 
 pico_set_program_name(tulip4041_module "tulip4041")
@@ -147,7 +147,7 @@ add_executable( tulip4041_devboard      # main application
 )
 target_compile_definitions(tulip4041_devboard PUBLIC 
                            TULIP_HARDWARE=0     # define the TULIP_HARDWARE macro
-                           VERSION_STRING="0.92 BETA 2"
+                           VERSION_STRING="0.93 BETA 2"
                           ) 
 
 pico_set_program_name(tulip4041_devboard "tulip4041")

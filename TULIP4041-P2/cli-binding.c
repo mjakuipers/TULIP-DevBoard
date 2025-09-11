@@ -120,8 +120,8 @@ int cli_printf(const char *format, ...) {
     }
 
     // Call embeddedCliPrint with the formatted string
-    tud_task();  // must keep the USB port updated
     embeddedCliPrint(getCliPointer(), buffer);
+    tud_task();  // must keep the USB port updated
     return 0;
 }
 
@@ -144,8 +144,8 @@ int cli_printfn(const char *format, ...) {
     }
 
     // Call embeddedCliPrint with the formatted string
-    tud_task();  // must keep the USB port updated
     embeddedCliPrintN(getCliPointer(), buffer);
+    tud_task();  // must keep the USB port updated
     return 0;
 }
 
@@ -171,9 +171,11 @@ const char* __in_flash()system_cmds[] =
     "configinit",
     "configlist",
     "gpio",
+    "owner",     
     #if (TULIP_HARDWARE == T_MODULE)
     "serial",       // program/read the TULIP serial number
     #endif
+    
 };
 
 /*
@@ -188,7 +190,9 @@ const char* __in_flash()system_cmds[] =
         #define help_configinit 9
         #define help_configlist 10
         #define help_gpio       11
-        #define help_serial     12
+        #define help_owner      12
+        #define help_serial     13
+
 */
 
 void onSystemCLI(EmbeddedCli *cli, char *args, void *context)
@@ -255,6 +259,9 @@ void onSystemCLI(EmbeddedCli *cli, char *args, void *context)
                 break;
       case help_gpio : 
                 uif_gpio_status();       // show the GPIO status
+                break;
+        case help_owner :
+                uif_owner(arg2);         // program/read the owner of the device
                 break;
       default:
           cli_printf("system: unkown command %s\n", arg1);    // unknown command
@@ -336,13 +343,21 @@ void onSDCardCLI(EmbeddedCli *cli, char *args, void *context)
     }
 }
 
+/*
+#define import_no_match -1
+#define import_no_arg   0
+#define import_all      1
+#define import_update   2
+#define import_compare  3
+*/
+
 const char* __in_flash()import_cmds[] =
 // list of arguments for the import command
 // import [filename]
 {
     "ALL",      // import all files in the directory
-    // "UPDATE",   // update files in the file sysytem
-    // "compare",  // compare files in the file system prior to an update
+    "UPDATE",   // update files in the file sysytem
+    "compare",  // compare files in the file system prior to an update
     // "FRAM", 
 };
 
@@ -356,72 +371,131 @@ const char* __in_flash()import_cmds[] =
 void onImportCLI(EmbeddedCli *cli, char *args, void *context)
 {
     const char *arg1 = embeddedCliGetToken(args, 1);        // filename or directory
-    const char *arg2 = embeddedCliGetToken(args, 2);        // ALL, UPDATE or FRAM
-    const char *arg3 = embeddedCliGetToken(args, 3);        // ALL, UPDATE or FRAM
+    const char *arg2 = embeddedCliGetToken(args, 2);        // ALL, UPDATE or compare
+    const char *arg3 = embeddedCliGetToken(args, 3);        // ALL, UPDATE or compare
 
     int cmd = -1;
     int num_cmds = sizeof(import_cmds) / sizeof(char *);
 
+
+
+    // arg1 is always a filename or directory, this is handled in the uif_import function
     if ((arg1 == NULL)) {
         // no argument given, this does nothing       
-        cli_printf("arguments not supported, use: import [filename] <ALL> <UPDATE/COMPARE>");    
+        cli_printf("arguments missing, use: import [file/directory] <ALL> <UPDATE/compare>");    
         return;
     }
 
-    if (arg2 == NULL && arg3 == NULL) {
-        // no second or third argument given, import a simgle file, name in arg1
+    if (arg2 == NULL) {
+        // no second argument, import a simgle file, name in arg1
         // this is a single file import, so pass the filename only
-        uif_import((char*)arg1, 0, 0);     // pass the filename only
+        uif_import((char*)arg1, import_no_arg, import_no_arg);     // pass the filename only
         return;
     }
 
-    // scan arg2 for something known, in this case only the ALL is supported
+    // scan arg2 for something known, this can be ALL, UPDATE or compare
     int a2 = 0;
     while (cmd != 0 && a2 < num_cmds) {
         cmd = strcmp(arg2, import_cmds[a2]);
         a2++;
     }
 
-    if (cmd != 0) {
+    if (cmd != 0) {   // no match in the argument
         a2 = -1;
     }
 
-    // scan arg3 for something known, in this case only the ALL is supported
+    // if arg2 is an unknown argument we get out
+    if (a2 == -1) {
+        // there is an argument in arg2 but it is not valid
+        cli_printf("import: unknown 2nd argument %s", arg2);
+        return;
+    }
+
+    // scan arg3 for something known, this can be ALL, UPDATE or compare
+    // but of course only if there is an argument
     int a3 = 0;
-    while (cmd != 0 && a3 < num_cmds) {
-        cmd = strcmp(arg3, import_cmds[a3]);
-        a3++;
+    cmd = -1;
+    if (arg3 != NULL) {
+        while (cmd != 0 && a3 < num_cmds) {
+            cmd = strcmp(arg3, import_cmds[a3]);
+            a3++;
+        }
+        if (cmd != 0) {
+            // there is an argument in arg3 but it is not valid
+            cli_printf("import: unknown 3rd argument %s", arg3);
+            return;
+        }
+    } else {
+        // if arg3 == NULL
+        a3 = 0;
     }
 
-    // a1 and a2 are passed with the following values:
-    // a2/a3 = 4      only filename, regular single file import, already handled
-    // a2/a3 = 1      ALL option
-    // a2/a3 = 2      UPDATE option
-    // a2/a3 = 3      compare option
-    // a2/a3 = 4      FRAM option
 
+    // a2 or a3 can be any of the following:
+    // #define import_no_arg   0
+    // #define import_all      1
+    // #define import_update   2
+    // #define import_compare  3
+    // 
+    // and are validated according to the following:
+    //   a2        a3       command                                 meaning
+    //   0         *        - import [file]                           single file import, handled above
+    //   1         0        - import [directory] ALL                  import ALL files in a directory
+    //   1         1        - import [directory] ALL ALL              * not valid
+    //   1         2        - import [directory] ALL UPDATE           update all files in a directory
+    //   1         3        - import [directory] ALL compare          compare all files in a directory
+    //   2         0        - import [file] UPDATE                    single file update
+    //   2         1        - import [directory] UPDATE ALL           update all files in a directory
+    //   2         2        - import [file] UPDATE UPDATE             * not valid
+    //   2         3        - import [file] UPDATE compare            * not valid
+    //   3         0        - import [file] compare                   single file compare
+    //   3         1        - import [directory] compare ALL          compare all files in a directory
+    //   3         2        - import [file] compare UPDATE            * not valid
+    //   3         3        - import [file] compare compare           * not valid
 
-    // first filter out unsupported options
-    if (a2 == a3) {
-        // both arguments are the same, this is not supported
-        cli_printf("argument combination not supported, use: import [filename] <ALL/FRAM> <UPDATE/COMPARE>");
+    // call to uif_import can be the following:
+    // a2              a3
+    // import_no_arg   import_no_arg
+    // import_all      import_no_arg            import [directory] ALL
+    // import_update   import_no_arg            import [file] UPDATE
+    // import_compare  import_no_arg            import [file] compare
+    // import_all      import_update            import [directory] ALL UPDATE
+    // import_all      import_compare           import [directory] ALL compare
+
+    if ((a2 == import_all) && (a3 == import_no_arg)) {
+        // import [directory] ALL
+        uif_import((char*)arg1, import_all, import_no_arg);     // pass the arguments
         return;
     }
 
-    if ((a2 == 1) && (a3 == 4)) {
-        // ALL and FRAM is not supported
-        cli_printf("cannot use ALL with FRAM");
+    if ((a2 == import_update) && a3 == import_no_arg) {
+        // import [file] UPDATE
+        uif_import((char*)arg1, import_update, import_no_arg);     // pass the arguments
+        return;
+    }   
+
+    if ((a2 == import_compare) && (a3 == import_no_arg)) {
+        // import [file] compare
+        uif_import((char*)arg1, import_compare, import_no_arg);     // pass the arguments
         return;
     }
 
-    if ((a2 == 4) || (a3 == 4)) {
-        // importing to FRAM is not yet supported
-        cli_printf("import to FRAM is not yet supported");
+    if (((a2 == import_all)    && (a3 == import_update)) ||
+        ((a2 == import_update) && (a3 == import_all))) {
+        // import [directory] ALL UPDATE
+        uif_import((char*)arg1, import_all, import_update);     // pass the arguments
         return;
     }
 
-    // pass the filename and detected arguments
-    uif_import((char*)arg1, a2, a3);     // pass the arguments
+    if (((a2 == import_all)    && (a3 == import_compare)) ||
+        ((a2 == import_compare) && (a3 == import_all))) {
+        // import [directory] ALL compare
+        uif_import((char*)arg1, import_all, import_compare);     // pass the arguments
+        return;
+    }    
+
+    // if we get here this is an unsupported comnbination of arguments
+    cli_printf("arguments not supported, use: import [file/directory] <ALL> <UPDATE/COMPARE>");
 }
 
 
@@ -761,7 +835,7 @@ void onCatCLI(EmbeddedCli *cli, char *args, void *context)
     int cmd = -1;
     int num_cmds = sizeof(plug_cmds) / sizeof(char *);
     if ((arg1 == NULL)) {
-        // no argument given, show the plugged ROM  
+        // no argument given, show all plugged ROMs
         cli_printf("no arguments given, use: cat Page (in hex), see help");   
         uif_cat(0, 0);           // show a summary of the plugged ROMs
         return;
@@ -1395,7 +1469,7 @@ void receiveCLIchar()
         // data is available in the console so read it
         // gpio_put(ONBOARD_LED, true); 
         int c = cdc_read_char(ITF_CONSOLE);
-        tud_task();  // must keep the USB port updated
+        // tud_task();  // must keep the USB port updated
         embeddedCliReceiveChar(cli, c);
         // gpio_put(ONBOARD_LED, false);
     }

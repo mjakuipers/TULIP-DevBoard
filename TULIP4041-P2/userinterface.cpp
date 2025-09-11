@@ -472,6 +472,18 @@ void uif_status()
       cli_printf("*  error reading serial string");
     }
 
+    // now read the owner string, if any
+    // map the string at FF_OWNER_BASE to a char
+    char *owner_string = (char *)FF_OWNER_BASE;  // buffer for the owner string, fixed address in FLASH
+    // check if the owner string is already programmed
+    if (owner_string[0] < 0x20 || owner_string[0] > 0x7E) {
+      // the first character is not printable, so no owner string programmed
+      cli_printf("*  Firmware: %s -- Compiled %s %s", Version_Number, __DATE__, __TIME__);
+      cli_printf("*  Owner   : no owner string programmed");
+    } else {
+      cli_printf("*  Owner   : %s", owner_string);
+    }
+
     cli_printf("*");
     cli_printf("*  Clock overview");
     cli_printf("*    TULIP freq : %7.2lf MHz", speed);
@@ -482,7 +494,7 @@ void uif_status()
     cli_printf("*      clk_peri : %7d kHz", f_clk_peri);
     cli_printf("*      clk_usb  : %7d kHz", f_clk_usb);
     cli_printf("*      clk_adc  : %7d kHz", f_clk_adc);
-    cli_printf("*      cpu temp :   %.02f C, %.02f F", tempC, tempC*9/5+32);	
+    cli_printf("*      cpu temp :   %.02f C, %.02f F", tempC, tempC*9/5+32);
     cli_printf("*      board id :  %s (unique RP2350 CPU identifier)", board_id_str);
     cli_printf("*"); 
     cli_printf("*  Memory usage");
@@ -645,13 +657,81 @@ void uif_configlist() {
     }
 }
 
+void uif_owner(const char *str)
+{
+  // show/program the owner of the device
+  // the owner string is stored in FLASH just under the FLASH File System
+  // Address is fixed at FF_OWNER_BASE
+
+  // only when calculator is not running
+  if (!uif_pwo_low()) return;
+
+  // map the string at FF_OWNER_BASE to a char
+  char *owner_string = (char *)FF_OWNER_BASE;  // buffer for the owner string, fixed address in FLASH
+
+  if (str == NULL) {
+    // read the owner string
+
+    #ifdef DEBUG
+    cli_printf("  reading TULIP4041 owner string from FLASH memory");
+    #endif
+
+    // check if the owner string is already programmed
+    if (owner_string[0] < 0x20 || owner_string[0] > 0x7E) {
+      // the first character is not printable, so no owner string programmed
+      cli_printf("  no proper string programmed at address: 0x%08X", FF_OWNER_BASE);
+      // print the first 32 characters as hex
+      for (int i = 0; i < 32; i++) {
+        cli_printfn("  %02X ", owner_string[i]);
+      }
+      cli_printf("");
+      return;
+    }
+
+    #ifdef DEBUG
+    cli_printf("  owner string address: 0x%08X", owner_string);
+    #endif
+
+    // print the owner string
+    cli_printf("  owner: \"%s\"", owner_string);
+
+  } else {
+    // program string as new owner string to FLASH
+
+    // check if the first 256 bytes of FLASH at address FF_OWNER_OFFSET is erased
+    if (ff_erased_block(FF_OWNER_OFFSET, 256, 1) != NOTFOUND) {
+      // first erase the page
+      cli_printf("  erasing FLASH at address: 0x%08X", FF_OWNER_OFFSET);
+      ff_erase_block(FF_OWNER_OFFSET);
+    }
+
+    // now ready to program the new string
+    // copy the string in a 256 byte buffer
+    char buffer[256];
+    int len = strlen(str);
+    memset(buffer, 0xFF, sizeof(buffer));       // ensure that the buffer contains all FF's
+    strncpy(buffer, str, len);          // copy the new owner string
+    buffer[len] = '\0';                 // ensure null termination
+
+    // program the new owner string to FLASH
+    cli_printf("  new owner string: \"%s\" to \"%s\"", str, buffer);
+    cli_printf("  programming new owner string to FLASH at address: 0x%08X", FF_OWNER_OFFSET);
+    ff_program_block(FF_OWNER_OFFSET, (uint8_t *)buffer, sizeof(buffer));
+
+    // and show the new owner string
+    cli_printf("  owner string address: 0x%08X", owner_string);
+    cli_printf("  owner string value  : \"%s\"", owner_string);
+  }
+}
+
+
 void uif_serial(const char *str)
 {
   // program/read the TULIp serial number
   // program if str has the correct format, otherwise just read the serial number
   // the string programmed is "TULIP4041 HW V0.9 serial #xxxx", 31 chars
-  // the string must be 4 characters with teh serial, the star of the string is fixed
-  char ser_string[32] = "TULIP4041 HW V0.9 serial #xxxx";   // this string is 30 characters long
+  // the string must be 4 characters with the serial, the start of the string is fixed
+  char ser_string[32] = "TULIP4041 HW V1.0 serial #xxxx";   // this string is 30 characters long
                                                             // xxx is the placeholder for the serial number
 
   if (str == NULL) {
@@ -814,24 +894,34 @@ int compare_openfile(FIL* fp, uint32_t offs)
   // now map the header of the file in FLASH
   ModuleMetaHeader_t *MetaH;          // pointer to meta header for getting info of next file
   MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+
+  #ifdef DEBUG
   cli_printf("  filename                         type  size      address     next file");
   cli_printf("  -------------------------------  ----  --------  ----------  ----------");
   cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
                 MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
-  
+  #endif
+
   // verify size infomation
   if (MetaH->FileSize != filesize) {
-    cli_printf("  file size in FLASH is %d, ndifferent from file on uSD card, cannot update", MetaH->FileSize);
+    // cli_printf("  file size in FLASH is %d, different from file on uSD card, cannot update", MetaH->FileSize);
     return COMPARE_DIFF_SIZE;
   }
 
   // now read the file from the uSD card in chunks of 4K compare with the file in FLASH
-  uint32_t addr = FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t);
+  uint32_t addr = 0;
+
+  // map the contents of the file in FLASH
+  uint8_t *flash_buf = (uint8_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t));
+
   UINT read = 0;
   uint32_t toread = filesize;
   uint32_t readsize = 0x1000;
   bool result = true;
   FRESULT fr = f_lseek(fp, 0);    // set the file pointer to the beginning of the file
+  bool is_writable = true;
+  bool is_different = false;
+  uint8_t flash_val = 0;  // byte read from FLASH
 
   while ((toread > 0) && result) {
     if (toread < readsize) readsize = toread;
@@ -842,27 +932,41 @@ int compare_openfile(FIL* fp, uint32_t offs)
     }
 
     // compare the buffer with the FLASH
-    result = (memcmp((void*)addr, buf, read) == 0);
+    // result = (memcmp((void*)addr, buf, read) == 0);   // memcmp returns 0 if the buffers are equal
 
+    // do a byte-by-byte compare to check if the byte is different
+    // if it is different check if is can be overwritten in FLASH without prior erasing
+    for (int i = 0; i < read; i++) {
+
+      if (buf[i] != flash_buf[addr + i]) {
+        // bytes are different the same, now check if programming is possible
+        is_different = true;          // at least one byte is different
+
+        flash_val = flash_buf[addr + i] & buf[i];    // this is the AND
+        flash_val ^= buf[i];                  // XOR to check if any bits need to change from 0 to 1, which is not allowed in FLASH
+        if (flash_val != 0) {
+        // bits need to change from 0 to 1, which is not allowed in FLASH
+          is_writable = false;
+          #ifdef DEBUG
+          cli_printf("  bytes at %08X differ: FLASH: %02X - File: %02X", addr + i, flash_buf[addr + i], buf[i]);
+          #endif
+          return COMPARE_DIFF_ERASE;
+        }
+      }
+    }
+
+    //prepare for next 4K
     toread -= read;
     addr += read;
   }
 
   // now check the result of the comparison
-  // if the files conetnst are equal, return COMPARE_SAME
-  // if not, do another check to find out if the file in FLASH can be updated without first erasing
-  if (result) return COMPARE_SAME;
-
-  // when we get here, the files are different
-  // do another compare to see if the file in FLASH can be updated without erasing
-
-
-
-  // cli_printf("  file %s %s", fname, result ? "is the same" : "is different");
-
-  
-  return COMPARE_DIFFERENT;
-  
+  // if the files are equal, return COMPARE_SAME
+  if (is_different) {
+        return COMPARE_DIFFERENT;
+      } else {
+        return COMPARE_SAME;
+      }
 }
 
 // compare a file with the one in FLASH
@@ -982,32 +1086,69 @@ int compare_file(const char *fname)
   
 }
 
+// write a function to compare strings with wildcards
+// returns true if the strings match, false otherwise
+// park this code for now, not used
+bool wildcard_match(const char *str, const char *pattern) {
+  while (*pattern) {
+    if (*pattern == '*') {
+      pattern++;
+      if (!*pattern) return true; // Trailing '*' matches everything
+      while (*str) {
+        if (wildcard_match(str, pattern)) return true;
+        str++;
+      }
+      return false;
+    } else if (*pattern == '?') {
+      if (!*str) return false; // '?' must match a character
+      str++;
+      pattern++;
+    } else {
+      if (*str != *pattern) return false; // Exact match required
+      str++;
+      pattern++;
+    }
+  }
+  return !*str && !*pattern; // Both strings must be at the end
+}
+
 // import a file with a given filename
 // import a file and program in FLASH
-// k = 0      only filename, regular single file import
-// k = 2      UPDATE option
-// k = 3      COMPARE option
-/*  #define IMPORT_SINGLE 0
-    #define IMPORT_ALL 1
-    #define IMPORT_UPDATE 2
-    #define IMPORT_COMPARE 3
-    #define IMPORT_FRAM 4
-*/
-
-// import a single file and program in FLASH
 // also called by the import_all function
-void import_file(const char *fname, int option)
+// a2 (option) and a3 are passed with the following values:
+// a2              a3
+// import_no_arg   import_no_arg            import [file]
+// import_update   import_no_arg            import [file] UPDATE
+// import_compare  import_no_arg            import [file] compare
+//
+
+// the following values are returned:
+#define import_nofile             0             // no file found or cannot open file
+#define import_nosupport          1             // file type not supported
+#define import_file_same          2             // files are identical, no update needed
+#define import_file_notinflash    3             // file not found in FLASH
+#define import_file_sizediff      4             // file size does not match, cannot compare or update
+#define import_file_diff_erase    5             // file is different and requires erasing before updating
+#define import_file_diff          6             // file is different and can be updated without erasing
+#define import_file_exists        7             // file exists and cannot be imported again
+#define import_file_imported      8             // file imported successfully
+#define import_filesys_full       9             // import not OK, file system full
+#define import_nospace           10            // import not OK, not enough space in FLASH
+
+
+int import_file(const char *fname, int option)
 {
   uint8_t buf[0x1000];          // 4K buffer
   char ffname[32];
+  int result = 0;
+  int rslt = 0;
 
   // first sort out the file to be imported
-
   FIL fil;
   FRESULT fr = f_open(&fil, fname, FA_READ);
   if (FR_OK != fr) {
       cli_printf("  cannot open file: %s, %s (%d)", fname, FRESULT_str(fr), fr);
-      return;
+      return import_nofile;
   }
 
   // make a copy of fname in ffname
@@ -1046,115 +1187,160 @@ void import_file(const char *fname, int option)
   if (type == 0) {
     cli_printf("  file type not supported"); 
     f_close(&fil);
-    return;
+    return import_nosupport;
   }
 
-  // the file is now sorted out
   // check if the file already exists in FLASH
-  // if it exists maybe the UPDATE option is used
+  // if it exists maybe the UPDATE or compare option is used
   uint32_t offs = ff_findfile(fname);
+  
   if (offs != NOTFOUND) {
-    cli_printf("  file already in FLASH at 0x%08X", offs);
-    // check for the UPDATE option
-    if (option == IMPORT_UPDATE) {
-      // check if the file is the same
-      int result = compare_openfile(&fil, offs);
+    cli_printf("  file found in FLASH at 0x%08X", offs);
+    // file exists, is this UPDATE or compare?
+    if ((option == import_update) || (option == import_compare)) {
+      // file UPDATE or compare, first compare the file
+      result = compare_openfile(&fil, offs);
       if (result == COMPARE_SAME) {
-        cli_printf("  file is the same, no update needed");
+        cli_printf("  file in FLASH is identical, no update needed");
         f_close(&fil);
-        return;
+        return import_file_same;
       }
       if (result == COMPARE_NOT_FOUND) {
+        // in case the file is not found in FLASH, should never get here
         cli_printf("  file not found in FLASH");
         f_close(&fil);
-        return;
+        return import_file_notinflash;
       }
       if (result == COMPARE_DIFF_SIZE) {
-        cli_printf("  file size in FLASH is different, cannot update");
+        cli_printf("  file size in FLASH is different, cannot compare or update");
         f_close(&fil);
-        return;
+        return import_file_sizediff;
       }
       if (result == COMPARE_DIFF_ERASE) {
         cli_printf("  file in FLASH is different, requires erasing before updating");
-        f_close(&fil);
-        return;
+        rslt = import_file_diff_erase;
+      }
+      if (result == COMPARE_DIFFERENT) {
+        cli_printf("  file in FLASH is different, can update without erasing");
+        rslt = import_file_diff;
       }
     } else {
+      // file exists in FLASH, but no UPDATE or compare requested
       cli_printf("  file already in FLASH, cannot import again");     
+      f_close(&fil);
+      return import_file_exists;
     }
 
-    f_close(&fil);
-    return;
+    // we get here if the file was found in FLASH but different
+    // if this was compare only we get out here
+    // if this was an update whe can write the file with or without prior erasing
+    if (option == import_compare) {
+      f_close(&fil);
+      return rslt;   // return the result of the comparison
+    } 
   }
 
-  // now check where we can put the file
-  // find the end of the file chain
-  offs = ff_lastfree(0);
-  if (offs == NOTFOUND ) {
-    cli_printf("  no free space in FLASH");
+  // when we get here the file was not found and it is a new file
+  // if we only do compare report it and get out, no programming then
+  if (option == import_compare) {
+    cli_printf("  file not found in FLASH, can be imported");
     f_close(&fil);
-    return;
-  }
-
-  #ifdef DEBUG
-  cli_printf("  last free space in FLASH at 0x%08X", offs);
-  cli_printf("  now checking for any holes that are large enough for the file");
-  #endif
-
-  offs = ff_findfree(0, filesize); // find the next free space in FLASH
-
-  // if offs is NOTFOUND, then there is no free space in FLASH
-  #ifdef DEBUG
-    cli_printf("  found free space in FLASH at 0x%08X", offs);
-  #endif
-
-
-  if (offs == NOTFOUND) {
-    cli_printf("  no free space in FLASH for this file");
-    f_close(&fil);
-    return;
-  }
-
-
-  if ((FF_SYSTEM_SIZE - offs) < (filesize + 256)) {
-    cli_printf("  not enough space in FLASH for this file");
-    f_close(&fil);
-    return;
+    return import_file_notinflash;
   }
 
   // offs now contains the address where to start programming
-  // first construct the header
+  // first construct the header 
   ModuleMetaHeader_t header;
-  header.FileType = type;
-  strcpy(header.FileName, fname);
-  header.FileSize = filesize;
 
-  //next file points to the next available file in the filesystem
-  // unless we are at the end of the filesystem
-  // first check the header of the current (*deleted?) file at offs
-  ModuleMetaHeader_t *MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);    // map header to struct
-  uint32_t nextoffs = MetaH->NextFile;  // get the next file offset from the header
-  if (MetaH->FileType == FILETYPE_END) {
-    // this is the end of the filesystem, header can be set to the file size
-    header.NextFile = offs + ((filesize + sizeof(header) + 255) & ~255);
+  // the UPDATE programming is handled below
+  // but only if the file already existed in FLASH
+  // if the file did not exist in FLASH it is a new file
+  if ((option == import_update) && (offs != NOTFOUND)) {
+    // prepare the update by saving the header
+    // first get a pointer to the current header
+    ModuleMetaHeader_t *MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map FLASH header to struct
+    memcpy(&header, MetaH, sizeof(ModuleMetaHeader_t));                             // copy the header to save it
+
+    // here we do the erasing, if necessary
+    if (result == COMPARE_DIFF_ERASE) {
+      cli_printf("  erasing FLASH at 0x%08X until 0x%08X", offs, header.NextFile);
+      ff_erase(offs, header.NextFile);
+    }
+
+    // file is now erased or does not need to be erased, the header is saved
+
   } else {
-    // this is not the end of the filesystem, so we can set the next file offset
-    // to the next available file in the filesystem
-    header.NextFile = nextoffs;
+    // this is a regular import of a new file, prepare for programming
+    // file not found in FLASH, prepare to import
+    // first find the end of the file chain
+    offs = ff_lastfree(0);
+    if (offs == NOTFOUND ) {
+      cli_printf("  no free space in FLASH");
+      f_close(&fil);
+      return import_filesys_full;
+    }
+
+    // check if the file will fit in FLASH  
+    #ifdef DEBUG
+      cli_printf("  last free space in FLASH at 0x%08X", offs);
+      cli_printf("  now checking for any holes that are large enough for the file");
+    #endif
+
+    offs = ff_findfree(0, filesize); // find the next free space in FLASH
+
+    // if offs is NOTFOUND, then there is no free space in FLASH
+    #ifdef DEBUG
+      cli_printf("  found free space in FLASH at 0x%08X", offs);
+    #endif
+
+    if (offs == NOTFOUND) {
+      cli_printf("  no free space in FLASH for this file");
+      f_close(&fil);
+      return import_nospace;
+    }
+
+    if ((FF_SYSTEM_SIZE - offs) < (filesize + 256)) {
+      cli_printf("  not enough space in FLASH for this file");
+      f_close(&fil);
+      return import_nospace;
+    }
+
+    // offs now contains the address where to start programming
+    // first construct the header
+    header.FileType = type;
+    strcpy(header.FileName, fname);
+    header.FileSize = filesize;
+
+    // next file points to the next available file in the filesystem
+    // unless we are at the end of the filesystem
+    // first check the header of the current (*deleted?) file at offs
+    ModuleMetaHeader_t *MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);    // map header to struct
+    uint32_t nextoffs = MetaH->NextFile;  // get the next file offset from the header
+    if (MetaH->FileType == FILETYPE_END) {
+      // this is the end of the filesystem, header can be set to the file size
+      header.NextFile = offs + ((filesize + sizeof(header) + 255) & ~255);
+    } else {
+      // this is not the end of the filesystem, so we can set the next file offset
+      // to the next available file in the filesystem
+      header.NextFile = nextoffs;
+    }
+
+    // check if flash can be programmed at all with ff_erased 
+    uint32_t addr = ff_erased(offs, filesize + sizeof(header), 1);
+    if (addr != NOTFOUND) {
+      cli_printf("  FLASH not erased at 0x%08X", addr);
+      cli_printf("  erasing FLASH at 0x%08X until 0x%08X", offs, header.NextFile);
+      
+      // now erase the FLASH at the offset offs until the next entry in the filesystem
+
+      // disable all interrupts, flash and restore interrupts
+      ff_erase(offs, header.NextFile);
+    }
   }
 
-  // check if flash can be programmed at all with ff_erased 
-  uint32_t addr = ff_erased(offs, filesize + sizeof(header), 1);
-  if (addr != NOTFOUND) {
-    cli_printf("  FLASH not erased at 0x%08X", addr);
-    // now erase the FLASH at the offset offs until the next entry in the filesystem
-    // so we need to find the next entry first
-    cli_printf("  erasing FLASH at 0x%08X until 0x%08X", offs, header.NextFile);
-    // disable all interrupts, flash and restore interrupts
-
-    ff_erase(offs, header.NextFile);
-
-  }
+  // when we get here the FLASH is ready for programming
+  // the space is erased or does not need to be erased
+  // the header is prepared
   
   // show the programming details in the CLI
   cli_printf("  flashing %-31s, type %04X, size %8d bytes at 0x%08X", header.FileName, header.FileType, header.FileSize, offs);
@@ -1163,10 +1349,13 @@ void import_file(const char *fname, int option)
   memset(buf, 0xFF, 0x1000);
 
   // copy to header to the buffer
-  memcpy(buf, &header, sizeof(header));
+  memcpy(buf, &header, sizeof(ModuleMetaHeader_t));
 
   // and add the first part of the file
   UINT read;
+
+  // in case this is an UPDATE, the filepointer must be reset
+  f_lseek(&fil, 0);
 
   // create a pointer inside our buffer to the start of the file data
   uint8_t* pp = buf + sizeof(header);
@@ -1174,15 +1363,16 @@ void import_file(const char *fname, int option)
   if (FR_OK != fr) {
       cli_printf("  file read error: %s (%d)", FRESULT_str(fr), fr);
       f_close(&fil);
-      return;
+      return import_nofile;
   }  
   
+  // pause for a moment to allow any pending USB transfers to complete
+  ff_delay500();
 
   // ensure that a multiple of 256 bytes is programmed including the header
   // normally this is always 4K, but for small files it can be less
   int bytestoprogram = read + sizeof(header);
   bytestoprogram = (bytestoprogram + 0xFF) & ~0xFF;
-
 
   // disable all interrupts, flash and restore interrupts
   uint32_t ints = save_and_disable_interrupts();
@@ -1213,124 +1403,134 @@ void import_file(const char *fname, int option)
 
   // close the file
   f_close(&fil);
+  return import_file_imported;
 }
 
+
 // import all files in the directory
-// i = 0  import all files in the directory
-// i = 2  import all files in the directory and update existing files
-// i = 3  check all files in the directory and compare with existing files, no import is done
-void uif_import_all(const char *dir, int i)
+// argument i is passed as follows:
+// #define import_no_arg   0
+// #define import_all      1
+// #define import_update   2
+// #define import_compare  3
+void uif_import_all(const char *dir, int arg)
 {
 
-    if (!ff_isinited()) {
+  int result[11] = {0};   // array to count the results of the import
+  int res;
+
+  if (!ff_isinited()) {
     cli_printf("  FLASH File system not initialized, please run INIT first");
     cli_printf("  Total space in FLASH appr %d Kbytes free", FF_SYSTEM_SIZE/1024);
     
     return;
   }
+
   // first open the directory
-    char cwdbuf[FF_LFN_BUF] = {0};
-    FRESULT fr; /* Return value */
-    char const *p_dir;
-    if (dir[0]) {
-        p_dir = dir;
+  char cwdbuf[FF_LFN_BUF] = {0};
+  FRESULT fr; /* Return value */
+  char const *p_dir;
+  if (dir[0]) {
+      p_dir = dir;
+  } else {
+      fr = f_getcwd(cwdbuf, sizeof cwdbuf);
+      if (FR_OK != fr) {
+          cli_printf("  cannot open directory: %s (%d)", FRESULT_str(fr), fr);
+          return;
+      }
+      p_dir = cwdbuf;
+  }
+
+  cli_printf("  Import directory in FLASH: %s", p_dir);
+  DIR dj = {};      /* Directory object */
+  FILINFO fno = {}; /* File information */
+  assert(p_dir);
+  fr = f_findfirst(&dj, &fno, p_dir, "*");
+  if (FR_OK != fr) {
+    cli_printf("  cannot find first file: %s (%d)", FRESULT_str(fr), fr);
+    return;
+  }
+
+  while (fr == FR_OK && fno.fname[0]) { /* Repeat while an item is found */
+    tud_task();  // must keep the USB port updated
+
+    // create string with full path and filename
+    char fname[80];
+    strcpy(fname, p_dir);
+    strcat(fname, "/");
+    strcat(fname, fno.fname);
+
+    // filename is fno.fname	
+    // first check if this is a real file or a directory
+    // if the file is a directory then skip it
+    if (fno.fattrib & AM_DIR) {
+      cli_printf("  skipping subdirectory %s", fno.fname);
     } else {
-        fr = f_getcwd(cwdbuf, sizeof cwdbuf);
-        if (FR_OK != fr) {
-            cli_printf("  cannot open directory: %s (%d)", FRESULT_str(fr), fr);
-            return;
-        }
-        p_dir = cwdbuf;
+      // no directory, import the file and pass the argument
+      // to handle compare or UPDATE
+      res = import_file(fname, arg);
+      result[res]++;
+      cli_printf("");
     }
+    fr = f_findnext(&dj, &fno);     // Search for next item
+  }
 
-    cli_printf("  Import directory in FLASH: %s", p_dir);
-    DIR dj = {};      /* Directory object */
-    FILINFO fno = {}; /* File information */
-    assert(p_dir);
-    fr = f_findfirst(&dj, &fno, p_dir, "*");
-    if (FR_OK != fr) {
-        cli_printf("  cannot find first file: %s (%d)", FRESULT_str(fr), fr);
-        return;
-    }
-    while (fr == FR_OK && fno.fname[0]) { /* Repeat while an item is found */
-        tud_task();  // must keep the USB port updated
+  // all done, close directory and finish
+  f_closedir(&dj);
 
-        // create string with full path and filename
-        char fname[80];
-        strcpy(fname, p_dir);
-        strcat(fname, "/");
-        strcat(fname, fno.fname);
-
-        // filename is fno.fname	
-        // first check if this is a real file or a directory
-        // if the file is a directory then skip it
-        if (fno.fattrib & AM_DIR) {
-          cli_printf("  skipping subdirectory %s", fno.fname);
-        } else {
-          // no directory, import the file
-          import_file(fname, 0);
-        }
-        fr = f_findnext(&dj, &fno); /* Search for next item */
-    }
-
-    // all done, close directory and finish
-    f_closedir(&dj);
+  // show results of mass importy/compare
+  cli_printf("  import/compare done, results:");
+  cli_printf("    files imported/updated successfully:    %3d", result[import_file_imported]);
+  cli_printf("    files exist in FLASH, no re-import:     %3d", result[import_file_exists]);
+  cli_printf("    files identical, no update needed:      %3d", result[import_file_same]);
+  cli_printf("    files different, update no erase:       %3d", result[import_file_diff]);
+  cli_printf("    files different, update with erase:     %3d", result[import_file_diff_erase]);
+  cli_printf("    files size different, cannot update:    %3d", result[import_file_sizediff]);
+  cli_printf("    files not found in FLASH:               %3d", result[import_file_notinflash]);
+  cli_printf("    files type not supported:               %3d", result[import_nosupport]);
+  cli_printf("    files could not be opened:              %3d", result[import_nofile]);
+  cli_printf("    files could not be imported, no space:  %3d", result[import_nospace]);
+  cli_printf("    files could not be imported, FS full:   %3d", result[import_filesys_full]);
 }
 
+
 // import a file and program in FLASH
-// a1 and a2 are passed with the following values:
-// a2/a3 = 0      only filename, regular single file import
-// a2/a3 = 1      ALL option
-// a2/a3 = 2      UPDATE option
-// a2/a3 = 3      COMPARE option
-// a2/a3 = 4      FRAM option (not yet supported)
+// a2 and a3 are passed with the following values:
+// a2              a3
+// import_no_arg   import_no_arg            import [file]
+// import_update   import_no_arg            import [file] UPDATE
+// import_compare  import_no_arg            import [file] compare
+// import_all      import_no_arg            import [directory] ALL
+// import_all      import_update            import [directory] ALL UPDATE
+// import_all      import_compare           import [directory] ALL compare
 void uif_import(const char *fname, int a2, int a3)       
 {
+  int i = 0;
+
   if (!uif_pwo_low()) {
     cli_printf("  function only permitted when HP41 is OFF or STANDBY");  
     return;    // only do this when calc is not running
   }
 
-  int i = 0;
+  #ifdef DEBUG
+  // show parameters
+    cli_printf("  command: import %s %d %d", fname, a2, a3);
+  #endif
 
-  if ((a2 == 1) || (a3 == 1)) {
+  if (a2 == import_all) {
     // import all files in the directory
-    if (a2 == 1) {
-      i = a3;
-    } else {
-      i = a2;
-    } 
-    uif_import_all(fname, i);
+    // a3 can be import_no_arg, import_update or import_compare
+    uif_import_all(fname, a3);
     return; 
   }
 
-
-
   // we get here for a single file import
-      // a1 and a2 are passed with the following values:
-    // a2/a3 = 0      only filename, regular single file import
-    // a2/a3 = 1      ALL option
-    // a2/a3 = 2      UPDATE option
-    // a2/a3 = 3      COMPARE option
-    // a2/a3 = 4      FRAM option (not yet supported)
-
-  if ((a2 == 4) || a3 == 4) {
-    cli_printf("  FRAM option not yet supported");
-    return;   
-  }
-
-  if ((a2 == 2) || (a3 == 2)) {
-    // UPDATE option
-    i = 2;
-  } else if ((a2 == 3) || (a3 == 3)) {
-    // COMPARE option
-    i = 3;
-  } else {
-    // regular single file import
-    i = 0;
-  }
-
-  import_file(fname, i);   // does all the work for a single file
+  // a2 and a3 are passed with the following values:
+  // a2              a3
+  // import_no_arg   import_no_arg            import [file]
+  // import_update   import_no_arg            import [file] UPDATE
+  // import_compare  import_no_arg            import [file] compare
+  import_file(fname, a2);   // does all the work for a single file
 }
 
 
@@ -1385,6 +1585,56 @@ void ShowROMDetails(uint16_t *ROMoffset)
 
 }
 
+void ShowROMDump(uint16_t *ROMoffset)
+{
+  // given an offset in FLASH to the ROM contents, dumps the ROM file
+
+  char  ShowPrint[250];
+  int   ShowPrintLen = 0;
+  uint16_t addr = 0;                        // address counter
+  uint16_t endaddr = addr + 0x1000;         // end of the dump
+  int i = 0;                                // counter for the number of bytes in a line
+  char c;
+  uint16_t romword;
+  int m;
+
+  uint16_t *myROMImage;               // buffer pointer for the ROM image
+
+  myROMImage = ROMoffset;
+
+  // now generate the hex dump
+  cli_printf("  dump of ROM contents");
+  cli_printf("  address  00   01   02   03   04   05   06   07   08   09   0A   0B   0C   0D   0E   0F        ASCII");
+  cli_printf("  ----    ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----  ----------------");
+
+  do {
+    tud_task();  // keep the USB port updated
+    ShowPrintLen = 0;
+    ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  %04X    ", addr);       // print the address
+
+    // print 16 bytes
+    for (m = 0; m < 16; m++) {
+      romword = swap16(myROMImage[addr]);
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%04X ", romword);
+      addr++;
+    }
+    addr = addr - 16;
+    // print byte values as characters
+    ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  ");
+    for (m = 0; m < 16; m++) {
+      c = swap16(myROMImage[addr]) & 0xFF;
+      if ((c < 0x20) || (c > 0x7E)) {
+        c = '.';
+      }
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%c", c);
+      addr++;
+    } 
+    cli_printf("%s", ShowPrint);
+        
+  } while (addr < endaddr);   // list 4K bytes by default
+  i++;
+}
+
 void unpack_image(word *ROM, const byte *BIN)
   {
   int i;
@@ -1427,8 +1677,6 @@ inline uint16_t getfrombin(void* binarray, uint16_t address) {
 
   result = res1 + res2;
   return result;
-
-
 }
 
 
@@ -1437,8 +1685,9 @@ void ShowMODDetails(ModuleFileHeader_t *MODoffset)
   // given an offset in FLASH to the ROM contents, show the details of the ROM file
   ModuleFileHeader_t *myMODImage;               // buffer pointer to the MOD file in FLASH
   ModuleHeader_t *myPageHeader;                 // pointer to the individual pages header
-  V1_t *myV1;                                   // pointer to the module contents in BIN format (5120 bytes)
-                                                // compressed ROM format
+  uint8_t *myImage;                             // pointer to the image data
+
+  int NumFunctions;
 
   myMODImage = MODoffset;
   int ModNumPages = myMODImage->NumPages;
@@ -1449,20 +1698,22 @@ void ShowMODDetails(ModuleFileHeader_t *MODoffset)
   int i = 0;
   while (i < ModNumPages) {
     // show details of the individual pages
+    // only works for MOD1 type MOD files
     myPageHeader = (ModuleHeader_t*)((uint32_t)MODoffset + sizeof(ModuleFileHeader_t)
-                                                         + i * sizeof(ModuleHeader_t)
-                                                         + i * sizeof(V1_t));
-    cli_printf("   *Page %2d    %s", i, myPageHeader->Name);
-    myV1 = (V1_t*)((uint32_t)myPageHeader + sizeof(ModuleHeader_t));
+                                                         + i * sizeof(ModuleHeader_t));
 
-    int NumFunctions = getfrombin(myV1, 1);
+    cli_printf("   *Page %2d    %s", i, myPageHeader->Name);
+
+    myImage = myPageHeader->Image;
+
+    NumFunctions = getfrombin(myImage, 1);
     
-    cli_printf("    XROM      %3d", getfrombin(myV1, 0));
+    cli_printf("    XROM      %3d", getfrombin(myImage, 0));
     cli_printf("    # Funcs   %3d", NumFunctions);
 
     // get a pointer to the ROM name (first function)
-    uint16_t ROMName_offs = ((getfrombin(myV1, 3) & 0xFF)) + ((getfrombin(myV1, 2) & 0xFF) * 256);
-    if (getfrombin(myV1, 2) > 0xFF) 
+    uint16_t ROMName_offs = ((getfrombin(myImage, 3) & 0xFF)) + ((getfrombin(myImage, 2) & 0xFF) * 256);
+    if (getfrombin(myImage, 2) > 0xFF) 
     {
       // usercode ROM, do not decode, just mention it
       cli_printf("    ROMName    <USERCODE>");
@@ -1476,13 +1727,13 @@ void ShowMODDetails(ModuleFileHeader_t *MODoffset)
       cli_printf("    ROMName    <none> (no functions)");
     } else
     {
-      char c = getfrombin(myV1, ROMName_offs - 1);
+      char c = getfrombin(myImage, ROMName_offs - 1);
       int i = 0;
       while ( ((c & 0xFF) < 0x40) && (i < 16)) {
         // only allowed chars
         ROMname[i] = HPchar[c & 0x3F];
         i++;
-        c = getfrombin(myV1, ROMName_offs - 1 - i);
+        c = getfrombin(myImage, ROMName_offs - 1 - i);
       }
       // and add the last character of the ROM name plus a NULL
       ROMname[i] = HPchar[c & 0x3F];
@@ -1490,14 +1741,12 @@ void ShowMODDetails(ModuleFileHeader_t *MODoffset)
       cli_printf("    ROMName    \"%s\" - first function entry at 0x%04x", ROMname, ROMName_offs);
     }
     // now the ROM Revision and checksum
-    cli_printf("    Rev        %c%c-%c%c", HPchar[getfrombin(myV1, 0xFFE) & 0x3F], 
-                                           HPchar[getfrombin(myV1, 0xFFD) & 0x3F], 
-                                           HPchar[getfrombin(myV1, 0xFFC) & 0x3F], 
-                                           HPchar[getfrombin(myV1, 0xFFB) & 0x3F]);
-    cli_printf("    Checksum   0x%03X", getfrombin(myV1, 0xFFF));  
+    cli_printf("    Rev        %c%c-%c%c", HPchar[getfrombin(myImage, 0xFFE) & 0x3F], 
+                                           HPchar[getfrombin(myImage, 0xFFD) & 0x3F], 
+                                           HPchar[getfrombin(myImage, 0xFFC) & 0x3F], 
+                                           HPchar[getfrombin(myImage, 0xFFB) & 0x3F]);
+    cli_printf("    Checksum   0x%03X", getfrombin(myImage, 0xFFF));  
     i++;
-
-
   }
 
 }
@@ -1508,8 +1757,8 @@ void ShowMODDump(ModuleFileHeader_t *MODoffset)
   // given an offset in FLASH to the ROM contents, dumps the first page of the MOD file
   ModuleFileHeader_t *myMODImage;               // buffer pointer to the MOD file in FLASH
   ModuleHeader_t *myPageHeader;                 // pointer to the individual pages header
-  V1_t *myV1;                                   // pointer to the module contents in BIN format (5120 bytes)
-                                                // compressed ROM format
+  uint8_t *myImage;                             // pointer to the image data
+
   char  ShowPrint[250];
   int   ShowPrintLen = 0;
   uint16_t addr = 0;                        // address counter
@@ -1521,18 +1770,21 @@ void ShowMODDump(ModuleFileHeader_t *MODoffset)
 
   myMODImage = MODoffset;
   int ModNumPages = myMODImage->NumPages;
-  cli_printf("    MOD Format %s", myMODImage->FileFormat);
-  cli_printf("    MOD Title  %s", myMODImage->Title);
-  cli_printf("    MOD Pages  %d", myMODImage->NumPages);
+
+  // we do not yet support MOD2 files
+  if (strcmp(myMODImage->FileFormat, "MOD2") == 0) {
+    cli_printf("  MOD2 files not yet supported");
+    return;
+  }
+
 
   ModNumPages = 1; // only show the first page
   while (i < ModNumPages) {
     // show details of the individual pages
     myPageHeader = (ModuleHeader_t*)((uint32_t)MODoffset + sizeof(ModuleFileHeader_t)
-                                                         + i * sizeof(ModuleHeader_t)
-                                                         + i * sizeof(V1_t));
-    // cli_printf("   *Page %2d    %s", i, myPageHeader->Name);
-    myV1 = (V1_t*)((uint32_t)myPageHeader + sizeof(ModuleHeader_t));
+                                                         + i * sizeof(ModuleHeader_t));
+
+    myImage = myPageHeader->Image;
 
     // now generate the hex dump
     cli_printf("  dump of ROM contents");
@@ -1546,7 +1798,7 @@ void ShowMODDump(ModuleFileHeader_t *MODoffset)
 
       // print 16 bytes
       for (m = 0; m < 16; m++) {
-        romword = getfrombin(myV1, addr);
+        romword = getfrombin(myImage, addr);
         ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%04X ", romword);
         addr++;
       }
@@ -1554,7 +1806,7 @@ void ShowMODDump(ModuleFileHeader_t *MODoffset)
       // print byte values as characters
       ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  ");
       for (m = 0; m < 16; m++) {
-        c = getfrombin(myV1, addr) & 0xFF;
+        c = getfrombin(myImage, addr) & 0xFF;
         if ((c < 0x20) || (c > 0x7E)) {
           c = '.';
         }
@@ -1718,6 +1970,8 @@ void uif_list(int i, const char *fname)
     if (MetaH->FileType == FILETYPE_ROM) {
       // ROM file, show details
       ShowROMDetails((uint16_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t)));
+      
+      ShowROMDump((uint16_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t)));
      return;
     } else if (MetaH->FileType == FILETYPE_MOD1 || MetaH->FileType == FILETYPE_MOD2) {
       // show MOD file details
@@ -1797,10 +2051,12 @@ void uif_list(int i, const char *fname)
   }    
 }
 
+
 // The Plug function relies on the LoadMOD function, based on LoadMOD in the V41 sources in HP41File.cpp
 // Copyright (c) 1989-2002  Warren Furlow   
 
 
+// the function isPageUsed is replaced by the isUsed function
 /****************************/
 // return if page is used, W&W RAMBOX RAM is not marked as used!
 /****************************/
@@ -1811,11 +2067,33 @@ void uif_list(int i, const char *fname)
 }
 */
 
-/****************************/
-// Returns 0 for success, 1 for open fail, 2 for read fail, 3 for invalid file, 4 for load conflict or no space
-// Use the ModuleMetaHeader_t structure to get the file information
 
+// Return values
+#define LOADMOD_SUCCESS                 0
+#define LOADMOD_FAIL                    100
+#define LOADMOD_OPEN_FAIL               101
+#define LOADMOD_READ_FAIL               102
+#define LOADMOD_INVALID_FILE            103
+#define LOADMOD_LOAD_CONFLICT           104   // load conflict or no space
+#define LOADMOD_UNSUPPORTED_HARDWARE    105
+#define LOADMOD_UNSUPPORTED_PAGE        106
+
+// in case a supported hardware MOD file is loaded, the retun value is the following:
 /*
+#define HARDWARE_NONE               0  // no additional hardware specified 
+#define HARDWARE_PRINTER            1  // 82143A Printer 
+#define HARDWARE_CARDREADER         2  // 82104A Card Reader 
+#define HARDWARE_TIMER              3  // 82182A Time Module or HP-41CX built in timer 
+#define HARDWARE_WAND               4  // 82153A Barcode Wand 
+#define HARDWARE_HPIL               5  // 82160A HP-IL Module 
+#define HARDWARE_INFRARED           6  // 82242A Infrared Printer Module 
+#define HARDWARE_HEPAX              7  // HEPAX Module - has special hardware features (write protect, relocation) 
+#define HARDWARE_WWRAMBOX           8  // W&W RAMBOX - has special hardware features (RAM block swap instructions) 
+#define HARDWARE_MLDL2000           9  // MLDL2000 
+#define HARDWARE_CLONIX             10 // CLONIX-41 Module 
+#define HARDWARE_MAX                10 // maximum HARDWARE_ define value 
+*/
+
 int LoadMOD(ModuleMetaHeader_t *MetaH)
 {
 
@@ -1823,27 +2101,59 @@ int LoadMOD(ModuleMetaHeader_t *MetaH)
   uint page,hep_page=0;
   uint FileSize;
   bool fLoad = false;
+  int hw_return = LOADMOD_SUCCESS;  // return value, assume success
 
-  pMFH = (ModuleFileHeader_t *)(MetaH + sizeof(ModuleMetaHeader_t));
+  pMFH = (ModuleFileHeader_t *)((uint8_t *)MetaH + sizeof(ModuleMetaHeader_t));
 
+  #ifdef DEBUG
+  cli_printf("  LoadMOD: called with MetaH      @ 0x%08X", (uint8_t *)MetaH);
+  cli_printf("  LoadMOD: ModuleFileHeader  pMFH @ 0x%08X", (uint8_t *)pMFH);
+  #endif
 
   // get file format and the most important MOD file parameters
   // there is no check on the file size etc
 
   // nFileFormat is 1 for MOD1 and 2 for MOD2, 0 for an unsupported type
   const int nFileFormat = MetaH->FileType;
-  if ((MetaH->FileType != FILETYPE_MOD1) && (MetaH->FileType != FILETYPE_MOD2)) {
-    return(3);  // not a MOD file, cannot do anything with it
+  if (MetaH->FileType != FILETYPE_MOD1) {
+    #ifdef DEBUG
+    cli_printf("  LoadMOD: only MOD1 files supported, this is a %d file", MetaH->FileType);
+    #endif
+    return(LOADMOD_INVALID_FILE);  // not a MOD file, cannot do anything with it
   }
 
   FileSize = MetaH->FileSize;  // get the file size from the meta header, just to check if we are not reading past the end
   
-  // first check if the hardware is supported by the TULIP firmware
-  if ((pMFH->Hardware != HARDWARE_NONE) && 
-      (pMFH->Hardware != HARDWARE_PRINTER) && 
-      (pMFH->Hardware != HARDWARE_CARDREADER) &&
-      (pMFH->Hardware != HARDWARE_HEPAX)) {
-    return(3);  // unsupported hardware type, cannot load this MOD file
+//  #define HARDWARE_NONE               0  /* no additional hardware specified */
+//  #define HARDWARE_PRINTER            1  /* 82143A Printer */
+//  #define HARDWARE_CARDREADER         2  /* 82104A Card Reader */
+//  #define HARDWARE_TIMER              3  /* 82182A Time Module or HP-41CX built in timer */
+//  #define HARDWARE_WAND               4  /* 82153A Barcode Wand */
+//  #define HARDWARE_HPIL               5  /* 82160A HP-IL Module */
+//  #define HARDWARE_INFRARED           6  /* 82242A Infrared Printer Module */
+//  #define HARDWARE_HEPAX              7  /* HEPAX Module - has special hardware features (write protect, relocation) */
+//  #define HARDWARE_WWRAMBOX           8  /* W&W RAMBOX - has special hardware features (RAM block swap instructions) */
+//  #define HARDWARE_MLDL2000           9  /* MLDL2000 */
+//  #define HARDWARE_CLONIX             10 /* CLONIX-41 Module */
+//  #define HARDWARE_MAX                10 /* maximum HARDWARE_ define value */
+
+  
+// first check if the hardware is supported by the TULIP firmware
+  if (
+      // (pMFH->Hardware == HARDWARE_PRINTER) || 
+      (pMFH->Hardware == HARDWARE_CARDREADER) ||
+      (pMFH->Hardware == HARDWARE_TIMER) ||
+      (pMFH->Hardware == HARDWARE_WAND) ||
+      // (pMFH->Hardware == HARDWARE_HPIL) ||
+      (pMFH->Hardware == HARDWARE_INFRARED) ||
+      // (pMFH->Hardware == HARDWARE_HEPAX) ||
+      (pMFH->Hardware == HARDWARE_WWRAMBOX) ||
+      (pMFH->Hardware == HARDWARE_MLDL2000) ||
+      (pMFH->Hardware == HARDWARE_CLONIX)) {
+    return (LOADMOD_UNSUPPORTED_HARDWARE);  // unsupported hardware type, cannot load this MOD file
+  } else{
+    // supported hardware or no specific hardware
+    hw_return = pMFH->Hardware;  // remember the hardware type for later use if succesful
   }
 
   byte ImageNo = 0;                         // image no. in MOD file
@@ -1856,15 +2166,34 @@ int LoadMOD(ModuleMetaHeader_t *MetaH)
   int EvenGroup[8]    = {0,0,0,0,0,0,0,0};      // <0, or =page # if even page(s) go in group
   int OrderedGroup[8] = {0,0,0,0,0,0,0,0};      // <0, or =page # if ordered page(s) go in group
 
+  #ifdef DEBUG
+  cli_printf("  LoadMOD: FileFormat %s, Title \"%s\", NumPages %d, Hardware %d", 
+            pMFH->FileFormat, pMFH->Title, pMFH->NumPages, pMFH->Hardware);
+  #endif
+
   // load ROM pages with three pass process
   for (int pass = 1; pass <= 3; pass++) {
-    for (int pageIndex=0; pageIndex < pMFH->NumPages; pageIndex++) {
+    for (int pageIndex = 0; pageIndex < pMFH->NumPages; pageIndex++) {
+      // show debug messages
+
       ModuleHeader_t *pMFP;                 // pointer to the page header in the MOD file 
-      if (1 == nFileFormat) {               // MOD1
-         pMFP = &((ModuleHeader_t *)&pMFH[1])[pageIndex];
-      } else {                              // MOD2
-        pMFP = (ModuleHeader_t *)(&((ModuleHeaderV2_t *)&pMFH[1])[pageIndex]);
-      }
+      // assign the pointer to the page header
+
+      // pMFH = (ModuleFileHeader_t *)((uint8_t *)MetaH + sizeof(ModuleMetaHeader_t));
+
+      pMFP = (ModuleHeader_t*)((uint8_t *)pMFH + sizeof(ModuleFileHeader_t) + pageIndex * sizeof(ModuleHeader_t));
+
+      #ifdef DEBUG
+      cli_printf("  Pass %d - PageIndex %d - checking page %01X (group %d) @ 0x%08X", pass, pageIndex, pMFP->Page, pMFP->PageGroup, (uint8_t *)pMFP);
+      #endif
+
+      // Skip this (is wrong anyway) - we always use MOD1 format for now
+      // if (1 == nFileFormat) {               // MOD1
+      //    pMFP = &((ModuleHeader_t *)&pMFH[1])[pageIndex];
+      // } else {                              // MOD2
+      //   pMFP = (ModuleHeader_t *)(&((ModuleHeaderV2_t *)&pMFH[1])[pageIndex]);
+      // }
+
       fLoad = false;
       switch(pass) {
         case 1:                             // pass 1: validate page variables, flag grouped pages
@@ -1873,7 +2202,7 @@ int LoadMOD(ModuleMetaHeader_t *MetaH)
             (pMFP->PageGroup && pMFP->Page<=POSITION_ANY) ||    // group pages cannot use non-grouped position codes 
             (!pMFP->PageGroup && pMFP->Page>POSITION_ANY))      // non-grouped pages cannot use grouped position codes
             {
-              return(3);
+              return(LOADMOD_INVALID_FILE);
             }
           if (pMFP->PageGroup == 0)             // if not grouped do nothing in this pass
             break;
@@ -1893,83 +2222,83 @@ int LoadMOD(ModuleMetaHeader_t *MetaH)
           if (pMFP->PageGroup == 0)             // if not grouped do nothing in this pass
             break;
           // a matching page has already been loaded
-          if (pMFP->Page==POSITION_LOWER && UpperGroup[pMFP->PageGroup-1]>0)       // this is the lower page and the upper page has already been loaded
-            page=UpperGroup[pMFP->PageGroup-1]-1;
-          else if (pMFP->Page==POSITION_LOWER && LowerGroup[pMFP->PageGroup-1]>0)  // this is another lower page
-            page=LowerGroup[pMFP->PageGroup-1];
-          else if (pMFP->Page==POSITION_UPPER && LowerGroup[pMFP->PageGroup-1]>0)  // this is the upper page and the lower page has already been loaded
-            page=LowerGroup[pMFP->PageGroup-1]+1;
-          else if (pMFP->Page==POSITION_UPPER && UpperGroup[pMFP->PageGroup-1]>0)  // this is another upper page
-            page=UpperGroup[pMFP->PageGroup-1];
-          else if (pMFP->Page==POSITION_ODD && EvenGroup[pMFP->PageGroup-1]>0)
-            page=EvenGroup[pMFP->PageGroup-1]+1;
-          else if (pMFP->Page==POSITION_ODD && OddGroup[pMFP->PageGroup-1]>0)
-            page=OddGroup[pMFP->PageGroup-1];
-          else if (pMFP->Page==POSITION_EVEN && OddGroup[pMFP->PageGroup-1]>0)
-            page=OddGroup[pMFP->PageGroup-1]-1;
-          else if (pMFP->Page==POSITION_EVEN && EvenGroup[pMFP->PageGroup-1]>0)
-            page=EvenGroup[pMFP->PageGroup-1];
-          else if (pMFP->Page==POSITION_ORDERED && OrderedGroup[pMFP->PageGroup-1]>0)
-            page=++OrderedGroup[pMFP->PageGroup-1];
+          if (pMFP->Page == POSITION_LOWER && UpperGroup[pMFP->PageGroup-1]>0)       // this is the lower page and the upper page has already been loaded
+            page = UpperGroup[pMFP->PageGroup-1]-1;
+          else if (pMFP->Page == POSITION_LOWER && LowerGroup[pMFP->PageGroup-1]>0)  // this is another lower page
+            page = LowerGroup[pMFP->PageGroup-1];
+          else if (pMFP->Page == POSITION_UPPER && LowerGroup[pMFP->PageGroup-1]>0)  // this is the upper page and the lower page has already been loaded
+            page = LowerGroup[pMFP->PageGroup-1]+1;
+          else if (pMFP->Page == POSITION_UPPER && UpperGroup[pMFP->PageGroup-1]>0)  // this is another upper page
+            page = UpperGroup[pMFP->PageGroup-1];
+          else if (pMFP->Page == POSITION_ODD && EvenGroup[pMFP->PageGroup-1]>0)
+            page = EvenGroup[pMFP->PageGroup-1]+1;
+          else if (pMFP->Page == POSITION_ODD && OddGroup[pMFP->PageGroup-1]>0)
+            page = OddGroup[pMFP->PageGroup-1];
+          else if (pMFP->Page == POSITION_EVEN && OddGroup[pMFP->PageGroup-1]>0)
+            page = OddGroup[pMFP->PageGroup-1]-1;
+          else if (pMFP->Page == POSITION_EVEN && EvenGroup[pMFP->PageGroup-1]>0)
+            page = EvenGroup[pMFP->PageGroup-1];
+          else if (pMFP->Page == POSITION_ORDERED && OrderedGroup[pMFP->PageGroup-1]>0)
+            page = ++OrderedGroup[pMFP->PageGroup-1];
           // find first page in group
           else {     // find free space depending on which combination of positions are specified
-            if (LowerGroup[pMFP->PageGroup-1]!=0 && UpperGroup[pMFP->PageGroup-1]!=0) {        // lower and upper
-              page=8;
-              while (page<=0xe && (TULIP_Pages.isUsed(page,pMFP->Bank) || TULIP_Pages.isUsed(page+1,pMFP->Bank)))
+            if (LowerGroup[pMFP->PageGroup-1] != 0 && UpperGroup[pMFP->PageGroup-1] != 0) {        // lower and upper
+              page = 8;
+              while (page <= 0xe && (TULIP_Pages.isUsed(page, pMFP->Bank) || TULIP_Pages.isUsed(page+1, pMFP->Bank)))
                 page++;
-            } else if (LowerGroup[pMFP->PageGroup-1]!=0) {                                       // lower but no upper
-              page=8;
-              while (page<=0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
+            } else if (LowerGroup[pMFP->PageGroup-1] != 0) {                                       // lower but no upper
+              page = 8;
+              while (page <= 0xf && TULIP_Pages.isUsed(page, pMFP->Bank))
                 page++;
-            } else if (UpperGroup[pMFP->PageGroup-1]!=0) {                                       // upper but no lower
-              page=8;
-              while (page<=0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
+            } else if (UpperGroup[pMFP->PageGroup-1] != 0) {                                       // upper but no lower
+              page = 8;
+              while (page <= 0xf && TULIP_Pages.isUsed(page, pMFP->Bank))
                 page++;
-            } else if (EvenGroup[pMFP->PageGroup-1]!=0 && OddGroup[pMFP->PageGroup-1]!=0) {      // even and odd
+            } else if (EvenGroup[pMFP->PageGroup-1] != 0 && OddGroup[pMFP->PageGroup-1] != 0) {      // even and odd
+              page = 8;
+              while (page <= 0xe && (TULIP_Pages.isUsed(page, pMFP->Bank) || TULIP_Pages.isUsed(page+1, pMFP->Bank)))
+                page += 2;
+            } else if (EvenGroup[pMFP->PageGroup-1] !=0 ) {                                        // even only
             page=8;
-            while (page<=0xe && (TULIP_Pages.isUsed(page,pMFP->Bank) || TULIP_Pages.isUsed(page+1,pMFP->Bank)))
-              page+=2;
-            } else if (EvenGroup[pMFP->PageGroup-1]!=0) {                                        // even only
-            page=8;
-            while (page<=0xe && TULIP_Pages.isUsed(page,pMFP->Bank))
-              page+=2;
-            } else if (OddGroup[pMFP->PageGroup-1]!=0) {                                        // odd only
-              page=8; // return even page number, page no. is incremented when setting OddGroup
-              while (page<=0xe && TULIP_Pages.isUsed(page+1,pMFP->Bank))
-                page+=2;
-            } else if (OrderedGroup[pMFP->PageGroup-1]!=0) {                                     // a block
-              uint count=-OrderedGroup[pMFP->PageGroup-1];
-              for (page=8;page<=0x10-count;page++) {
-                uint nFree=0;
+            while (page <= 0xe && TULIP_Pages.isUsed(page, pMFP->Bank))
+              page += 2;
+            } else if (OddGroup[pMFP->PageGroup-1] != 0) {                                        // odd only
+              page = 8; // return even page number, page no. is incremented when setting OddGroup
+              while (page <= 0xe && TULIP_Pages.isUsed(page + 1, pMFP->Bank))
+                page += 2;
+            } else if (OrderedGroup[pMFP->PageGroup-1] != 0) {                                     // a block
+              uint count = -OrderedGroup[pMFP->PageGroup-1];
+              for (page = 8; page <= 0x10 - count; page++) {
+                uint nFree = 0;
                 uint page2;
-                for (page2=page;page2<=0x0f;page2++) { // count up free spaces
-                  if (!TULIP_Pages.isUsed(page2,pMFP->Bank))
+                for (page2 = page; page2 <= 0x0f; page2++) { // count up free spaces
+                  if (!TULIP_Pages.isUsed(page2, pMFP->Bank))
                     nFree++;
                   else
                     break;
                 }
-                if (count<=nFree)            // found a space
+                if (count <= nFree)            // found a space
                   break;
               }
             } else {
-              page=8;
-              while (page<=0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
+              page = 8;
+              while (page <= 0xf && TULIP_Pages.isUsed(page, pMFP->Bank))
                 page++;
             }
 
             // save the position that was found in the appropriate array
-            if (pMFP->Page==POSITION_LOWER)
-              LowerGroup[pMFP->PageGroup-1]=page;
-            else if (pMFP->Page==POSITION_UPPER) {
+            if (pMFP->Page == POSITION_LOWER)
+              LowerGroup[pMFP->PageGroup-1] = page;
+            else if (pMFP->Page == POSITION_UPPER) {
               ++page;                                 // found two positions - take the upper one
-              UpperGroup[pMFP->PageGroup-1]=page;
-            } else if (pMFP->Page==POSITION_EVEN)
-              EvenGroup[pMFP->PageGroup-1]=page;
-            else if (pMFP->Page==POSITION_ODD) {
+              UpperGroup[pMFP->PageGroup-1] = page;
+            } else if (pMFP->Page == POSITION_EVEN)
+              EvenGroup[pMFP->PageGroup-1] = page;
+            else if (pMFP->Page == POSITION_ODD) {
               ++page;                                 // found two positions - take the odd one
-              OddGroup[pMFP->PageGroup-1]=page;
-            } else if (pMFP->Page==POSITION_ORDERED)
-              OrderedGroup[pMFP->PageGroup-1]=page;
+              OddGroup[pMFP->PageGroup-1] = page;
+            } else if (pMFP->Page == POSITION_ORDERED)
+              OrderedGroup[pMFP->PageGroup-1] = page;
           }
           fLoad = true;
           break;
@@ -1977,43 +2306,134 @@ int LoadMOD(ModuleMetaHeader_t *MetaH)
         case 3:      // pass 3 - find location for non-grouped pages
           if (pMFP->PageGroup)
             break;
-          if (pMFP->Page==POSITION_ANY) {          // a single page that can be loaded anywhere 8-F
+          if (pMFP->Page == POSITION_ANY) {          // a single page that can be loaded anywhere 8-F
             page=8;
             // look for an empty page or a page with W&W RAMBOX RAM
-            while (page<=0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
+            while (page <= 0xf && TULIP_Pages.isUsed(page,pMFP->Bank))
               page++;
           } else                                    // page number is hardcoded
-            page=pMFP->Page;
+            page = pMFP->Page;
           fLoad = true;
           break;
-        }   // end of switch(pass)
+      }   // end of switch(pass)
 
       if (fLoad) {   
         // load the image
-        // the page is ready to be loaded, but we can skip this since the Page is in FLASH
+        // the page is ready to be plugged, but we can skip this since the Page is in FLASH
+        // we do need to get the parameters in the CPage and CBank structures where needed
+        // but remember that the contents of the MOD file are always available in FLASH
+        // only we cannot write to FLASH
+
+        // The MOD file image is now ready to be plugged with the following parameters
+        //     page       : target Page
+        //     pMFP->Bank : target Bank
+        //     pageIndex  : target PageIndex
+        //     ImageNo    : Image number in MOD file
+        // show debug messages
+        #ifdef DEBUG
+        cli_printf("  About to Plug MOD to Page %d - Bank %d - PageIndex %d - ImageNumber %d", page, pMFP->Bank, pageIndex, ImageNo);
+        #endif
+
+        if (page <= 3) {
+          // not supported, exit
+          // free(pMFH);
+          return(LOADMOD_UNSUPPORTED_PAGE);
+        }
+
+        // the loading of the file is skipped here, the file is already in FLASH with direct access
         size_t nPageCustomOffset;
 
+        // define a single Bank in a Page
+        //  struct CBank
+        // {
+        //   uint32_t b_img_rom;   // Offset to current image in FLASH or FRAM
+        //   uint16_t *b_img_data; // hard address of the image in FLASH
+        //   uint16_t b_img_flags; // Flags, type and status of the Bank
+        //   char b_img_name[32];  // Filename of the plugged module (in case of a ROM file usually)
+        //   uint32_t b_img_file;  // Offset to the MOD or ROM file in FLASH or FRAM
+        //                         // in case more info is needed
+        // };
+
+        // prepare the flags for the new Page
+        uint16_t Bank_Flags = 0;
+
+        // BANK_none      = 0x0000,       // nothing plugged here
+        // BANK_ACTIVE    = 0x0001,       // 1: bank is active (has a valid content)
+        // BANK_FLASH     = 0x0002,       // 1: bank is in FLASH, 0: bank is in FRAM
+        // BANK_ROM       = 0x0004,       // 1: bank is ROM, 0: not ROM (but MOD1 or MOD2)
+        // BANK_MOD       = 0x0008,       // 1: bank is MOD1, 0: bank is MOD2
+        // BANK_ENABLED   = 0x0010,       // 1: bank is enabled for reading, 0: not enabled for reading
+        // BANK_DIRTY     = 0x0020,       // 1: bank is dirty (written to but not saved), 0: bank is OK
+                                          // remnant from Tiny41, not used in TULIP for now
+                                          // may be needed if Read-Modify-Write for QROm MOD files is too slow on FRAM
+        // BANK_WRITEABLE = 0x0040,       // 1: bank is write enabled, 0: no writing possible
+        // BANK_RESERVED  = 0x0080,       // 1: bank reserved by a physical module, 0: pluggable for TULIP
+        // BANK_EMBEDDED  = 0x0100,       // page is embedded in the firmware
+                                          // used for the HP-IL and Printer ROMs
+                                          // other bits are reserved for future use
+
+
+        // set the flags for the new Bank
+        Bank_Flags = BANK_ACTIVE | BANK_FLASH | BANK_ENABLED;  // always active, enabled and in FLASH
+
+        if (pMFP->RAM)          Bank_Flags &= !BANK_ROM;
+        if (pMFP->WriteProtect) Bank_Flags &= !BANK_WRITEABLE;
+
+        if (MetaH->FileType == FILETYPE_MOD1) Bank_Flags |= BANK_MOD;  // MOD1
+        // for MOD2 the flag is 0
+
+        // First ensure that the page/bank is free indeed
+        if ((page > 0xF) || TULIP_Pages.isUsed(page, pMFP->Bank)) {
+          // free(pMFH);
+          return(LOADMOD_LOAD_CONFLICT);  // no space or load conflict
+        }
+
+        // and plug the image
+        TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_data = (uint16_t *)pMFP->Image;      // hard address of the image in FLASH
+        TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_rom = (uint32_t)(MetaH) - FF_SYSTEM_BASE; // offset to the MOD file in FLASH
+        TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_flags = Bank_Flags;  // set the flags for the bank
+        TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_name[0] = 0; // clear the name, it will be set below
+        TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_file = (uint32_t)(MetaH) - FF_SYSTEM_BASE; // offset to the MOD file in FLASH
+
+        // and set the name
+        strcpy(TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_name, MetaH->FileName);
+
+        #ifdef DEBUG
+        cli_printf("  Flags: %04X", Bank_Flags);
+        cli_printf("  Image: %04X", TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_data);
+        cli_printf("  ROM:   %04X", TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_rom);
+        cli_printf("  File:  %04X", TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_file);
+        cli_printf("  Name:  %s", TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_name);
+        #endif
+
+
+        /* we do not use the followoing from V41
         ModulePage *pNewPage=new ModulePage;
-        pNewPage->pModule=pModuleNew;
-        pNewPage->pAltPage=NULL;
-        strcpy(pNewPage->szName,pMFP->Name);
-        strcpy(pNewPage->szID,pMFP->ID);
-        pNewPage->ImageNo=ImageNo++;            // save module position in MOD file
-        pNewPage->Page=pMFP->Page;
-        pNewPage->ActualPage=page;
-        pNewPage->Bank=pMFP->Bank;
-        pNewPage->PageGroup=pMFP->PageGroup;
-        pNewPage->BankGroup=pMFP->BankGroup;
+        pNewPage->pModule = pModuleNew;
+        pNewPage->pAltPage = NULL;
+        strcpy(pNewPage->szName, pMFP->Name);
+        strcpy(pNewPage->szID, pMFP->ID);
+        pNewPage->ImageNo = ImageNo++;            // save module position in MOD file
+        pNewPage->Page = pMFP->Page;
+        pNewPage->ActualPage = page;
+        pNewPage->Bank = pMFP->Bank;
+        pNewPage->PageGroup = pMFP->PageGroup;
+        pNewPage->BankGroup = pMFP->BankGroup;
         if (pMFP->BankGroup)
-          pNewPage->ActualBankGroup=pMFP->BankGroup+NextActualBankGroup*8;  // ensures each bank group has a number that is unique to the entire simulator
+          pNewPage->ActualBankGroup = pMFP->BankGroup + NextActualBankGroup * 8;  // ensures each bank group has a number that is unique to the entire simulator
         else
-          pNewPage->ActualBankGroup=0;
-        pNewPage->fRAM=pMFP->RAM;
-        pNewPage->fWriteProtect=pMFP->WriteProtect;
-        pNewPage->fFAT=pMFP->FAT;
-        pNewPage->fHEPAX=(pMFH->Hardware==HARDWARE_HEPAX);
-        pNewPage->fWWRAMBOX=(pMFH->Hardware==HARDWARE_WWRAMBOX);
-        if (1==nFileFormat)                   // MOD1
+          pNewPage->ActualBankGroup = 0;
+        pNewPage->fRAM = pMFP->RAM;
+        pNewPage->fWriteProtect = pMFP->WriteProtect;
+        pNewPage->fFAT = pMFP->FAT;
+        pNewPage->fHEPAX = (pMFH->Hardware == HARDWARE_HEPAX);
+        pNewPage->fWWRAMBOX = (pMFH->Hardware == HARDWARE_WWRAMBOX);
+        */
+
+        // unpacking a compressed file is not needed
+        // maybe later when the ROM needs to be in FRAM
+        /*
+        if (1 == nFileFormat)                   // MOD1
           {
           unpack_image(pNewPage->Image,pMFP->Image);
           nPageCustomOffset=offsetof(ModuleFilePage,PageCustom);
@@ -2028,46 +2448,46 @@ int LoadMOD(ModuleMetaHeader_t *MetaH)
             }
           nPageCustomOffset=offsetof(ModuleFilePageV2,PageCustom);
           }
-        memcpy(pNewPage->PageCustom,(byte *)pMFP+nPageCustomOffset,sizeof(pNewPage->PageCustom));
+          memcpy(pNewPage->PageCustom,(byte *)pMFP+nPageCustomOffset,sizeof(pNewPage->PageCustom));
+        */
+
+        // here we check for some situations that the TULIP does not support
+
+
+
+        /* Page 0 not supported by TULIP
         // patch the NULL timeout value to be longer - not known if this works for all revisions
         if (page==0 && (0==strcmpi(pNewPage->szName,"NUT0-D") || 0==strcmpi(pNewPage->szName,"NUT0-G") || 0==strcmpi(pNewPage->szName,"NUT0-N")))
           {
           pNewPage->Image[0x0ec7]=0x3ff;                               // original value =0x240
           pNewPage->Image[0x0fff]=compute_checksum(pNewPage->Image);   // fix the checksum so service rom wont report error
           }
-        // HEPAX special case
+          */
+
+        // HEPAX special case, this is skipped for now
+        /*
         if (hep_page && pNewPage->fHEPAX && pNewPage->fRAM)            // hepax was just loaded previously and this is the first RAM page after it
           {
           pNewPage->ActualPage=hep_page;
           pNewPage->pAltPage=PageMatrix[hep_page][pMFP->Bank-1]->pAltPage;
           PageMatrix[hep_page][pMFP->Bank-1]->pAltPage=pNewPage;       // load this RAM into alternate page
           }
-        // there is no free space or some load conflict exists (only W&W RAMBOX pages can be overloaded)
-        else if (page>0xf || (PageMatrix[page][pMFP->Bank-1]!=NULL && !PageMatrix[page][pMFP->Bank-1]->fWWRAMBOX))
-          {
-          free(pMFH);
-          delete pNewPage;
-          UnloadMOD(pModuleNew);
-          return(4);
-          }
-        else                                                           // otherwise load into primary page
-        {
-          pNewPage->pAltPage=PageMatrix[page][pMFP->Bank-1];           // save actual content to alternate page
-          PageMatrix[page][pMFP->Bank-1]=pNewPage;
-        }
-        hep_page=0;
-        if (pNewPage->fHEPAX && !pNewPage->fRAM)                       // detect HEPAX ROM
-          hep_page=page;
-        }
+          */
+
+
       }
-    }
+      
+    }   // this is the end of the loop:  for (int pageIndex = 0; pageIndex < pMFH->NumPages; pageIndex++)
 
-  free(pMFH);
-  NextActualBankGroup++;
-  return(0);
-  }                                                  
 
-*/
+    // free(pMFH);
+    // return 0;
+  }          // this is the end of the 3 pass loop   for (int pass = 1; pass <= 3; pass++)                                      
+
+  return hw_return;  // return the hardware type if succesful
+}
+
+// */
 
 /*
 #define PLUG_HELP_TXT "plug functions\r\n\
@@ -2241,7 +2661,7 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
             }
 
             if (MetaH->FileType == FILETYPE_MOD1 || MetaH->FileType == FILETYPE_MOD2) {
-              cli_printf("  only ROM files currently supported");
+              cli_printf("  only ROM files currently supported in a given Page, please use Autoplug for MOD files");
               return;
             }
             break;
@@ -2317,34 +2737,88 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
               // do the actual plugging
               TULIP_Pages.plug(Page, 1, rom_flags, offs); // plug the ROM in the given page
               TULIP_Pages.save(); // save the page settings in FRAM
-            } else if (MetaH->FileType == FILETYPE_MOD1 || MetaH->FileType == FILETYPE_MOD2) {
-              cli_printf("  only ROM files currently supported");
+            } else if (MetaH->FileType == FILETYPE_MOD1) {
+              // MOD2 is not supported yet, but no error message is given
+              cli_printf("  Plugging MOD file");
 
-              // plug a MOD file with the following algorithm
+              // call the MOD file loader
 
-            /*
-              MODULE FILE LOADER - for emulators etc
-              The exact loading procedure will be dependent on the emulator's implementation.  V41 uses a
-              three pass process to find empty pages and ensure that the ROM attributes are correctly followed.
-              Feel free to copy and adapt the algorithm in LoadMOD() to your software.
+              int res = LoadMOD(MetaH);
+              if (res >= LOADMOD_FAIL) {
+                // show the error
+                switch (res) {
+                  case LOADMOD_OPEN_FAIL:
+                    cli_printf("  Error: failed to open MOD file");
+                    break;
+                  case LOADMOD_READ_FAIL:
+                    cli_printf("  Error: failed to read MOD file");
+                    break;
+                  case LOADMOD_INVALID_FILE:
+                    cli_printf("  Error: invalid MOD file");
+                    break;
+                  case LOADMOD_LOAD_CONFLICT:
+                    cli_printf("  Error: load conflict or no space available");
+                    break;
+                  case LOADMOD_UNSUPPORTED_HARDWARE:
+                    cli_printf("  Error: unsupported hardware");
+                    break;
+                  case LOADMOD_UNSUPPORTED_PAGE:
+                    cli_printf("  Error: unsupported Page requested in MOD file");
+                    break;
+                  default:
+                    cli_printf("  Error: unknown error %d", res);
+                    break;
+                }
+              } else {
+                // OK
+                cli_printf("  MOD file loaded successfully");
+                TULIP_Pages.save(); // save the page settings in FRAM
 
-              First Pass:  Validate variables, go through each page in the mod file.  If there any PageGroups,
-              count the number of pages in each group using the appropriate array (LowerGroup[8], UpperGroup[0], etc).
-              This count is stored as a negative number.  In the second pass this value will be replaced with
-              a positive number which will represent the actual page to be loaded
+                // and we may have hardware dependent MOD files plugged
+                //  #define HARDWARE_NONE               0  /* no additional hardware specified */
+                //  #define HARDWARE_PRINTER            1  /* 82143A Printer */
+                //  #define HARDWARE_CARDREADER         2  /* 82104A Card Reader */
+                //  #define HARDWARE_TIMER              3  /* 82182A Time Module or HP-41CX built in timer */
+                //  #define HARDWARE_WAND               4  /* 82153A Barcode Wand */
+                //  #define HARDWARE_HPIL               5  /* 82160A HP-IL Module */
+                //  #define HARDWARE_INFRARED           6  /* 82242A Infrared Printer Module */
+                //  #define HARDWARE_HEPAX              7  /* HEPAX Module - has special hardware features (write protect, relocation) */
+                //  #define HARDWARE_WWRAMBOX           8  /* W&W RAMBOX - has special hardware features (RAM block swap instructions) */
+                //  #define HARDWARE_MLDL2000           9  /* MLDL2000 */
+                //  #define HARDWARE_CLONIX             10 /* CLONIX-41 Module */
+                //  #define HARDWARE_MAX                10 /* maximum HARDWARE_ define value */
+                switch (res) {
+                  case HARDWARE_PRINTER:
+                    cli_printf("  HP82143A Printer hardware emulation enabled");
+                    globsetting.set(HP82143A_enabled, 1); // enable the Printer ROM in the settings
+                    break;
 
-              Second Pass: Go through each page again and find free locations for any that are grouped.
-              If a page is the first one encountered in a group, find a block of free space for the group.
-              For instance, Odd/Even will require two contiguous spaces.  If a page is the second or subsequent
-              one encountered in a group, then we already have the block of space found and simply need to
-              stick it in the right place.  For instance, the lower page has already been loaded, then the upper
-              page goes right after it.
+                  case HARDWARE_HEPAX:
+                    cli_printf("  HEPAX Hardware detected, module plugged but no HEPAX instruction support");
+                    break;
 
-              Third Pass: Find a free location for any non-grouped pages.  This includes system pages which have
-              their page number hardcoded.
-              */
+                  case HARDWARE_HPIL:
+                    cli_printf("  HP-IL Hardware detected, HP-IL emulation enabled");
+                    globsetting.set(HP82160A_enabled, 1); // enable the HP82160A ROM in the settings
+                    break;
+
+                  case HARDWARE_NONE:
+                    // no action required
+                    break;
+                
+                  default:
+                    // other hardware types are not supported yet
+                    cli_printf("  Note: hardware type %d detected, but not supported yet", res);
+                    break;
+                }
+              } 
               return;
             }
+            else if (MetaH->FileType == FILETYPE_MOD2) {
+                // MOD2 is not supported yet, but no error message is given
+                cli_printf("  MOD2 files are not supported yet, please use MOD1 files");
+                return;
+              }
             break;
 
     default: 
@@ -2367,7 +2841,7 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
 
     // print 16 bytes
     for (int m = 0; m < 16; m++) {
-      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%03X ", TULIP_Pages.getword(addr + m), 1);
+      ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "%03X ", TULIP_Pages.getword(addr + m, 1));
     }
     // print byte values as characters
     ShowPrintLen += sprintf(ShowPrint + ShowPrintLen, "  ");
@@ -2516,6 +2990,8 @@ void uif_reserve(int i, int p, const char *comment)
       }
       TULIP_Pages.plug(5, 1, PAGE_RESERVED, 0); // plug Page 5 for TIME module
       TULIP_Pages.setComment(5, 1, P5_txt); // set the comment 
+      p = 5;
+      comment = P5_txt;
       break;
     case reserve_printer: // reserve Page 6 for Printer module
       if (TULIP_Pages.isReserved(5)) {
@@ -2523,6 +2999,8 @@ void uif_reserve(int i, int p, const char *comment)
       }
       TULIP_Pages.plug(6, 1, PAGE_RESERVED, 0); // plug Page 6 for a Printer module
       TULIP_Pages.setComment(6, 1, P6_txt); // set the comment 
+      p = 6;
+      comment = P6_txt;
       break;
     case reserve_hpil:    // reserve Page 7 for HPIL module
       if (TULIP_Pages.isReserved(7)) {
@@ -2530,6 +3008,8 @@ void uif_reserve(int i, int p, const char *comment)
       }
       TULIP_Pages.plug(7, 1, PAGE_RESERVED, 0); // plug Page 7 for HP-IL
       TULIP_Pages.setComment(7, 1, P7_txt); // set the comment 
+      p = 7;
+      comment = P7_txt;
       break;
     case reserve_clear:   // clear the reservation of the given Page
       if (p == 0) {
@@ -2617,7 +3097,7 @@ void uif_cat(int p, int b)
           if (!TULIP_Pages.isPlugged(pg, bk)) {        
             TULIP_Pages.getFileName(pg, bk, FileNm);           // get the file name, if any
             // this is an empty page, so show a message
-;
+
             if (bk ==1) {
               // we only print bank 1 if it is not plugged
               // other unplugged banks are skipped
@@ -2632,23 +3112,24 @@ void uif_cat(int p, int b)
           } else if (TULIP_Pages.isPlugged(pg, bk) && !TULIP_Pages.isEmbeddedROM(pg, bk)) {
             // Normal plugged ROM, so show the details
             TULIP_Pages.getRevision(pg, bk, rev);
+            int addr = pg * 0x1000; // address of the page
            // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs - Flags   - File  ");
            // cli_printf("  ----   ----   ----   -----   ------   -----   ---------------------");
             if (bk == 1) {
-              cli_printf("  %3X    %3d    %3d    %s     %2d     %04X    * %s  @ 0x%08X", pg, bk, TULIP_Pages.getXROM(pg, bk), 
+              cli_printf("  %3X    %3d    %4d   %s     %2d     %04X    * %-25s  @ 0x%08X", pg, bk, TULIP_Pages.getword(addr + 0x00, bk), 
                                                                                     rev, 
-                                                                                    TULIP_Pages.getFunctions(pg, bk),
+                                                                                    TULIP_Pages.getword(addr + 0x01, bk),
                                                                                     TULIP_Pages.getflags(pg, bk),
                                                                                     TULIP_Pages.Pages[pg].m_banks[bk].b_img_name,
-                                                                                    TULIP_Pages.image_offs(pg,bk));
+                                                                                    TULIP_Pages.Pages[pg].m_banks[bk].b_img_data);
             } else {
               // do not print Page number for readability
-              cli_printf("         %3d    %3d    %s     %2d     %04X    * %s  @ 0x%08X", bk, TULIP_Pages.getXROM(pg, bk), 
+              cli_printf("         %3d    %4d   %s     %2d     %04X    * %-25s  @ 0x%08X", bk, TULIP_Pages.getword(addr + 0x00, bk), 
                                                                                     rev, 
-                                                                                    TULIP_Pages.getFunctions(pg, bk),
+                                                                                    TULIP_Pages.getword(addr + 0x01, bk),
                                                                                     TULIP_Pages.getflags(pg, bk),
                                                                                     TULIP_Pages.Pages[pg].m_banks[bk].b_img_name,
-                                                                                    TULIP_Pages.image_offs(pg,bk));
+                                                                                    TULIP_Pages.Pages[pg].m_banks[bk].b_img_data);
             }
           } else if (TULIP_Pages.isPlugged(pg, bk) && TULIP_Pages.isEmbeddedROM(pg, bk)) {
             // Emmbedded ROM
@@ -2657,7 +3138,7 @@ void uif_cat(int p, int b)
            // cli_printf("  Page - Bank - XROM -  Rev  - #Funcs - Flags   - File  ");
            // cli_printf("  ----   ----   ----   -----   ------   -----   ---------------------");
             if (bk ==1) {
-              cli_printf("  %3X    %3d    %3d    %s     %2d     %04X    * %s  @ 0x%08X ", pg, bk, TULIP_Pages.getword(addr + 0x00, bk), 
+              cli_printf("  %3X    %3d    %4d   %s     %2d     %04X    * %-25s  @ 0x%08X ", pg, bk, TULIP_Pages.getword(addr + 0x00, bk), 
                                                                                     rev, 
                                                                                     TULIP_Pages.getword(addr + 0x01, bk),
                                                                                     TULIP_Pages.getflags(pg, bk),
@@ -2665,7 +3146,7 @@ void uif_cat(int p, int b)
                                                                                     TULIP_Pages.Pages[pg].m_banks[bk].b_img_data);
             } else {
             // do not print Page number for readability
-              cli_printf("         %3d    %3d    %s     %2d     %04X    * %s  @ 0x%08X ", bk, TULIP_Pages.getword(addr + 0x00, bk), 
+              cli_printf("         %3d    %4d   %s     %2d     %04X    * %-25s  @ 0x%08X ", bk, TULIP_Pages.getword(addr + 0x00, bk), 
                                                                                     rev, 
                                                                                     TULIP_Pages.getword(addr + 0x01, bk),
                                                                                     TULIP_Pages.getflags(pg, bk),
@@ -2674,7 +3155,7 @@ void uif_cat(int p, int b)
             }
           } else {
             // nothing plugged in this page/bank
-            cli_printf("  %3X     %3d                                      - nothing plugged here", pg, bk);
+            cli_printf("  %3X     %3d                                      - nothing to see here", pg, bk);
          }
         }
       }
@@ -2731,7 +3212,9 @@ void uif_cat(int p, int b)
 // toggle the emulation of the selected function in the given page
 void uif_emulate(int i, int p) {
 
-  if (!uif_pwo_low()) return;    // only do this when calc is not running{
+  bool sticky = false;
+
+  if (!uif_pwo_low()) return;    // only do this when calc is not running
 
   switch (i)
   {
@@ -2745,7 +3228,11 @@ void uif_emulate(int i, int p) {
               if (TULIP_Pages.isPlugged(j, 1) && (TULIP_Pages.Pages[j].m_bank & bank_sticky)  ) {
                 // Found Page with ZEPROM emulation enabled
                 cli_printf("  - ZEPROM Page %X     enabled (Sticky Bankswitching)", j);
+                sticky = true;
               }
+            }
+            if (!sticky) {
+              cli_printf("  - ZEPROM            disabled (sticky Bankswitching)");
             }
             break;
     case emulate_hpil: // toggle HP-IL emulation
@@ -2769,7 +3256,7 @@ void uif_emulate(int i, int p) {
             }
             break;  
     case emulate_zeprom: // toggle ZEPROM emulation in the given Page
-            // toggle the bank_sticky bit, but only if a mpudle is plugged there
+            // toggle the bank_sticky bit, but only if a module is plugged there
             if (!TULIP_Pages.isPlugged(p, 1)) {
               cli_printf("  Page %X is not plugged, cannot toggle ZEPROM emulation", p);
               return; // exit the function
@@ -2850,13 +3337,13 @@ void uif_printer(int i) {
   if (i == printer_irtest) {
     // test the infrared LED
     // simply send a string to the IR led, no throttling
-    for (int i = 'A'; i < 'Z'; i++) {
+    for (int i = 'A'; i <= 'Z'; i++) {
       // send the string to the IR led
       // this is a test, so no throttling
       PrintIRchar(i);
-      PrintIRchar(13);    // send a carriage return
-      PrintIRchar(10);    // send a line feed
     }	
+    PrintIRchar(00);    // send a carriage return
+    PrintIRchar(0xE0);    // send a line feed
     return;
   }
 

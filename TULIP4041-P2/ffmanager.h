@@ -68,9 +68,13 @@ int ff_compare(uint32_t offs, uint8_t *buf, int num);
 uint32_t ff_erased(uint32_t offs, uint32_t size, int num);
 bool ff_write_range(uint32_t offs, uint8_t *buf, int num);
 bool ff_write(uint32_t offs, uint8_t data);
-bool ff_writeable(uint32_t offs, uint32_t size);
-bool ff_writeableb(uint32_t offs, uint8_t data);
+bool ff_writable(uint32_t offs, uint32_t size);
+bool ff_writableb(uint32_t offs, uint8_t data);
 bool ff_isinited();
+void ff_delete(uint32_t offs);
+uint32_t ff_erased_block(uint32_t offs, uint32_t size, int num);
+void ff_program_block(uint32_t address, const uint8_t *data, size_t size);
+void ff_erase_block(uint32_t address);
 
 
 

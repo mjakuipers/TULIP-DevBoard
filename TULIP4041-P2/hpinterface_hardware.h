@@ -171,10 +171,10 @@ extern "C" {
                                                             // FF_SYSTEM BASE 0x10100000 (1 MByte for firmware)
                                                             // start of FLASH File system, used for reading
 
-#define FF_SERIAL_BASE (FF_SYSTEM_BASE - 0x00001000)        // base address for the serial number, 4KByte before FF_SYSTEM_BASE
-#define FF_SERIAL_SIZE 0x00001000                           // size of the serial number area, 4KByte
-                                                            // this is where we put the TULIP serial number
-                                                            // and the owner string
+#define FF_OWNER_BASE   (FF_SYSTEM_BASE - 0x00001000)       // base address for the owner string, 4KByte before FF_SYSTEM_BASE
+#define FF_OWNER_OFFSET (FF_OFFSET - 0x1000)                // offset in FLASH for the owner string
+#define FF_OWNER_SIZE   0x1000                              // size of the owner string area, 4KByte
+                                                            // this is where we put the TULIP owner string
 
 #undef PICO_FLASH_SIZE_BYTES
 #if (TULIP_HARDWARE == T_DEVBOARD)

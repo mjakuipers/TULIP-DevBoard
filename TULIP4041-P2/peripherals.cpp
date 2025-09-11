@@ -241,6 +241,7 @@ void bus_init()
 
     gpio_init(P_IR_LED);  
     gpio_set_dir(P_IR_LED, GPIO_OUT);       // IR led and PWO_OE output driver
+    gpio_set_drive_strength(P_IR_LED, GPIO_DRIVE_STRENGTH_12MA);
     gpio_put(P_IR_LED, 0);                  // set low
 
     gpio_init(PICO_VBUS_PIN);

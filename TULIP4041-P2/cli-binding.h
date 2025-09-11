@@ -44,7 +44,8 @@ extern "C" {
         calcreset     drive PWO to reset HP41\r\n\
         configinit    re-initialize the FRAM persistent settings configuration\r\n\
         configlist    list all configuration settings\r\n\
-        gpio          show the GPIO status\r\n"
+        gpio          show the GPIO status\r\n\
+        owner         show/program the owner of the device\r\n"
 
 #elif TULIP_HARDWARE == T_MODULE
         #define SYSTEM_HELP_TXT "TULIP4041 system status and control\r\n\
@@ -61,6 +62,7 @@ extern "C" {
         configinit    re-initialize the FRAM persistent settings configuration\r\n\
         configlist    list all configuration settings\r\n\
         gpio          show the GPIO status\r\n\
+        owner         show/program the owner of the device\r\n\
         serial        show/program the TULIP serial number\r\n\
                       the serial number is programmed in OTP and can be programmed only once\r\n\
                       TULIP module gets its serial number during assembly testing\r\n"
@@ -77,7 +79,8 @@ extern "C" {
         #define help_configinit 9
         #define help_configlist 10
         #define help_gpio       11
-        #define help_serial     12
+        #define help_owner      12
+        #define help_serial     13
 
 #define SDCARD_HELP_TXT "uSD card functions\r\n\
         [no argument] shows the uSD card status and mounts the card\r\n\
@@ -102,10 +105,11 @@ extern "C" {
                       [filenm] can be a .ROM or .MOD file present in FLASH\r\n\
         [filenm] P    plug the named ROM in Page P (hex) and Bank 1\r\n\
         [filenm] P B  plug the named ROM in Page P (hex) and Bank B (1..4)\r\n\
-        [filenm]      ROM file: no Page number will autoplug and find a free Page from 8..F\r\n\
+        [filenm]      ROM file: no Page number will autoplug and find a free Page >=8\r\n\
                       MOD file: will attempt to plug according to the MOD file parameters\r\n\
         [filenm] T    Autoplug Test only, will not plug for real\r\n\
-                      just to check where the ROM/MOD will be plugged\r\n"
+                      just to check where the ROM will be plugged\r\n\
+                      ignored for MOD files, these will be plugged!\r\n"
 
         #define plug_hpil       1
         #define plug_ilprinter  2
@@ -271,23 +275,23 @@ extern "C" {
         #define fram_init      3
         #define fram_nukeall   4
 
+#define import_no_match -1
+#define import_no_arg   0
+#define import_all      1
+#define import_update   2
+#define import_compare  3
 
 #define IMPORT_HELP_TXT "import functions\r\n\
         [filename]                   import a single file to FLASH\r\n\
-        [directory] [ALL]            import all files in a directory to FLASH\r\n"
-
-        /*
-        [filename]  [compare]        compare a single file with FLASH\r\n\
+        [filename]  [compare]        compare a single file with the one in FLASH\r\n\
         [filename]  [UPDATE]         update a single file in FLASH\r\n\
-
-        [directory] [compare]        compare all files in a directory with FLASH\r\n\
-        [directory] [UPDATE]         update all files in a directory in FLASH\r\n\"
+        [directory] [ALL]            import all files in a directory to FLASH\r\n\
+        [directory] [compare] [ALL]  compare all files in a directory with FLASH\r\n\
+        [directory] [UPDATE] [ALL]   update all files in a directory in FLASH\r\n"
 
         /*
         [filename]  [FRAM]           import a single file in FRAM\r\n\
         [filename]  [compare] <FRAM> compare a single file with the one in FLASH (or FRAM)\r\n\
-        [directory] [ALL] [compare]  compare all files in a directory with the ones in FLASH\r\n\
-        [directory] [ALL] [UPDATE]   update all files in a directory in FLASH\r\n"
         */
 
 #define DELETE_HELP_TXT "delete function, removes a file from FLASH\r\n\
@@ -315,7 +319,6 @@ extern "C" {
 #define emulate_blinky    6
 #define emulate_timer     7
 
-
 #define EMULATE_HELP_TXT "enable/disable hardware emulation functions\r\n\
         toggles the emulation status. Do not enable if the real hardware is used!\r\n\
         [no argument] shows the status of the emulated hardware\r\n\
@@ -323,7 +326,8 @@ extern "C" {
         hpil          toggle HPIL hardware emulation\r\n\
         printer       toggle HP82143A printer emulation\r\n\
         zeprom P      toggle ZEPROM emulation in Page P (hex) for sticky bankswitching\r\n\
-                      P is the Page number in hex (0..F)\r\n"
+                      sticky bankswitching is active in both odd and even Pages of a Port\r\n\
+                      P is the Page number in hex (0..F), \r\n"
 
 #define RESERVE_HELP_TXT "reserve a Page for a physical module\r\n\
         [P] <comment> reserve a physical module in Page P\r\n\
@@ -334,7 +338,7 @@ extern "C" {
         timer         reserve Page 5 for the HP41 timer module\r\n\
         printer       reserve Page 6 for a printer\r\n\
         hpil          reserve Page 7 for the HP-IL module\r\n\
-        clear [P]     cancel reservation for Page P (in hex)\r\n\
+        clear [P]     cancel reservation for Page P (hex)\r\n\
         clear all     cancel all reservations\r\n"
 
 #define reserve_cx      1
@@ -377,6 +381,7 @@ extern "C" {
   extern void uif_configlist();         // list all settings
   extern void uif_serial(const char *str);    // show/program the TULIP serial number
   extern void uif_gpio_status();        // show the GPIO status
+  extern void uif_owner(const char *str);        // show/program the owner of the device
 
 // all dir functions
   extern void uif_dir(const char *dir);                // dir root

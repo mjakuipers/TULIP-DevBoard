@@ -74,7 +74,7 @@
 
     File types: 
     #define     FILETYPE_EMPTY  0x00      // indicates an erased file for empty space
-    #define     FILETYPE_DELETED 0x00      // ROM file
+    #define     FILETYPE_DELETED 0x00     // ROM file
     #define     FILETYPE_MOD1   0x01      // MOD1 file
     #define     FILETYPE_MOD2   0x02      // MOD2 file
     #define     FILETYPE_ROM    0x03      // ROM file
@@ -94,8 +94,9 @@
 // the code follows the example in the pico-sdk
 // the string programmed is "TULIP4041 HW V 1.0 serial #xxxx", 31 chars
 
-const uint8_t  *flash_contents_bt = (const  uint8_t *)(XIP_BASE + FF_OFFSET);    // pointer to FLASH byte array of FLASH File system
-const uint16_t *flash_contents_wd = (const uint16_t *)(XIP_BASE + FF_OFFSET);    // pointer to FLASH word array of FLASH File system
+const uint8_t  *flash_contents_bt  = (const  uint8_t *)(XIP_BASE + FF_OFFSET);    // pointer to FLASH byte array of FLASH File system
+const uint16_t *flash_contents_wd  = (const uint16_t *)(XIP_BASE + FF_OFFSET);    // pointer to FLASH word array of FLASH File system
+const uint8_t  *flash_contents_all = (const uint8_t *)(XIP_BASE);                    // pointer to FLASH byte array of the complete FLASH
 
 static uint32_t ints;
 
@@ -416,6 +417,8 @@ void ff_show(uint32_t addr)
       addr++;
     } 
     
+    // flush the USB buffer
+    tud_task();
 
     cli_printf("%s", ShowPrint);
 
@@ -634,7 +637,7 @@ uint32_t ff_findfile(const char *name)
 
 // Check if a single byte can be written to a location in FLASH.
 // A byte is writable if no 0 bits need to be changed to 1 bits.
-bool ff_writeableb(uint32_t offs, uint8_t data)
+bool ff_writableb(uint32_t offs, uint8_t data)
 {
   // A FLASH byte is writable if:
   // - Only 1 bits are flipped to 0 bits.
@@ -645,10 +648,21 @@ bool ff_writeableb(uint32_t offs, uint8_t data)
   return (flash_val == 0);
 }
 
+bool ff_writeableb(uint8_t flash_byte, uint8_t data)
+{
+  // A FLASH byte is writable if:
+  // - Only 1 bits are flipped to 0 bits.
+  // - 1 bits and 0 bits remain unchanged.
+  // This is checked using bitwise AND followed by XOR. If the result is zero, writing is OK.
+  uint8_t flash_val = flash_byte & data;    // this is the AND
+  flash_val ^= data;                        // XOR to check if any bits need to change from 0 to 1, which is not allowed in FLASH
+  return (flash_val == 0);
+}
+
 
 // check if a range in FLASH is writeable by the buf contents
 // offset must be 256 byte aligned, number of bytes must be a multiple of 256, this is not checked!
-bool ff_writeable(uint32_t offs, uint8_t *buf, int num)
+bool ff_writable(uint32_t offs, uint8_t *buf, int num)
 {
     bool writeable = true;
     uint8_t flash_val;
@@ -854,6 +868,61 @@ void ff_erase(uint32_t fl_start, uint32_t fl_end)
 
     // and restore interrupts
     restore_interrupts(ints);
+}
+
+
+// erase a 4K block anywhere in FLASH
+void ff_erase_block(uint32_t address) {
+
+    // align address to 4K boundary
+    address &= FLASH_SECTOR_OFFS;
+    
+    ff_delay500();  // wait for 0.5 seconds to flush the console output
+
+    // disable interrupts to prevent issues with the flash programming
+    ints = save_and_disable_interrupts();
+    flash_range_erase(address, FLASH_SECTOR_SIZE);
+    
+    restore_interrupts(ints);
+
+}
+
+// program a block anywhere in FLASH
+void ff_program_block(uint32_t address, const uint8_t *data, size_t size) {
+    // align address to 256 byte boundary
+    address &= FLASH_PAGE_OFFS;
+
+    ff_delay500();  // wait for 0.5 seconds to flush the console output
+
+    // disable interrupts to prevent issues with the flash programming
+    ints = save_and_disable_interrupts();
+    flash_range_program(address, data, size);
+    restore_interrupts(ints);
+}
+
+
+uint32_t ff_erased_block(uint32_t offs, uint32_t size, int num) {
+// check if the FLASH is fully erased
+// offs is here an address in the complete FLASH!
+// num indicates granularity, 1 every byte is checked, 256 means every 256nd byte is checked
+// checks the range starting with offs for size bytes
+// returns the first non-erased address or 0xFFFFFFFF if all is erased
+
+  uint32_t addr = offs;             // our address counter, 
+                                    // start at the beginning of the file system
+  uint32_t end = PICO_FLASH_SIZE_BYTES;    // end of the file system
+  bool erased = true;               // assume FLASH is erased
+
+  // check for correct range
+  if ((offs + size) > end) return false;
+
+  do {
+    erased = (flash_contents_all[addr] == 0xFF);   // check if byte is erased
+    addr += num;                                  // next byte to check
+  } while ((addr < (offs + size)) && erased);     // until end of file system or not erased
+
+  if (erased) return NOTFOUND;                    // all is erased
+  return (addr - num);                            // return the first non-erased address
 }
 
 

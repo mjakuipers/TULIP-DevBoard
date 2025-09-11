@@ -389,6 +389,7 @@ public:
         // the image is packed in 4 words per 5 bytes, so we need to unpack it
         // need to evaluate the code below for speed and improve where possible
         uint8_t *bin = (uint8_t*)Pages[port].m_banks[bank].b_img_data;
+        addr = addr & PAGE_MASK; // get the address within the page
 
         uint16_t offset = (addr * 5) / 4;            // offset in the packed ROM file of the first byte
         int shift1 = (addr & 0x0003) * 2;
@@ -555,28 +556,16 @@ void getFileName(int port, int bank, char *filename) {
     static char p[6];      
     if ((port < 1) || (port >= NR_PAGES)) return false;
     if ((bank < 1) || (bank > 4)) return false;
+    u_int16_t Page = port << 12;          // get the Page offset from the port
 
-    if (Pages[port].m_banks[bank].b_img_flags & BANK_EMBEDDED) {
-      // this is an embedded module, so we can read the revision from the image
-      // without swapping the words
-      rev[0] = HPChar[(Pages[port].m_banks[bank].b_img_data[0xFFE]) & 0x3F]; 
-      rev[1] = HPChar[(Pages[port].m_banks[bank].b_img_data[0xFFD]) & 0x3F];
-      rev[2] = '-';
-      rev[3] = HPChar[(Pages[port].m_banks[bank].b_img_data[0xFFC]) & 0x3F];
-      rev[4] = HPChar[(Pages[port].m_banks[bank].b_img_data[0xFFB]) & 0x3F];
-      rev[5] = 0;    // end of string       
-      return true; 
-    } else {
-      // this is not an embedded module, so we can read the revision from the image
-      // but the words must be byte swapped
-      rev[0] = HPChar[swap16(Pages[port].m_banks[bank].b_img_data[0xFFE]) & 0x3F]; 
-      rev[1] = HPChar[swap16(Pages[port].m_banks[bank].b_img_data[0xFFD]) & 0x3F];
-      rev[2] = '-';
-      rev[3] = HPChar[swap16(Pages[port].m_banks[bank].b_img_data[0xFFC]) & 0x3F];
-      rev[4] = HPChar[swap16(Pages[port].m_banks[bank].b_img_data[0xFFB]) & 0x3F];
-      rev[5] = 0;    // end of string 
-      return true;
-    }
+    // use the getword function here to read the words from the image
+    rev[0] = HPChar[getword(Page + 0xFFE, bank) & 0x3F];
+    rev[1] = HPChar[getword(Page + 0xFFD, bank) & 0x3F];
+    rev[2] = '-';
+    rev[3] = HPChar[getword(Page + 0xFFC, bank) & 0x3F];
+    rev[4] = HPChar[getword(Page + 0xFFB, bank) & 0x3F];
+    rev[5] = 0;    // end of string
+
     return true;
   }
 

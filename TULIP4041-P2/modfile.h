@@ -82,6 +82,7 @@ typedef unsigned long dword;
 
 /* relative position codes- do not mix these in a group except ODD/EVEN and UPPER/LOWER */
 /* ODD/EVEN, UPPER/LOWER can only place ROMS in 16K blocks */
+// used in the MOD file loading process
 #define POSITION_MIN                0x1f   /* minimum POSITION_ define value */
 #define POSITION_ANY                0x1f   /* position in any port page (8-F) */
 #define POSITION_LOWER              0x2f   /* position in lower port page relative to any upper image(s) (8-F) */

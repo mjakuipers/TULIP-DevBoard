@@ -244,7 +244,6 @@ void usbd_serial_init(void)
 	uint8_t id[8];
 	int drivercount;
 
-
 	flash_get_unique_id(id);
 
 	// for the production testing create a fixed serial number
@@ -262,6 +261,4 @@ void usbd_serial_init(void)
 
 	snprintf(usbd_serial, USBD_STR_SERIAL_LEN, "%02X%02X%02X%02X%02X%02X%02X%02X",
 		 id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]);
-
-
 }
