@@ -1,6 +1,11 @@
 # TULIP-DevBoard and TULIP-Module
 README for the TULIP4041 DevBoard
 
+There are now a number of MOD files prepared for use in the TULIP:
+  HEPAX_4H.MOD       4-Bank modified HEPAX with RAM pages (plugs in any even Page)
+  OSX-BS4X.MOD       standard 4-bank CCD OSX (plugs in any odd Page)
+  OSX_BS4X-LIB4.MOD  standard 4-bank CCD OSX (plugs in any odd Page) with LIBRARY4 (plugs in Page 4)
+
 VERSION 0.93 BETA 2, September 2025
 -   Fixed issue with reserving Page 5, 6, 7
 -   Increased GPIO drive strength for IR LED to 12 mA
