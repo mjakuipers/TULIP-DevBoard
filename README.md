@@ -1,6 +1,10 @@
 # TULIP-DevBoard and TULIP-Module
 README for the TULIP4041 DevBoard
 
+Please be aware that the firmware files are in the TULIP4041-P2/build subdirectory. The firmware files are:
+   - tulip4041_module.uf2      For the TULIP Module
+   - tulip4041_devboard.uf2    For the TULIP DevBoard
+
 There are now a number of MOD files prepared for use in the TULIP:
   HEPAX_4H.MOD       4-Bank modified HEPAX with RAM pages (plugs in any even Page)
   OSX-BS4X.MOD       standard 4-bank CCD OSX (plugs in any odd Page)
