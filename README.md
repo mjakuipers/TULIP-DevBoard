@@ -10,6 +10,9 @@ There are now a number of MOD files prepared for use in the TULIP:
   OSX-BS4X.MOD       standard 4-bank CCD OSX (plugs in any odd Page)
   OSX_BS4X-LIB4.MOD  standard 4-bank CCD OSX (plugs in any odd Page) with LIBRARY4 (plugs in Page 4)
 
+VERSION 0.94 BETA 2, September 2025
+-   Fixed issue with Page 8 bank switching
+
 VERSION 0.93 BETA 2, September 2025
 -   Fixed issue with reserving Page 5, 6, 7
 -   Increased GPIO drive strength for IR LED to 12 mA
