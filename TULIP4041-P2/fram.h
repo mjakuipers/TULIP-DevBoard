@@ -46,6 +46,8 @@ extern "C" {
 #include "hp41_defs.h"
 #include "cli-binding.h"
 #include "hpinterface_hardware.h"
+// #include "modfile.h"
+// #include "module.h"
 
 #define SPI_FRAM_SPEED  (40*1000*1000)          // set speed to 30 (?) MHz
 
@@ -68,12 +70,35 @@ extern "C" {
 //  0x1E000                 XMEM start
 //   
 
+// definition of FRAM File System Addresses
+
+
+
+#define FRAM_FS_START           0x00000                                         // start of FRAM file system
+#define FRAM_HEADER             0x00000                                         // end of FRAM file system
+
+
+// #define FRAM_SETTINGS _HEADER   0x00100                                         // start of settings area
+
+// #define FRAM_SETTINGS_CONTENT   FRAM_SETTINGS_HEADER + (ModuleMetaHeader_t)     // start of settings contents
+
+// #define FRAM_ROMMAP_HEADER      FRAM_SETTINGS_CONTENT + sizeof(GSettings.gsettings) // start of ROM map header
+// #define FRAM_ROMMAP_CONTENT     FRAM_ROMMAP_HEADER + (ModuleMetaHeader_t)      // start of ROM map contents
+
+// #define FRAM_TRACER_HEADER       FRAM_ROMMAP_CONTENT + sizeof(Pages)            // start of tracer settings header
+
+// #define FRAM_TRACER_CONTENT      FRAM_TRACER_HEADER + (ModuleMetaHeader_t)     // start of tracer settings contents
+// #define FRAM_FS_CONTENT_START    FRAM_TRACER_CONTENT + sizeof(m_filter)     // start of file system contents
+
+
+#define FRAM_FS_END             0x3FFFF                 // end of FRAM file system
+
 #define FRAM_SIZE               0x40000                 // size of the FRAM device in bytes (256k*8 = 2 Mbit device)
 #define FRAM_gsettings_start    0x1D000                 // start of global peristent settings in FRAM
 #define FRAM_tracer_start       0x1D400                 // start of tracer settings
 #define XMEMstart               0x1E000                 // start address of XMEM modules in FRAM
 
-#define FRAM_INIT_ADDR          0x00000                  // address to store the FRAM initialization value
+#define FRAM_INIT_ADDR          0x00000                 // address to store the FRAM initialization value
 #define FRAM_INIT_VALUE         0x4041                  // value to indicate that the FRAM is initialized
 #define FRAM_ROMMAP_START       0x00010
 
@@ -117,6 +142,12 @@ void fr_write16(uint32_t addr, uint16_t word);
 void fr_write32(uint32_t addr, uint32_t word);
 void fram_show(uint32_t addr);
 
+
+// for the FRAM File System managament
+uint32_t fr_lastfree(uint32_t offs);
+// uint32_t fr_findfree(uint32_t offs, uint32_t size);
+// uint32_t fr_findnextf(uint32_t offs);
+// uint32_t fr_findfile(const char *name);
 
 void fr_nukeall();                     // erase all FRAM to zero
 

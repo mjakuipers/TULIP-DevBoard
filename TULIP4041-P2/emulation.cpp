@@ -1242,7 +1242,7 @@ void __not_in_flash_func(core1_pio)()
             //   for Port 8/9, A/B, C/D and E/F both banks are swichted
             //   
 
-            rom_pg = (rom_addr & 0xF000) >> 12;                            // right aligned page number
+            rom_pg = (rom_addr & 0xF000) >> 12;                             // right aligned page number
             banktoswitch = 0;                                               // default no bankswitching
 
             // Bankswitch instructions are:
@@ -1250,6 +1250,8 @@ void __not_in_flash_func(core1_pio)()
             // ENBANK2      0x180   0b0001.1000.0000.0000
             // ENBANK3      0x140   0b0001.0100.0000.0000
             // ENBANK4      0x1C0   0b0001.1100.0000.0000
+
+            rx_inst_t = rx_inst;
             switch (rx_inst)
             {
                 case inst_ENBANK1:     
@@ -1276,14 +1278,14 @@ void __not_in_flash_func(core1_pio)()
                     // HP41CX, ENBANK in Page 3 actually switched Page 5 active bank
                     active_bank[5] = banktoswitch;
                 }
-                else if ((rom_pg > 8))
+                else if ((rom_pg >= 8))
                 {
                     // switching for Port 8/9, A/B, C/D and E/F odd and even Pages
                     active_bank[rom_pg & 0xFFFE]     = banktoswitch;
                     active_bank[(rom_pg & 0xFFFE) + 1] = banktoswitch;
                 }
 
-                // the bankswitching is done, but a check needs to be dome if this is sticky or not
+                // the bankswitching is done, but a check needs to be done if this is sticky or not
                 // if the page is not enabled then the bank is not sticky, so no need to
                 if ((TULIP_Pages.Pages[rom_pg].m_bank & bank_sticky) && TULIP_Pages.isEnabled(rom_pg, 1)) {
                     // set the active bank for both the odd and even pages

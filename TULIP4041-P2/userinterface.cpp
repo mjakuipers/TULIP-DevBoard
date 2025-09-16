@@ -1,8 +1,3 @@
-// Created: 2018/02/04 12:24:41
-
-#define Version_Number VERSION_STRING
-#define Comp_Date_string COMP_DATE_TIME
-
 /*  
  * userinterface.c
  *
@@ -19,13 +14,19 @@
  *
  */
 
+
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "hardware/pll.h"
+#include "hardware/clocks.h"
+#include "hardware/structs/pll.h"
+#include "hardware/structs/clocks.h"
 #include "userinterface.h"
 
-#define IMPORT_SINGLE 0
-#define IMPORT_ALL 1
-#define IMPORT_UPDATE 2
-#define IMPORT_COMPARE 3
-#define IMPORT_FRAM 4 
+#define Version_Number VERSION_STRING
+#define Comp_Date_string COMP_DATE_TIME
+
+
 
 
  // Global settings strings for human readable settings
@@ -242,9 +243,6 @@ int emu_blinky             = 0;     // HP41 IR Printer emulation enabled
 int sample_break           = 0;     // start trace sampling after nn traces, for very long traces
 
  
-int8_t ROMBuffer[0x2000];           // array for download buffer
-uint16_t *rom_buf = (uint16_t *) ROMBuffer;  // same, for 16-bit access
-
 char  UPrint[250];        // used for building cli messages
 int   UPrintLen = 0;
 
@@ -350,12 +348,7 @@ State_e state = ST_NONE;
 
 // functions called from the CLI
 
-#include <stdio.h>
-#include "pico/stdlib.h"
-#include "hardware/pll.h"
-#include "hardware/clocks.h"
-#include "hardware/structs/pll.h"
-#include "hardware/structs/clocks.h"
+
 
 // program a delay as a busy wait while updating the USB CDC interface
 // returns true if the delay was cancelled by a keypress
@@ -1413,9 +1406,9 @@ int import_file(const char *fname, int option)
 // #define import_all      1
 // #define import_update   2
 // #define import_compare  3
+
 void uif_import_all(const char *dir, int arg)
 {
-
   int result[11] = {0};   // array to count the results of the import
   int res;
 
@@ -2055,7 +2048,6 @@ void uif_list(int i, const char *fname)
 // The Plug function relies on the LoadMOD function, based on LoadMOD in the V41 sources in HP41File.cpp
 // Copyright (c) 1989-2002  Warren Furlow   
 
-
 // the function isPageUsed is replaced by the isUsed function
 /****************************/
 // return if page is used, W&W RAMBOX RAM is not marked as used!
@@ -2146,7 +2138,7 @@ int LoadMOD(ModuleMetaHeader_t *MetaH)
       (pMFH->Hardware == HARDWARE_WAND) ||
       // (pMFH->Hardware == HARDWARE_HPIL) ||
       (pMFH->Hardware == HARDWARE_INFRARED) ||
-      // (pMFH->Hardware == HARDWARE_HEPAX) ||
+      // (pMFH->Hardware == HARDWARE_HEPAX) ||   // there is no HEPAX hardware support, but HEPAX works with the modified 4H version
       (pMFH->Hardware == HARDWARE_WWRAMBOX) ||
       (pMFH->Hardware == HARDWARE_MLDL2000) ||
       (pMFH->Hardware == HARDWARE_CLONIX)) {
@@ -3972,41 +3964,6 @@ void print_paper()
 
 
 
-void file_download()
-{
-  int key;
-  int n = 0;     // character counter
-  // start dowload into ROMBuffer
-
-  printf("F - file download - start sending the file now\n");
-
-  while ((n < 0x2000) && (key >= 0)) 
-  {
-    // loop to read bytes 
-    while ((key = getchar_timeout_us(100)) < 0) {}
-    ROMBuffer[n] = key;
-    n++;
-    if ((n % 0x40) == 0) { printf("."); }
-  }
-
-  // correct download
-  printf("\n download finished %d bytes downloaded\n", n);
-
-  // swap the bytes
-  for (int i =0; i < 0x1000; i++)
-  {
-    rom_buf[i] = swap16(rom_buf[i]);
-  }
-
-  // and show the results for the first 8 lines
-  for (int i = 0; i < 31; i++) {
-    printf("\n ROM %04X - ", i * 16); 
-    for (int m = 0; m < 16; m++) {
-      printf("%04X ", rom_buf[i * 16 + m]);        
-    }
-  }
-  printf("\n");
-}
 
 void rom_f()
 // ROM subcomands prompt
@@ -4015,41 +3972,9 @@ void rom_f()
   state = ST_ROM;
 }
 
-void rom_hex()
-// hex listing of current ROM, only first and last 8 lines
-{
-  printf("h - hex dump, short\n");
-  for (int i = 0; i < 8; i++) {
-    printf("\n ROM %04X - ", i * 16); 
-    for (int m = 0; m < 16; m++) {
-      printf("%04X ", rom_buf[i * 16 + m]);        
-    }
-  }
 
-  printf("\n");
 
-  for (int i = 0xF8; i < 0x100 ; i++) {
-    printf("\n ROM %04X - ", i * 16); 
-    for (int m = 0; m < 16; m++) {
-      printf("%04X ", rom_buf[i * 16 + m]);        
-    }
-  }
-
-  printf("\n");
-}
-
-void rom_hexl()
-// hex listing of current ROM, all lines
-{
-  printf("H - hex dump, complete ROM\n");
-  for (int i = 0x00; i < 0x100 ; i++) {
-    printf("\n ROM %04X - ", i * 16); 
-    for (int m = 0; m < 16; m++) {
-      printf("%04X ", rom_buf[i * 16 + m]);        
-    }
-  }
-  printf("\n");
-}
+/*
 
 int rom_checksum()
 {
@@ -4078,274 +4003,8 @@ int rom_checksum()
   FrmROMHandler.LblCHK.Caption := Hex3(Swap(MODArray[CHECKSUM_Addr]));
   FrmROMHandler.LblCALCCHK.Caption := Hex3(Accumulator);
 */
-}
 
 
- 
-void rom_check()
-// print ROM checksum
-{
-  printf("c - calculate checksum\n");
-  printf(" calculated checksum = %03X\n", rom_checksum);
-
-  /* Accumulator := 0;
-  for i := 0 to Rom4KSize - 1 do begin
-    Accumulator := Accumulator + Swap(MODArray[i]);
-    if Accumulator > $03FF then begin
-      Accumulator := (Accumulator and $03FF) + 1;
-    end;
-  end;
-  Accumulator := (-Accumulator) and $03FF;
-  FrmROMHandler.LblCHK.Caption := Hex3(Swap(MODArray[CHECKSUM_Addr]));
-  FrmROMHandler.LblCALCCHK.Caption := Hex3(Accumulator);
-*/
-}
-
-// ROM summary structure
-typedef struct
-{
-  int rom_xrom;
-  int rom_funcs;
-  int rom_firstfunc;
-  char *rom_name;
-  char *rom_revision;
-  int rom_checksum;
-  int calc_checksum;
-} ROM_SUMMARY;
-
-ROM_SUMMARY r_summary;
-
-
-void fill_summary()
-{
-
-  char c;
-
-  r_summary.rom_xrom = rom_buf[0];
-  r_summary.rom_funcs = rom_buf[1];
-  r_summary.rom_checksum = rom_buf[0xFFF];
-  r_summary.calc_checksum = rom_checksum();
-  r_summary.rom_firstfunc = (rom_buf[3] & 0xFF) + ((rom_buf[2] & 0xFF) << 8);  // pointer to the name]
-
-  if (rom_buf[2] > 0xFF) 
-  {
-    sprintf(ROMname, "<USERCODE>");
-  }
-  else
-  {
-    c = rom_buf[r_summary.rom_firstfunc -1];
-    int i = 0;
-    while ( ((c & 0xFF) < 0x40) && (i < 16)) {
-      // only allowed chars
-      ROMname[i] = HPchar[c & 0x3F];
-      i++;
-      c = rom_buf[r_summary.rom_firstfunc - 1 - i];
-     }
-     // and add the last character of the ROM name plus a NULL
-     ROMname[i] = HPchar[c & 0x3F];
-     ROMname[i+1] = 0;
-  }
-  ROMrev[0] = HPchar[rom_buf[0xFFE] & 0x3F];
-  ROMrev[1] = HPchar[rom_buf[0xFFD] & 0x3F];
-  ROMrev[2] = '-';
-  ROMrev[3] = HPchar[rom_buf[0xFFC] & 0x3F];
-  ROMrev[4] = HPchar[rom_buf[0xFFB] & 0x3F];
-  ROMrev[5] = 0;
-
-}
-
-
-void rom_name()
-// show ROM name
-{
-
-  fill_summary();
-  printf("n - show ROM name and other characteristics\n");
-  printf("\n XROM        : %d 0x%02X", r_summary.rom_xrom, r_summary.rom_xrom);
-  printf("\n # functions : %d 0x%02X", r_summary.rom_funcs, r_summary.rom_funcs);
-  printf("\n ROM name    : '%s'   @ 0x%04X", ROMname, r_summary.rom_firstfunc);
-  printf("\n ROM rev     : %s", ROMrev);
-  printf("\n checksum    : %03X - calculated: %03X", r_summary.rom_checksum, r_summary.calc_checksum);
-  printf("\n");
-}
-
-void rom_list()
-// show ROM's in FLASH and/or FRAM
-{
-  printf("l - list available ROMs in FLASH and/or FRAM\n");
-
-  printf(" memory | page | XROM | revision | name");
-
-  // first list the FLASH pages
-  for (int page = 0; page < 10; page++) {
-    printf("\n  FLASH |  %02d  |  ", page);
-    if (flash_contents[page * 0x1000] == 0xFFFF) {
-      // page is empty
-      printf("    |         | EMPTY");
-    }
-    else
-    {
-      // valid content, so download and list contents
-      for (int i = 0; i < 0x1000; i++)
-      {
-        rom_buf[i] = flash_contents[page * 0x1000 + i];
-      }
-      fill_summary();
-      printf("%02d  |  %s  | %s", r_summary.rom_xrom, ROMrev, ROMname);
-    }
-  }
-
-  // list the FRAM pages
-  for (int page = 0; page < 10; page++) {
-    printf("\n  FRAM  |  %02d  |  ", page);
-
-    fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, page * 0x2000, (uint8_t*)rom_buf, 0x2000);  
-    if (rom_buf[0] == 0xFFFF)
-    {
-     printf("    |         | EMPTY");
-    }
-    else 
-    {
-      fill_summary();
-      printf("%02d  |  %s  | %s", r_summary.rom_xrom, ROMrev, ROMname);
-    }
-  }
-
-  printf("\n");
-
-}
-
-
-// #define ROM_BASE_OFFSET  0x00080000
-// const uint16_t *flash_contents = (const uint16_t *) (XIP_BASE + ROM_BASE_OFFSET);
-
-
-void rom_program()
-// program ROM in Flash or SRAM according to settings
-{
-  printf("P - program ROM in FLASH or FRAM\n");
-
-  if (((prog_t == P_NONE) || (rom_target < 0)) && !enable_programming)
-  {
-    // no programming enabled
-    enable_programming = false;
-    printf("ROM programming disabled, choose target FLASH or FRAM first or valid target Page!\n");   
-  } 
-  else
-  {
-    printf(" start programming");
-    switch(prog_t) {
-      case P_FLASH:
-        printf(" FLASH - Page %d at FLASH address %08X\n", rom_target, XIP_BASE + ROM_BASE_OFFSET + (rom_target * 0x2000));
-        sleep_ms(2000);               // needs some rest to prevent USB going crazy
-        // first erase FLASH Page
-        flash_range_erase(ROM_BASE_OFFSET + (rom_target * 0x2000), 0x2000);
-        flash_range_program(ROM_BASE_OFFSET + (rom_target * 0x2000), (uint8_t *)rom_buf, 0x2000);
-        break;
-      case P_FRAM:
-        printf(" FRAM - Page %d at FRAM address %06X\n", rom_target, rom_target * 0x2000 );
-        fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, (rom_target * 0x2000), (uint8_t*)rom_buf, 0x2000);
-        break;
-    default:
-      break;
-    }
-  }
-  printf("\n programming disabled, enable again with <rE> for programming a new ROM!\n");
-}
-
-
-void rom_set_fl()
-// set target to FLASH for ROM programming
-{
-  printf("f - set target for programming ROM to FLASH\n");
-  prog_t = P_FLASH;
-  printf("ROM programming mode set to FLASH");
-  if (rom_target < 0) {
-    printf(" - do not forget to set ROM target Page");
-  }
-  else
-  {
-    printf(" - ROM target Page = %d\n", rom_target);
-  }
-}
-
-void rom_set_fr()
-// set target to FLASH for ROM programming
-{
-  printf("r - set target for programming ROM to FRAM\n");
-  prog_t = P_FRAM;
-  printf("ROM programming mode set to FRAM");
-  if (rom_target < 0) {
-    printf(" - do not forget to set ROM target Page");
-  }
-  else
-  {
-    printf(" - ROM target Page = %d\n", rom_target);
-  }
-}
-
-void rom_pr_en()
-// enable programming into FLASH or FRAM
-{
-  printf("E - Enable programming ROM in FLASH or FRAM\n");
-  printf("enable again after programming to program a new ROM !\n");
-
-  if ((prog_t == P_NONE) || (rom_target < 0))
-  {
-    // no programming enabled
-    enable_programming = false;
-    printf("ROM programming NOT enabled, choose target FLASH or FRAM first or valid target Page!");   
-  } 
-  else
-  {
-    switch(prog_t) {
-      case P_FLASH:
-        enable_programming = true;
-        printf("ROM programming enabled, use with caution. Programming target is FLASH - Page %d", rom_target);
-        break;
-      case P_FRAM:
-        enable_programming = true;
-        printf("ROM programming enabled, use with caution. Programming target is FRAM - Page %d", rom_target);
-        break;
-    default:
-      break;
-    }
-  }
-  printf("\n WARNING: THE HP41 MUST BE OFF OR AT LEAST IN LIGHT SLEEP FOR FLASH and FRAM PROGRAMMING \n");
-}
-
-void rom_down()
-{
-
-  printf("d - Download ROM from FLASH or FRAM\n");
-
-  if ((prog_t == P_NONE) || (rom_target < 0))
-  {
-    // no valid target page selected
-    printf("Sorry, please choose target FLASH or FRAM first or valid target Page!\n");   
-  } 
-  else
-  {
-    switch(prog_t) {
-      case P_FLASH:
-        printf("downloading from FLASH - Page %d\n", rom_target);
-        for (int i = 0; i < 0x1000; i++)
-        {
-          rom_buf[i] = flash_contents[rom_target * 0x1000 + i];
-        }
-        break;
-      case P_FRAM:
-        printf("downloading from FRAM - Page %d\n", rom_target);
-        // read the complete ROM in one go
-        fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, rom_target * 0x2000, (uint8_t*)rom_buf, 0x2000);            
-        break;
-    default:
-      break;
-    }
-  }
-  printf("\n");
-
-}
 
 void rom_digit(int c)
 {
@@ -4355,7 +4014,6 @@ void rom_digit(int c)
     rom_target = c - '0';
   }
   printf("ROM programming target Page = %d\n", rom_target);
-
 }
 
 void rom_mapping()
@@ -4559,19 +4217,11 @@ void sdcard_test()
 SERIAL_COMMAND serial_cmds[] = {
   { 'h', serial_help,     "Serial command help"  },
   { '?', serial_help,     "Serial command help"  },
-  { 'd', toggle_disasm,   "Toggle disassembler"  },
-  { 't', toggle_trace,    "Toggle trace"  },
-  { 'o', toggle_traceo,   "Toggle system ROM trace"  },
-  { 'b', set_break,       "Set breakpoint after n samples (for loooong traces)"  },
   { 'P', power_on,        "Power On - drive ISA for 20 us"  },
   { 'p', print_f,         "Printer functions subcommands"},
-  // { 'x', xmem_set,      "Extended Memory Modules (0/1/2), 3 prints XMEM contents"},  //  void xmem_set(int i)
-  { 'f', file_f,          "File functions (download ROM file)"},
-  { 'r', rom_f,           "ROM functions subcommands"},
   { 'w', welcome,         "show welcome message"  },
   { 'i', pio_welcome,     "show PIO status"},
   // { 'W', wandcode,      "send one of the barcode test commands"},
-  { 's', sdcard_test,     "uSD card test (list directory)"},
   { 'I', ident_cdc,       "Identify CDC serial ports"},
   { 'R', rp2040_reset,    "CAUTION: full reset of the RP2040-TUP"},
   { 'B', rp2040_bootsel,  "CAUTION: reboots the RP2040 in BOOTSEL mode"},
@@ -4590,37 +4240,12 @@ TRACE_COMMAND trace_cmds[] = {
 PRINT_COMMAND print_commands[] = {
   { 'h', print_help,    "Printer commands help" },
   { '?', print_help,    "Printer commands help" },  
-  // { 'O', print_on,      "toggle printer ON/OFF" },
-  { 'b', print_busy,    "toggle printer BUSY" },
-  { 'i', print_idle,    "toggle printer IDLE" },
-  { 'e', print_empty,   "toggle printer Buffer Empty" },
-  { 'm', print_man,     "set to MAN mode"},
-  { 't', print_trace,   "set to TRACE mode"},        
-  { 'n', print_norm,    "set to NORM mode"},
-  { 'a', print_adv,     "push ADV button (short push only)"},
-  { 'p', print_print,   "push PRINT button (short push only)"},
-  { 'l', print_bat,     "toggle printer LOW BAT status"},
-  { 'o', print_paper,   "toggle Out Of Paper"},
-  { 's', print_status,  "show printer status"},
+
 };
 
 // supported subcommands for the user interface, ROM sub-level
 ROM_COMMAND rom_commands[] = {
-  { 'h', rom_help,    "ROM commands help" },
-  { '?', rom_help,    "ROM commands help" },  
-  { 'm', rom_mapping, "toggle default ROM mapping" },  
-  { 'o', rom_off,     "toggle ROM emulation" },
-  { 'x', rom_hex,     "hex listing of current ROM, only 5 first and 5 last lines" },
-  { 'X', rom_hexl,    "hex listing of current ROM, all lines"},
-  { 'c', rom_check,   "calculate ROM checksum" },
-  { 'n', rom_name,    "show ROM name"},
-  { 'l', rom_list,    "show ROM's in FLASH and/or FRAM"},
-  { 'd', rom_down,    "download selected ROM to current ROM"},
-  { 'P', rom_program, "program ROM in Flash or SRAM according to settings"},
-  { 'f', rom_set_fl,  "set target to FLASH for ROM programming"},
-  { 'r', rom_set_fr,  "set target to FRAM for ROM programming"},
-  { 'E', rom_pr_en,   "enable programming into FLASH or FRAM"},
-  { '*', rom_help,    "input any digit 0..9 to set the FLASH/FRAM target page"},
+
 };
 
 const int helpSize = sizeof(serial_cmds) / sizeof(SERIAL_COMMAND);
@@ -4706,7 +4331,7 @@ void serial_loop(void)
             break;
           case ST_FILE:
             if (key == 'F') {
-              file_download();
+              // file_download();
               state = ST_NONE;
             }
           case ST_ROM:      // ROM functions

@@ -2,7 +2,10 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
-VERSION 0.93 BETA 2, September 2025
+VERSION 0.94 BETA 4, October 2025
+-   Placeholder
+
+VERSION 0.93 BETA 3, September 2025
 -   Fixed issue with reserving Page 5, 6, 7
 -   Increased GPIO drive strength for IR LED to 12 mA
 -   Added support for MOD file plugging

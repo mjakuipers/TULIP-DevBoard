@@ -109,7 +109,7 @@ extern "C" {
                       MOD file: will attempt to plug according to the MOD file parameters\r\n\
         [filenm] T    Autoplug Test only, will not plug for real\r\n\
                       just to check where the ROM will be plugged\r\n\
-                      ignored for MOD files, these will be plugged!\r\n"
+                      ignored for MOD files, these will be plugged! \r\n"
 
         #define plug_hpil       1
         #define plug_ilprinter  2
@@ -171,7 +171,8 @@ extern "C" {
         ilrom         toggle tracing of Page 6 + 7\r\n\
         hpil          toggle HP-IL tracing to ILSCOPE USB serial port\r\n\
         pilbox        toggle PILBox serial tracing to ILSCOPE USB serial port\r\n\
-        ilregs        toggle tracing of HP-IL registers\r\n"
+        ilregs        toggle tracing of HP-IL registers\r\n\
+        save          save tracer settings\r\n"
 /*
         trig              toggle the trigger enable\r\n\
                           blocks all samples until a trigger is found\r\n\
@@ -327,7 +328,7 @@ extern "C" {
         printer       toggle HP82143A printer emulation\r\n\
         zeprom P      toggle ZEPROM emulation in Page P (hex) for sticky bankswitching\r\n\
                       sticky bankswitching is active in both odd and even Pages of a Port\r\n\
-                      P is the Page number in hex (0..F), \r\n"
+                      P is the Page number in hex (0..F) \r\n"
 
 #define RESERVE_HELP_TXT "reserve a Page for a physical module\r\n\
         [P] <comment> reserve a physical module in Page P\r\n\

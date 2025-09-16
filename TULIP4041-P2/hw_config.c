@@ -18,6 +18,8 @@ See
 https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/tree/main#customizing-for-the-hardware-configuration
 */
 
+// Config file for the FATFs library ans uSD card SPI driver
+
 #ifdef __cplusplus 
 extern "C" { 
 #endif 
@@ -110,7 +112,6 @@ sd_card_t *sd_get_by_num(size_t num) {
         return NULL;
     }
 }
-
 
 #ifdef __cplusplus 
 } 

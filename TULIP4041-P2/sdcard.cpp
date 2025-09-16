@@ -49,20 +49,22 @@ void put_out_error_message(const char *s) {
     cli_printf("%s", s);
 }
 void put_out_info_message(const char *s) {
-    cli_printf("x");cli_printf("%s", s);
+    cli_printf("x"); 
+    cli_printf("%s", s);
 }
 /* This will not be called unless build_flags include "-D USE_DBG_PRINTF": */
 void put_out_debug_message(const char *s) {
-    cli_printf("x");cli_printf("%s", s);
+    cli_printf("x"); 
+    cli_printf("%s", s);
 }
 
 // #define printf cli_printf
 // #define puts cli_printf
 
-#define error(s)                  \
-    {                             \
-        printf("ERROR: %s", s); \
-        for (;;) __breakpoint();  \
+#define error(s)                        \
+    {                                   \
+        cli_printf("ERROR: %s", s);     \
+        for (;;) __breakpoint();        \
     }
 
 static char const *fs_type_string(int fs_type) {

@@ -28,8 +28,6 @@
 #include "fram.h"
 #include "emulation.h"
 
-
-
 // settings below are used as an index in an array of words (uint16)
 //      0       = false/no
 //      !0      = true/yes
@@ -241,8 +239,6 @@ class GSettings {
             return 0;
         }
     }
-}   
-
-; // end of class GSettings
+} ; // end of class GSettings
 
 #endif      // __GLOBALSETTINGS_H__

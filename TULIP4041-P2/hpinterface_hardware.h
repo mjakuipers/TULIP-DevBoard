@@ -139,7 +139,7 @@ extern "C" {
     #define SPARE1                  3           // spare pin for future use
 #elif (TULIP_HARDWARE == T_MODULE)
     #define P_FI                    -1          // no FI input on the final module
-    #define P_IR_LED                29           // IR output to LED, shared PWO OE on DevBoard
+    #define P_IR_LED                29          // IR output to LED, shared PWO OE on DevBoard
     #define P_PWO_OE                23          // PWO output enable, shared with SPARE1
     #define SPARE1                  23          // spare pin for future use, or PWO-OE
 #endif
@@ -183,7 +183,6 @@ extern "C" {
     #define PICO_FLASH_SIZE_BYTES (16 * 1024 * 1024) // size of the FLASH memory in bytes, 16 MByte
 #endif
 
-
 #define FF_SYSTEM_END   (PICO_FLASH_SIZE_BYTES)             // end of FLASH memory for Pico relative to FF_SYSTEM_BASE
 #define FF_SYSTEM_SIZE  (PICO_FLASH_SIZE_BYTES - FF_OFFSET) // total bytes in the file system
 
@@ -201,7 +200,6 @@ extern "C" {
 #define FLASH_SECTOR_OFFS ~(FLASH_SECTOR_MASK)             // FLASH sector offset, becomes 0xFFFFF000
 
 #define NOTFOUND        0xFFFFFFFF
-
 
 #ifdef __cplusplus
 }

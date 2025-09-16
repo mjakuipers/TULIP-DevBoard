@@ -315,5 +315,44 @@ uint32_t fr_erased(uint32_t offs, uint32_t size, int num)
 }
 
 
+// for the FRAM File System managament
+
+// find the last free address in FRAM starting from offs
+// returns the address of the last free byte or 0xFFFFFFFF if none found    
+
+/*
+uint32_t fr_lastfree(uint32_t offs)
+{
+    uint32_t addr = offs;               // our address counter, 
+                                        // start at the beginning of the file system
+    ModuleMetaHeader_t MetaH;           // meta header for getting info of next file
+
+    // first find the last available slot in FRAM
+
+    uint32_t end = FRAM_SIZE;
+
+    while (offs < end) {
+
+    #ifdef DEBUG
+      // cli_printf("  checking file at 0x%08X end at: 0x%08X", offs, end);
+    #endif
+
+    // read the Filoe Header from FRAM
+    fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, offs, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+
+    if (MetaH.FileType == FILETYPE_FFFF) break;                // if it erased then it is useable
+    // check if this is a valid file to prevent looping
+    if ((MetaH.FileType > FILETYPE_4041)) {
+      // unsupported file type, this is not a valid file
+      return NOTFOUND;                                          // no free space found
+    }
+    offs = MetaH.NextFile;                                     // go to the next file
+  }
+  if (offs > end) return NOTFOUND;                              // no free space found
+  return offs;                                                  // return the offset of the last free slot
+}
+
+*/
+
 
 
