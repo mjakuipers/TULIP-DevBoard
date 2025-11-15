@@ -1,5 +1,7 @@
 # TULIP-DevBoard and TULIP-Module
-README for the TULIP4041 DevBoard
+README for the TULIP4041 DevBoard and Module.
+
+To order, contact me directly with your email address to receive an order form.
 
 Please be aware that the firmware files are in the TULIP4041-P2/build subdirectory. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module
@@ -72,7 +74,16 @@ And go back to step 7
 
 Any issues? Best is to report these in the issue tracker here on GitHub.
 
-Details on the TULIP Module version are coming soon, here is a preview of the module itself on YouTube: https://youtu.be/zgKlAMlz9vY
+Here are links to some videos I made:
+- Soldering the HP41 connector: https://www.youtube.com/watch?v=pW8rN5y5UB0
+- Production testing: https://www.youtube.com/watch?v=3AXWcQL1dGo
+- Harvest a connector from an HP41 module: https://www.youtube.com/watch?v=I3a0NojwHeg
+- Preview of the pre-production units, firmware and housing: https://www.youtube.com/watch?v=8PRu2yhQjck
+- Overview of the pre-production units: https://www.youtube.com/watch?v=zgKlAMlz9vY
+
+Robert Prosperi gave a talk about the TULIP on the 2025 HHC confernce in Orlando, with a Q+A session where I particpated online: https://www.youtube.com/watch?v=4R3ebXHAJd4, here is the presentation PDF: https://hhuc.us/2025/Presentations/TULIP4041%20-%20The%20Next%20Chapter.pdf
+
+The housing design is now also available here: https://github.com/blackjetrock/hp41c-tulip-module-case. Thanks Andrew for the design!
 
 ![IMG_20240925_110722543](https://github.com/user-attachments/assets/33102d0d-1736-4b8a-81de-e93384321606)
 
