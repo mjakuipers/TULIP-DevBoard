@@ -2,10 +2,20 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
-VERSION 0.94 BETA 4, October 2025
--   Placeholder
+VERSION 0.95 BETA 3, November 2025
+-   Added Page 4 bankswitching to support Library4 in HP41C/CV/MAXX machines
+-   Reset into BOOTSELmode now unplugs all embedded modules
+-   Changed reading uSD card number of sectors, now with ioctl call to fix issue with exFAT on MacOS
+-   Fixed issue with enabling hpil emulation upon reboot/powercycle causing a real HP-IL module to malfunction
+-   Fixed unplug ALL command which did not clear reservations
+-   Fixed flash INIT command, would sometimes hang
+-   Fixed driving ISA to powerup the calculator
+-   Fixed tracer output which showed all instructions in column 7, it now correctly shows only TULIP decoded instructions
 
-VERSION 0.93 BETA 3, September 2025
+VERSION 0.94 BETA 2, September 2025
+-   Fixed issue with non-working bank switching in Page 8
+
+VERSION 0.93 BETA 2, September 2025
 -   Fixed issue with reserving Page 5, 6, 7
 -   Increased GPIO drive strength for IR LED to 12 mA
 -   Added support for MOD file plugging

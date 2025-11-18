@@ -382,6 +382,8 @@ public isa_inst_out:
         wait 1 gpio SYNC_TIME   side 0          ; wait for SYNC_TIME to go high                                                
 public isa_out:
         out pins, 1             side 1  [15]    ; send 1 bit and delay until after the falling edge of CLK02
+
+public isa_poweron:                             ; entry used for ISA poweron
         wait 1 gpio P_CLK02     side 1          ; wait for rising edge of CLK02
         jmp x--, isa_out        side 1          ; next bit
         wait 0 gpio SYNC_TIME   side 1          ; wait for end of SYNC_TIME
@@ -407,8 +409,9 @@ static inline void hp41_pio_isaout_program_init(PIO pio, uint sm, uint offset,
     pio_sm_set_consecutive_pindirs(pio, sm, out_base_pin, 1, true);          // pin direction for ISA_OUT
     pio_sm_set_consecutive_pindirs(pio, sm, sideset_base_pin, 1, true);      // pin direction for ISA_OE
 
-    sm_config_set_out_pins(&c, out_base_pin, 1);    // just using 1 output
-    sm_config_set_sideset_pins(&c, sideset_base_pin);
+    sm_config_set_out_pins(&c, out_base_pin, 1);        // just using 1 output for ISA_OUT
+    sm_config_set_sideset_pins(&c, sideset_base_pin);   // sideset used for ISA_OE
+    sm_config_set_set_pins(&c, out_base_pin, 1);        // use the out pin ISA_OUT fo the set instruction for poweron
     // sm_config_set_jmp_pin(&c, jmp_pin);  
 
     // Configure Output Shift Register OSR

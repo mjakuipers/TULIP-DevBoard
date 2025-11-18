@@ -147,7 +147,7 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_siz
     ejected = !sd_mount_s();
     if (!ejected)
     {
-      *block_count = sd_sect_count();
+      *block_count = sd_sect_count_alt();
       *block_size  = SECT_SIZE;
     }
   }
@@ -236,7 +236,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t* 
   //    bufsize : number of bytes to be copied, return here number of bytes read
 
 
-  // first work out number of sectors to read, sector size is always 512 !
+  // first work out number of sectors to write, sector size is always 512 !
   uint32_t numsect = bufsize / SECT_SIZE;
   if ((bufsize % numsect) != 0) numsect + 1;        // in case there is a remainder of a full sector to be returned
 
@@ -265,6 +265,28 @@ int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, 
 
   switch (scsi_cmd[0])
   {
+    case SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL:
+      // Sync the logical unit if needed
+      // added to check for ejection from host side
+      // for testing with MacOS
+      break;
+    case SCSI_CMD_TEST_UNIT_READY:
+      break;
+    case SCSI_CMD_INQUIRY:
+      break;
+    case SCSI_CMD_MODE_SELECT_6:
+      break;
+    case SCSI_CMD_MODE_SENSE_6:
+      break;
+    case SCSI_CMD_START_STOP_UNIT:
+      break;
+    case SCSI_CMD_READ_CAPACITY_10:
+      break;
+    case SCSI_CMD_REQUEST_SENSE:
+      break;
+    case SCSI_CMD_READ_FORMAT_CAPACITY:
+      break;
+
     default:
       // Set Sense = Invalid Command Operation
       tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0x00);
@@ -277,13 +299,10 @@ int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, 
   // return resplen must not larger than bufsize
   if ( resplen > bufsize ) resplen = bufsize;
 
-  if ( response && (resplen > 0) )
-  {
-    if (in_xfer)
-    {
+  if ( response && (resplen > 0)) {
+    if (in_xfer) {
       memcpy(buffer, response, (size_t) resplen);
-    } else
-    {
+    } else {
       // SCSI output
     }
   }

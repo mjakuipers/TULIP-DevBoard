@@ -47,6 +47,7 @@ extern "C" {
 #define SECT_SIZE       512     // fix the sector size
 
 uint32_t sd_sect_count();
+uint32_t sd_sect_count_alt();
 
 void sdcard_init();                 
 void sd_status();

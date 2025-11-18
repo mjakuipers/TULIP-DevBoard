@@ -386,7 +386,7 @@ void Print_task()
     // check for disconnection of Printer
     if ((Print_firstconnect) && (!cdc_connected(ITF_PRINT))) {
         // CDC interface is disconnected
-        cli_printf("  CDC Port 5 [printer]] disconnected");
+        cli_printf("  CDC Port 5 [printer] disconnected");
         Print_firstconnect = false;
     }
 

@@ -27,8 +27,6 @@
 #define Comp_Date_string COMP_DATE_TIME
 
 
-
-
  // Global settings strings for human readable settings
 const char* __in_flash("flash_constants")glob_set_[] = {
 
@@ -432,7 +430,7 @@ void uif_status()
     pico_get_unique_board_id(&board_id);
 
     char board_id_str[sizeof(board_id.id) * 2 + 1];
-    for (int i = 0; i < sizeof(board_id.id); ++i) {
+    for (int i = 0; i < sizeof(board_id.id); i++) {
         sprintf(board_id_str + i * 2, "%02X", board_id.id[i]);
     }
 
@@ -471,7 +469,6 @@ void uif_status()
     // check if the owner string is already programmed
     if (owner_string[0] < 0x20 || owner_string[0] > 0x7E) {
       // the first character is not printable, so no owner string programmed
-      cli_printf("*  Firmware: %s -- Compiled %s %s", Version_Number, __DATE__, __TIME__);
       cli_printf("*  Owner   : no owner string programmed");
     } else {
       cli_printf("*  Owner   : %s", owner_string);
@@ -545,7 +542,7 @@ void uif_cdc_ident()
   }
 }
 
-
+// Reboot the RP2350, with a 2 second delay to allow a cancel
 void uif_reboot()
 {
   cli_printf("  RESETTING THE TULIP4041 in 2 seconds !! press any key to cancel");
@@ -570,6 +567,7 @@ void uif_bootsel()
   uint sleepcount = 500;
 
   cli_printf("  RESETTING THE TULIP4041 to BOOTSEL mode in 2 seconds!! press any key to cancel");
+  cli_printf("  will unplug all embedded modules upon REBOOT\n\n");
 
   while(true) {
     tud_task();                 // to process IO until the watchdog triggers
@@ -581,7 +579,18 @@ void uif_bootsel()
     }
     sleepcount--;
     if (sleepcount == 0) {  
-    // reboots the RP2350 when the counter expires, uses the standard LED for activity monitoring
+      // unplug any embedded modules here
+      for (int page = 4; page < 16; page++) {
+        if (TULIP_Pages.isPlugged(page, 1) && TULIP_Pages.isEmbeddedROM(page, 1)) {
+          // page is plugged and embedded, so unplug it and all banks
+          TULIP_Pages.unplug(page, 1);
+          TULIP_Pages.unplug(page, 2);
+          TULIP_Pages.unplug(page, 3);
+          TULIP_Pages.unplug(page, 4);
+          TULIP_Pages.save();
+        }
+      }
+      // reboots the RP2350 when the counter expires, uses the standard LED for activity monitoring
       reset_usb_boot(1<<PICO_DEFAULT_LED_PIN, 0);      
     }
   }
@@ -2884,11 +2893,11 @@ void uif_unplug(int p, int bk)            // plug the selected ROM / bank
 
   } else if (p == unplug_ALL) {
     // unplug all plugged ROMs and Banks including reserved Pages
-    cli_printf("  Unplugging all plugged ROMs including reserved Pages");
+    // cli_printf("  Unplugging all plugged ROMs including reserved Pages");
     for (int i = 4; i < 16; i++) {
       for (int b = 1; b < 5; b++) {
         // check if the Page is plugged
-        if (TULIP_Pages.isPlugged(i, b)) {
+        if (TULIP_Pages.isPlugged(i, b) || TULIP_Pages.isReserved(i)) {
           // page is plugged, so unplug it
           TULIP_Pages.unplug(i, b);
         }
@@ -3725,7 +3734,7 @@ void uif_flash(int i, uint32_t addr) {
                 // Erase the FLASH File System when the counter expires
                 ff_nuke();
                 cli_printf("  FLASH FILE SYSTEM ERASED");
-                cli_printf("  use the flash INIT caoomand to initialize the FLASH File system");
+                cli_printf("  use the flash INIT command to initialize the FLASH File system");
                 return;
               }
             }

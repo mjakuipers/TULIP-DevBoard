@@ -260,6 +260,27 @@ uint32_t sd_sect_count()
     return tot_sect;
 }
 
+// return the number of total sector in the SD card
+// called by msc_device_disk callbacks from the TinyUSB stack
+// alternative version to works with exFAT on macOS
+uint32_t sd_sect_count_alt()
+{
+    sd_card_t *sd_card_p = sd_get_by_num(0);
+    FATFS *fs_p = &sd_card_p->state.fatfs; 
+
+    // DWORD sect_count = 0;
+    LBA_t tot_sect_lba = 0;
+
+    DRESULT dr = disk_ioctl(DRIVENUM, GET_SECTOR_COUNT, &tot_sect_lba);
+
+    if (FR_OK != dr) {
+        cli_printf("  ioctl error: %d)", dr);
+        return 0;
+    }
+
+    return (uint32_t)tot_sect_lba;
+}
+
 
 // SD card status
 void sd_status() 
@@ -364,6 +385,14 @@ void sd_status()
     }
     #endif
 
+    // DWORD sect_count = 0;
+    LBA_t tot_sect_lba = 0;
+
+    DRESULT dr = disk_ioctl(DRIVENUM, GET_SECTOR_COUNT, &tot_sect_lba);
+
+    cli_printf("  Sector count            : %10" PRIu64, tot_sect_lba);
+    // cli_printf("  Sector count (2)        : %10" PRIu64, tot_sect);
+
     /* Print the free space (assuming 512 bytes/sector) */
     cli_printf("  Filesystem type         : %s", fs_type_string(fs_p->fs_type));
     cli_printf("  Sector size             : %10lu bytes", sect_size);    
@@ -371,7 +400,7 @@ void sd_status()
 
 
     cli_printf("  Total drive space       : %10" PRIu64 " KByte %10" PRIu64 " MByte", tot_sect/2, tot_sect /2 / 1024);
-    cli_printf("  Avialable               : %10" PRIu64 " KByte %10" PRIu64 " MByte", fre_sect/2, fre_sect /2 / 1024);
+    cli_printf("  Available               : %10" PRIu64 " KByte %10" PRIu64 " MByte", fre_sect/2, fre_sect /2 / 1024);
     cli_printf("  Used                    : %10" PRIu64 " KByte %10" PRIu64 " MByte", used_sect/2, used_sect /2 / 1024);
 
 	cli_printf("  Volume base sector      : %10d", fs_p->volbase);		

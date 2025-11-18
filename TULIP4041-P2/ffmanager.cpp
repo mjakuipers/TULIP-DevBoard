@@ -329,17 +329,22 @@ void ff_init()
   // assign MetaH to point to buf
   MetaH = (ModuleMetaHeader_t*)buf;
 
+  cli_printfn("  Checking if FLASH is fully erased ... ");
+
   uint32_t addr = ff_erased(0, FF_SYSTEM_SIZE - 256, 1);
 
   // check if the FLASH is fully erased
   if (addr == NOTFOUND) {
     // FLASH is erased, now create the file system
-    cli_printf("  FLASH is erased, creating file system");
+    cli_printf("  FLASH is erased, now creating file system");
   } else {
     // FLASH is not erased, do not overwrite
     cli_printf("  FLASH is not erased at address %08X, cannot create file system", addr);
     return;
   }
+
+  // delay to flush the console output
+  ff_delay500();
   
   // initialize the buffer with 0xFF
   memset(buf, 0xFF, FLASH_PAGE_SIZE);
@@ -360,6 +365,8 @@ void ff_init()
     cli_printf("  FLASH File System initialized, first file created at %08X", FF_OFFSET);
     printbuf(flash_contents_bt, FLASH_PAGE_SIZE);
   #endif
+
+  cli_printf("  FLASH File System initialized, header file created");
 
 }
 

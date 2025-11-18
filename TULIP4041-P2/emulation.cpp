@@ -403,23 +403,22 @@ void wakemeup_41()
         // only if PWO is low!
 
         // isaout state machine will be stalled at the blocking pull from the TX FIFO
-        // so we can simply send a 1, and the data is pulled 
-        // we then do a forced jump to the out instruction
-        // this will drive ISA and ISA_OE, and stall waiting for the end of T0 (T0_TIME is low here)
-        // after a wait of 10-20 usecs we will force a jump to the start of isaout and wait for data to arrive.
 
-        // put a value 1 in the TX FIFO
-        isa_out_data = 1;
-        pio_sm_exec(pio1_pio, isaout_sm, pio_encode_jmp(isaout_offset + hp41_pio_isaout_offset_isa_inst_out) | pio_encode_sideset(1, 0));           
-        pio_sm_put_blocking(pio1_pio, isaout_sm, isa_out_data); 
+        // we drive both ISA_OUT and ISA_OE high with the set instruction
+        // ISA_OE is active high, so ISA will be driven high
+        pio_sm_exec(pio1_pio, isaout_sm, pio_encode_set(pio_pins, 1) | pio_encode_sideset(1, 0)); // set ISA_OUT high
 
-        // jump to the output of data
-        pio_sm_exec(pio1_pio, isaout_sm, pio_encode_jmp(isaout_offset + hp41_pio_isaout_offset_isa_out) | pio_encode_sideset(1, 1));         
+        // jump to the label to wait for CLK02 with ISA_OE high
+        pio_sm_exec(pio1_pio, isaout_sm, pio_encode_jmp(isaout_offset + hp41_pio_isaout_offset_isa_poweron) | pio_encode_sideset(1, 1));
 
-        busy_wait_us(20);    // wait 20 us
+        busy_wait_us(15);    // wait 15 us
 
-        // now stop driving ISA_OE by going back to the start of the state machine
-        pio_sm_exec(pio1_pio, isaout_sm, pio_encode_jmp(isaout_offset + hp41_pio_isaout_offset_handle_carry) | pio_encode_sideset(1, 0)); 
+        // and stop driving ISA_OUT and ISA_OE by setting both low again
+        // jump back to the start of the state machine
+        pio_sm_exec(pio1_pio, isaout_sm, pio_encode_jmp(isaout_offset + hp41_pio_isaout_offset_handle_carry) | pio_encode_sideset(1, 0));
+        pio_sm_exec(pio1_pio, isaout_sm, pio_encode_set(pio_pins, 0) | pio_encode_sideset(1, 0)); // set ISA_OUT and ISA_OE low
+
+
     }
 }
 
@@ -970,7 +969,7 @@ void __not_in_flash_func(core1_pio)()
 
         // blocking read for the 2nd part of DATA rx FIFO to get bits D55..D32
         // this happens at T0_TIME
-        // consider doing 28 clok cycles in the datain state machine to get this data earlier for WROM handling
+        // consider doing 28 clock cycles in the datain state machine to get this data earlier for WROM handling
         // figure out when to check for PWO otherwise we might stall here
 
         // must wait until after T0_TIME, need to figure this out
@@ -1251,7 +1250,7 @@ void __not_in_flash_func(core1_pio)()
             // ENBANK3      0x140   0b0001.0100.0000.0000
             // ENBANK4      0x1C0   0b0001.1100.0000.0000
 
-            rx_inst_t = rx_inst;
+            
             switch (rx_inst)
             {
                 case inst_ENBANK1:     
@@ -1272,17 +1271,21 @@ void __not_in_flash_func(core1_pio)()
             }
 
             if (banktoswitch != 0) {
+                rx_inst_t = rx_inst;
                 // only if there is an ENBANKx instruction
-                if (rom_pg == 3)
-                {
+                if (rom_pg == 3){
                     // HP41CX, ENBANK in Page 3 actually switched Page 5 active bank
                     active_bank[5] = banktoswitch;
                 }
-                else if ((rom_pg >= 8))
-                {
+                else if ((rom_pg >= 8)) {
                     // switching for Port 8/9, A/B, C/D and E/F odd and even Pages
+                    // also enables bank switching for any other page
                     active_bank[rom_pg & 0xFFFE]     = banktoswitch;
                     active_bank[(rom_pg & 0xFFFE) + 1] = banktoswitch;
+                }
+                else {
+                    // normal bankswitching for single page, mainly intended for Pages 4, 6, 7
+                    active_bank[rom_pg] = banktoswitch;
                 }
 
                 // the bankswitching is done, but a check needs to be done if this is sticky or not

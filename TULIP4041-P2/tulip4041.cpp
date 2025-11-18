@@ -128,12 +128,12 @@ int main() {
     WandBuffer_init();      // only if used, do this dynamic in the future
 
     // for a test version HPIL and the HP-IL printer are plugged
-    globsetting.set(HPIL_plugged, 1);               // set the HPIL plugged flag  
-    globsetting.set(ILPRINTER_plugged, 1);          // set the HP-IL printer plugged flag
+    // globsetting.set(HPIL_plugged, 1);               // set the HPIL plugged flag  
+    // globsetting.set(ILPRINTER_plugged, 1);          // set the HP-IL printer plugged flag
 
     // and HP-IL must be enabled of course
-    globsetting.set(HP82160A_enabled, 1);           // set the HP-IL enabled flag
-    globsetting.save();                             // save the settings
+    // globsetting.set(HP82160A_enabled, 1);           // set the HP-IL enabled flag
+    // globsetting.save();                             // save the settings
     
     initCliBinding();                               // initialization of the embedded-cli
 
