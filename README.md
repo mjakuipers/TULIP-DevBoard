@@ -12,8 +12,24 @@ The TULIP Hardware V1.0 Schematics are added, following the succesful verificati
 
 There are now a number of MOD files prepared for use in the TULIP:
   HEPAX_4H.MOD       4-Bank modified HEPAX with RAM pages (plugs in any even Page)
-  OSX-BS4X.MOD       standard 4-bank CCD OSX (plugs in any odd Page)
-  OSX_BS4X-LIB4.MOD  standard 4-bank CCD OSX (plugs in any odd Page) with LIBRARY4 (plugs in Page 4)
+  OSX-BS4X.MOD       standard 4-bank CCD OSX (plugs in any odd Page) for HP41CX
+  OSX_BS4X-LIB4.MOD  standard 4-bank CCD OSX (plugs in any odd Page) with LIBRARY4 (plugs in Page 4) for HP41CX
+
+  For the HP41C/CV Use the following:
+  XOSX_BS4X.MOD      4-bank version of CCD OSX for HP41C/CV systems
+  LIBRARY4-MAXX.MOD  2-bank switching version of Library4. Must be plugged in Page 4 for HP41C/CV systems
+                     the system MUST support bankswitching in Page4. Is supported in TULIP from firmware 0.95!
+
+VERSION 0.95 BETA 3, November 2025
+-   Added Page 4 bankswitching to support Library4 in HP41C/CV/MAXX machines
+    Is somewhat experimental, please report issues
+-   Reset into BOOTSELmode now unplugs all embedded modules
+-   Changed reading uSD card number of sectors, now with ioctl call to fix issue with exFAT on MacOS
+-   Fixed issue with enabling hpil emulation upon reboot/powercycle causing a real HP-IL module to malfunction
+-   Fixed unplug ALL command which did not clear reservations
+-   Fixed flash INIT command, would sometimes hang
+-   Fixed driving ISA to powerup the calculator
+-   Fixed tracer output which showed all instructions in column 7, it now correctly shows only TULIP decoded instructions
 
 VERSION 0.94 BETA 2, September 2025
 -   Fixed issue with Page 8 bank switching
