@@ -235,6 +235,7 @@ static inline void hp41_pio_debugout_program_init(PIO pio, uint sm, uint offset,
 #define hp41_pio_isaout_offset_handle_carry 0u
 #define hp41_pio_isaout_offset_isa_inst_out 5u
 #define hp41_pio_isaout_offset_isa_out 8u
+#define hp41_pio_isaout_offset_isa_poweron 9u
 
 static const uint16_t hp41_pio_isaout_program_instructions[] = {
             //     .wrap_target
@@ -281,8 +282,9 @@ static inline void hp41_pio_isaout_program_init(PIO pio, uint sm, uint offset,
     // set correct pin direction for outputs
     pio_sm_set_consecutive_pindirs(pio, sm, out_base_pin, 1, true);          // pin direction for ISA_OUT
     pio_sm_set_consecutive_pindirs(pio, sm, sideset_base_pin, 1, true);      // pin direction for ISA_OE
-    sm_config_set_out_pins(&c, out_base_pin, 1);    // just using 1 output
-    sm_config_set_sideset_pins(&c, sideset_base_pin);
+    sm_config_set_out_pins(&c, out_base_pin, 1);        // just using 1 output for ISA_OUT
+    sm_config_set_sideset_pins(&c, sideset_base_pin);   // sideset used for ISA_OE
+    sm_config_set_set_pins(&c, out_base_pin, 1);        // use the out pin ISA_OUT fo the set instruction for poweron
     // sm_config_set_jmp_pin(&c, jmp_pin);  
     // Configure Output Shift Register OSR
     // Shifting to right matches HP41 bit order
