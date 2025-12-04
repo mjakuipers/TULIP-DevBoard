@@ -12,11 +12,11 @@ The TULIP Hardware V1.0 Schematics are added, following the succesful verificati
 
 There are now a number of MOD files prepared for use in the TULIP:
 - HEPAX_4H.MOD       4-Bank modified HEPAX with RAM pages (plugs in any even Page)
-- OSX-BS4X.MOD       standard 4-bank CCD OSX (plugs in any odd Page) for HP41CX
-- OSX_BS4X-LIB4.MOD  standard 4-bank CCD OSX (plugs in any odd Page) with LIBRARY4 (plugs in Page 4) for HP41CX
+- OSX-BS4X.MOD       standard 4-bank CCD OSX (plugs in any lower port Page) for HP41CX
+- OSX_BS4X-LIB4.MOD  standard 4-bank CCD OSX (plugs in any lower port Page) with LIBRARY4 (plugs in Page 4) for HP41CX
 
   For the HP41C/CV Use the following:
-- XOSX_BS4X.MOD      4-bank version of CCD OSX for HP41C/CV systems
+- XOSX_BS4X.MOD      4-bank version of CCD OSX for HP41C/CV systems (plugs in any lower port Page)
 - LIBRARY4-MAXX.MOD  2-bank switching version of Library4. Must be plugged in Page 4 for HP41C/CV systems
                      the system MUST support bankswitching in Page 4. Is supported in TULIP from firmware 0.95!
 
