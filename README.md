@@ -55,9 +55,11 @@ VERSION 0.91 BETA 2, July 2025, Functional changes:
 -   A ROM can now be plugged with a Page nmber. This works only for Bank 1 and the first available Page is used
 -   The reserve command is added to reserve a Page for a physical Module, plugging without a Page number respects this reservation
 
-**Remember to unplug your embedded ROMs (HP-IL, ILPrinter) when doing a firmware upgrade**
+**Remember to unplug your embedded ROMs (HP-IL, ILPrinter) when doing a firmware upgrade (this is automatic from Firmware V0.95)**
 
 **ONLY USE THE .UF2 VERSION FOR THE DEVBOARD!**
+
+Some users with a Mac as their host computer have reported issues with the uSD card. It works fine on the TULIp itself, but refuse to connect to the host PC as a drive. The solution is to format the to the ExFAT format using the official SD CArd Formatting software available at https://www.sdcard.org/downloads/formatter/
 
 **TULIP4041 Quick Start**
 
