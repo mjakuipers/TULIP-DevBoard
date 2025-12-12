@@ -59,7 +59,7 @@ VERSION 0.91 BETA 2, July 2025, Functional changes:
 
 **ONLY USE THE .UF2 VERSION FOR THE DEVBOARD!**
 
-Some users with a Mac as their host computer have reported issues with the uSD card. It works fine on the TULIp itself, but refuse to connect to the host PC as a drive. The solution is to format the to the ExFAT format using the official SD CArd Formatting software available at https://www.sdcard.org/downloads/formatter/
+Some users with a Mac as their host computer have reported issues with the uSD card. It works fine on the TULIP itself, but refuse to connect to the host PC as a drive while in the TULIP. The solution is to format the to the ExFAT format using the official SD CArd Formatting software available at https://www.sdcard.org/downloads/formatter/
 
 **TULIP4041 Quick Start**
 
