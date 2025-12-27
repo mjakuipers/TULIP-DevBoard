@@ -111,7 +111,7 @@ static const uint16_t hp41_pio_datain_program_instructions[] = {
     0x208c, //  1: wait   1 gpio, 12
     0x00c4, //  2: jmp    pin, 4
     0x8000, //  3: push   noblock
-    0x4f01, //  4: in     pins, 1                [15]
+    0x4a01, //  4: in     pins, 1                [10]
             //     .wrap
 };
 
@@ -247,7 +247,7 @@ static const uint16_t hp41_pio_isaout_program_instructions[] = {
     0x80a0, //  5: pull   block           side 0
     0xe029, //  6: set    x, 9            side 0
     0x209b, //  7: wait   1 gpio, 27      side 0
-    0x7f01, //  8: out    pins, 1         side 1 [15]
+    0x7a01, //  8: out    pins, 1         side 1 [10]
     0x308d, //  9: wait   1 gpio, 13      side 1
     0x1048, // 10: jmp    x--, 8          side 1
     0x301b, // 11: wait   0 gpio, 27      side 1
@@ -322,7 +322,7 @@ static const uint16_t hp41_pio_dataout_program_instructions[] = {
             //     .wrap_target
     0x80a0, //  0: pull   block           side 0
     0x201a, //  1: wait   0 gpio, 26      side 0
-    0x7f01, //  2: out    pins, 1         side 1 [15]
+    0x7a01, //  2: out    pins, 1         side 1 [10]
     0x308d, //  3: wait   1 gpio, 13      side 1
     0x10c2, //  4: jmp    pin, 2          side 1
             //     .wrap
@@ -396,7 +396,7 @@ static const uint16_t hp41_pio_fiout_program_instructions[] = {
             //     .wrap_target
     0x80a0, //  0: pull   block
     0x201a, //  1: wait   0 gpio, 26
-    0x6f01, //  2: out    pins, 1                [15]
+    0x6a01, //  2: out    pins, 1                [10]
     0x208d, //  3: wait   1 gpio, 13
     0x00c2, //  4: jmp    pin, 2
             //     .wrap
