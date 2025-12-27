@@ -1107,11 +1107,11 @@ static void writeToOutput(EmbeddedCli *cli, const char *str) {
 }
 
 static bool isControlChar(char c) {
-    return c == '\r' || c == '\n' || c == '\b' || c == '\t' || c == 0x7F;
+    return (c == '\r' || c == '\n' || c == '\b' || c == '\t' || c == 0x7F);
 }
 
 static bool isDisplayableChar(char c) {
-    return (c >= 32 && c <= 126);
+    return (c >= 32 && c <= 255);
 }
 
 static uint16_t fifoBufAvailable(FifoBuf *buffer) {

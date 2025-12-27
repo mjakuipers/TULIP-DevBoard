@@ -91,12 +91,12 @@ void pcf8520_reset() {
     // First do a reset, then set default values, especially the XTAL load capacitance
     // There are a load more options to set up the device in different ways that could be added here
 
-    uint8_t buf[2];
+    // uint8_t buf[2];
 
-    // no rest is done, not needed
+    // no reset is done, not needed
     // write pattern 0x58 to the control register 0x00 for a software reset
-    // uint8_t buf[2] = {0x00, 0x58};
-    // i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 2, false);
+    uint8_t buf[2] = {0x00, 0x58};
+    i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 2, false);
 
     // set Control Register 1 to the initial values
     // 0x58 = 1000 0000b
@@ -122,7 +122,7 @@ void pcf8520_reset() {
     // set the Tmnr_CLKOUT regsiter (address 0x0F) to 0x00
     // bit 5..3 COF[2:0] - 110, 1024 Hz output
     // all other bits are 0
-    buf[0] = 0x0F; // Tmnr_CLKOUT register
+    buf[0] = 0x0F; // Tmr_CLKOUT register
     buf[1] = 0x30; // set COF[2:0] to 110 for 1 kHz output
     i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 2, false);
 }

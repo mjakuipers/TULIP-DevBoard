@@ -196,7 +196,7 @@ public data_start:                      ; for forcing a restart of this state ma
                                         ; as we are at the end of the DATA cycle
         push noblock                    ; never block
 data_in:
-        in pins, 1            [15]      ; read DATA pin into ISR
+        in pins, 1            [10]      ; read DATA pin into ISR
                                         ; and wait until after the falling edge of CLK01
                                         ; and then into the next phase
 .wrap                                   ; and start over again
@@ -381,7 +381,7 @@ public isa_inst_out:
                                                 ; move this instruction to C code?
         wait 1 gpio SYNC_TIME   side 0          ; wait for SYNC_TIME to go high                                                
 public isa_out:
-        out pins, 1             side 1  [15]    ; send 1 bit and delay until after the falling edge of CLK02
+        out pins, 1             side 1  [10]    ; send 1 bit and delay until after the falling edge of CLK02
 
 public isa_poweron:                             ; entry used for ISA poweron
         wait 1 gpio P_CLK02     side 1          ; wait for rising edge of CLK02
@@ -492,7 +492,7 @@ static inline void hp41_pio_isaout_program_init(PIO pio, uint sm, uint offset,
                                                 ; fall through whenever data arrives                                      
         wait 0 gpio T0_TIME     side 0          ; wait until start of T0_TIME 
 data_out_go:
-        out pins, 1             side 1  [15]    ; send out DATA bit from the ISR
+        out pins, 1             side 1  [10]    ; send out DATA bit from the ISR
                                                 ; delay with 15 clocks = 15* 80 ns = 1200 ns
                                                 ; more than enough to pass over the 700+ ns CLK02 high time
                                                 ; at this point CLK02 is low
@@ -615,7 +615,7 @@ public fiout_start:
                                                 ; fall through whenever data arrives
         wait 0 gpio T0_TIME                     ; wait until start of T0_TIME 
 fi_go:
-        out pins, 1             [15]            ; send out FI_OE bit from the OSR
+        out pins, 1             [10]            ; send out FI_OE bit from the OSR
                                                 ; and wait until after CLK02 has gone low
         wait 1 gpio P_CLK02                     ; wait for CLK02 to go high, start of next bit
         jmp pin, fi_go                          ; when T0_TIME is high go to next bit

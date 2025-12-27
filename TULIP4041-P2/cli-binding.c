@@ -344,11 +344,30 @@ void onSDCardCLI(EmbeddedCli *cli, char *args, void *context)
 }
 
 /*
-#define import_no_match -1
-#define import_no_arg   0
-#define import_all      1
-#define import_update   2
-#define import_compare  3
+#define import_no_match        -1
+#define import_no_arg           0
+#define import_all              1
+#define import_update           2
+#define import_compare          3
+#define import_fram             4
+#define import_fram_compare     5
+#define import_fram_update      6
+*/
+
+
+
+/*
+#define IMPORT_HELP_TXT "import functions\r\n\
+        [filename]                   import a single file to FLASH\r\n\
+        [filename]  [compare]        compare a single file with the one in FLASH\r\n\
+        [filename]  [UPDATE]         update a single file in FLASH\r\n\
+        [directory] [ALL]            import all files in a directory to FLASH\r\n\
+        [directory] [compare] [ALL]  compare all files in a directory with FLASH\r\n\
+        [directory] [UPDATE] [ALL]   update all files in a directory in FLASH\r\n\
+        - import functions for FRAM:\r\n\
+        [filename]  [fr]             import a single file in FRAM\r\n\
+        [filename]  [compare] [fr]   compare a single file with the one in FRAM\r\n\
+        [filename]  [UPDATE] [fr]    update a single file in FRAM\r\n"
 */
 
 const char* __in_flash()import_cmds[] =
@@ -358,7 +377,7 @@ const char* __in_flash()import_cmds[] =
     "ALL",      // import all files in the directory
     "UPDATE",   // update files in the file sysytem
     "compare",  // compare files in the file system prior to an update
-    // "FRAM", 
+    "q",       // import to FRAM instead of FLASH
 };
 
 // the following commans line options are possible:
@@ -368,6 +387,11 @@ const char* __in_flash()import_cmds[] =
 // import [directory] [ALL]
 // import [directory] [ALL] <COMPARE>
 // import [directory] [ALL] <UPDATE>
+//    - import functions for FRAM:
+// import [filename] [q]             import a single file in QROM space (FRAM)\r\n\
+// import [filename] [q] [compare]   compare a single file with the one in QROM space (FRAM)\r\n\
+// import [filename] [q] [UPDATE]    update a single file in QROM space (FRAM)\r\n"
+
 void onImportCLI(EmbeddedCli *cli, char *args, void *context)
 {
     const char *arg1 = embeddedCliGetToken(args, 1);        // filename or directory
@@ -387,7 +411,7 @@ void onImportCLI(EmbeddedCli *cli, char *args, void *context)
     }
 
     if (arg2 == NULL) {
-        // no second argument, import a simgle file, name in arg1
+        // no second argument, import a single file, name in arg1
         // this is a single file import, so pass the filename only
         uif_import((char*)arg1, import_no_arg, import_no_arg);     // pass the filename only
         return;
@@ -436,6 +460,7 @@ void onImportCLI(EmbeddedCli *cli, char *args, void *context)
     // #define import_all      1
     // #define import_update   2
     // #define import_compare  3
+    // #define import_qrom     4
     // 
     // and are validated according to the following:
     //   a2        a3       command                                 meaning
@@ -461,6 +486,10 @@ void onImportCLI(EmbeddedCli *cli, char *args, void *context)
     // import_compare  import_no_arg            import [file] compare
     // import_all      import_update            import [directory] ALL UPDATE
     // import_all      import_compare           import [directory] ALL compare
+
+
+
+
 
     if ((a2 == import_all) && (a3 == import_no_arg)) {
         // import [directory] ALL
@@ -540,12 +569,17 @@ const char* __in_flash()plug_cmds[] =
         [filenm] T    Autoplug Test only, will not plug for real\r\n\
                       just to check where the ROM/MOD will be plugged\r\n"
 
+
+
         #define plug_hpil       1
         #define plug_ilprinter  2
         #define plug_printer    3
         #define plug_file_X     4   // file in specific Page
         #define plug_file_A     5   // Autoplug file in first free Page
         #define plug_file_T     6   // Autoplug Test only
+        #define import_fram             4
+        #define import_fram_compare     5
+        #define import_fram_update      6
 */  
 
 
@@ -1203,8 +1237,10 @@ const char* __in_flash()fram_cmds[] =
 {
     "status",           // get status
     "dump",             // dump FLASH contents
-    "INIT",             // initialize FLASH file system
-    "NUKEALL",          // erase all FLASH pages
+    "INIT",             // initialize FRAM file system (old command, use newinit)
+    "NUKEALL",          // erase all FRAM pages
+    // "newinit",          // initialize FRAM file system
+    // "list",             // list all files in FRAM
 };
 
 void onFramCLI(EmbeddedCli *cli, char *args, void *context) {
@@ -1213,7 +1249,7 @@ void onFramCLI(EmbeddedCli *cli, char *args, void *context) {
 
     int cmd = -1;
     uint32_t addr = 0;
-    int num_cmds = sizeof(flash_cmds) / sizeof(char *);
+    int num_cmds = sizeof(fram_cmds) / sizeof(char *);
 
     if ((arg1 == NULL)) {
         // no argument given, show status
@@ -1269,7 +1305,7 @@ const char* __in_flash()list_cmds[] =
     "all",             // list all files, including erased and dummy files
     "ext",             // extended listing with more details per file
     "flash",           // list all files in FLASH
-    "fram",            // list all files in FRAM
+    // "fram",            // list all files in FRAM
 };
 
 void onListCLI(EmbeddedCli *cli, char *args, void *context) {
@@ -1386,9 +1422,10 @@ void onRTCCLI(EmbeddedCli *cli, char *args, void *context) {
 #define emulate_hpil      2
 #define emulate_printer   3
 #define emulate_zeprom    4
-#define emulate_xmem      5
-#define emulate_blinky    6
-#define emulate_timer     7
+#define emulate_wand      5
+#define emulate_xmem      6
+#define emulate_blinky    7
+#define emulate_timer     8
 
 */
 
@@ -1399,7 +1436,9 @@ const char* __in_flash()emulate_cmds[] =
     "status",        
     "hpil",          
     "printer",
-    "zeprom",               
+    "zeprom",    
+    "wand"      
+
 };  
 
 void onEmulateCLI(EmbeddedCli *cli, char *args, void *context) {
@@ -1459,7 +1498,115 @@ void onEmulateCLI(EmbeddedCli *cli, char *args, void *context) {
     }
 }
 
+/*
+#define wand_status    1
+#define wand_test      2
+#define wand_scan      3
+#define wand_list      4
+#define wand_send      5
 
+
+#define WAND_HELP_TXT "wand functions\r\n\
+        [no argument]     shows the wand status\r\n\
+        status            shows the wand status\r\n\
+        scan [filename]   scan the named file \r\n\
+        test              performs a wand test sequence, use with WNDTST\r\n"
+*/
+
+
+const char* __in_flash()wand_cmds[] =
+// list of arguments for the RTC command
+// 
+{
+    "status",        
+    "test",          
+    "scan",
+    "list",     
+    "send",  
+};  
+
+void onWandCLI(EmbeddedCli *cli, char *args, void *context) {
+    const char *arg1 = embeddedCliGetToken(args, 1);
+    const char *arg2 = embeddedCliGetToken(args, 2);
+    const char *arg3 = embeddedCliGetToken(args, 3);
+    const char *arg4 = embeddedCliGetToken(args, 4);
+    const char *arg5 = embeddedCliGetToken(args, 5);
+    const char *arg6 = embeddedCliGetToken(args, 6);
+    const char *arg7 = embeddedCliGetToken(args, 7);
+    const char *arg8 = embeddedCliGetToken(args, 8);
+    const char *arg9 = embeddedCliGetToken(args, 9);
+
+    char instruction[100];
+
+    int cmd = -1;
+    int num_cmds = sizeof(wand_cmds) / sizeof(char *);
+
+    if ((arg1 == NULL)) {
+        // no arguments given, show status
+        cli_printf("no arguments given, use: emulate [device], see help");
+        uif_wand(wand_status, 0, NULL); 
+        return;
+    }
+
+    // scan the list of arguments for something known
+    int i = 0;
+    while (cmd != 0 && i < num_cmds) {
+        cmd = strcmp(arg1, wand_cmds[i]);
+        i++;
+    }
+    
+    if (cmd != 0) {                 // no valid argument found
+        i = -1;
+    }
+
+    int p = 0;
+    if (i == wand_scan) {
+        // emulate zeprom, check for a valid Page number in arg2
+        if (arg2 == NULL) {
+            // no filename given, show error
+            cli_printf("no filename given, use: wand scan [filename");
+            return;
+        } 
+        uif_wand(i, arg2, NULL);       // pass the filename
+        return;
+    }
+
+    instruction[0] = '\0';
+
+    if ((i == wand_send) && (arg2 != NULL)) {
+        // create a new string with the extra arguments after arg1 to pass as one instruction
+        snprintf(instruction, CLI_CMD_BUFFER_SIZE, "%s %s %s %s %s %s %s %s", arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+    }
+
+
+    if (i >= 0) {
+        uif_wand(i, arg2, instruction);              // valid argument
+        return;
+    }
+
+    if (i == -1) {
+        // no valid argument
+        cli_printf("invalid argument %s, see help", arg1);    // unknown command	
+    }
+}
+
+// Wand Paper Keyboard emulation
+
+void onWCLI(EmbeddedCli *cli, char *args, void *context) {
+    const char *arg1 = embeddedCliGetToken(args, 1);
+
+    int cmd = -1;
+    int num_cmds = sizeof(wand_cmds) / sizeof(char *);
+
+    if ((arg1 == NULL)) {
+        // no arguments given, show status
+        cli_printf("no arguments given, use: w [HP41 instruction], see documentation");
+        return;
+    }
+
+    uif_w(arg1);       // pass the instruction
+
+}
 
 // this routine receives one character from the CLI
 void receiveCLIchar()
@@ -1688,6 +1835,23 @@ void initCliBinding() {
             .binding = onEmulateCLI
     };
 
+    // Command binding for the wand command
+    CliCommandBinding wand_binding = {
+            .name = "wand",
+            .help = WAND_HELP_TXT,
+            .tokenizeArgs = true,
+            .context = NULL,
+            .binding = onWandCLI
+    };
+
+    CliCommandBinding w_binding = {
+            .name = "w",
+            .help = W_HELP_TXT,
+            .tokenizeArgs = false,
+            .context = NULL,
+            .binding = onWCLI
+    };
+
     // Command binding for the delete command
     CliCommandBinding delete_binding = {
             .name = "delete",
@@ -1728,5 +1892,7 @@ void initCliBinding() {
 
     embeddedCliAddBinding(cli, cat_binding);
     embeddedCliAddBinding(cli, emulate_binding);
+    embeddedCliAddBinding(cli, wand_binding);
+    embeddedCliAddBinding(cli, w_binding);
 
 }

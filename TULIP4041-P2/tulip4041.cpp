@@ -70,9 +70,31 @@
 int main() {
 
     // set the correct main clock frequency to 125 MHz   
-    // set_sys_clock_khz(125000, true);
-    set_sys_clock_khz(TULIP_CLOCK, true);   // set the Tulip clock to 48 MHz
-  
+    // set_sys_clock_khz(75000, true);
+    set_sys_clock_khz(TULIP_CLOCK_FAST, true);   // set the Tulip clock to 125 MHz
+
+
+    // The previous line automatically detached clk_peri from clk_sys, and
+    // attached it to pll_usb, so that clk_peri won't be disturbed by future
+    // changes to system clock or system PLL. If we need higher clk_peri
+    // frequencies, we can attach clk_peri directly back to system PLL (no
+    // divider available) and then use the clk_sys divider to scale clk_sys
+    // independently of clk_peri.
+    clock_configure(
+        clk_peri,                                               // Clock to configure   
+        0,                                                      // No glitchless mux
+        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,       // System PLL on AUX mux
+        TULIP_CLOCK_FAST * 1000,                                 // Input frequency
+        TULIP_CLOCK_FAST * 1000                                  // Output (must be same as no divider)
+    );
+    
+    uint32_t actual_freq = clock_get_hz(clk_sys);
+
+    // set the peripheral clock to the same frequency to 80MHz be able to set the SPI speed higher
+    // clock_configure(clk_peri, 0, CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, 80 * MHZ, 80 * MHZ);
+    // clock_set_reported_hz(clk_peri, 80 * MHZ);
+
+
     // initialize the serial devices
     stdio_init_all();           // initialize stdio for the debug UART
     serialport_init();          // debug UART on GPIO 0+1
@@ -93,11 +115,30 @@ int main() {
     tud_init(BOARD_TUD_RHPORT); // initialize the TinyUSB stack
     usbd_serial_init();
 
+
+
     // initialize the debug output
     gpio_put(P_DEBUG, true);
 
     // initialize SPI interface for FRAM
     init_spi_fram();
+
+
+    // all IO is now initialized, especially UART and SPI as these use the peripheral clocks
+    // We can now change the system clock without affecting these peripherals
+    USB_powered = gpio_get(PICO_VBUS_PIN);   // check if USB power is present
+
+    if (!USB_powered) {
+        // lower the clock speed to save power when no USB power is present
+        uint div = TULIP_CLOCK_FAST / TULIP_CLOCK_SLOW;
+        clock_configure(
+            clk_sys,
+            CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+            CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+            TULIP_CLOCK_FAST * 1000,
+            TULIP_CLOCK_SLOW * 1000
+        );
+    }   
 
     // initialize the I2C port for the RTC
     // only on the module version, on the devboard this is used for the FI input and IR output
@@ -109,7 +150,6 @@ int main() {
     sdcard_init();     // initialize the FatFS system and uSD card SPI interface
 
 
- 
     // prepare the HP-IL loop
     HPIL_init();
 
@@ -126,15 +166,7 @@ int main() {
     TraceBuffer_init();     // only if used, do this dynamic in the future
     PrintBuffer_init();     // only if used, do this dynamic in the future
     WandBuffer_init();      // only if used, do this dynamic in the future
-
-    // for a test version HPIL and the HP-IL printer are plugged
-    // globsetting.set(HPIL_plugged, 1);               // set the HPIL plugged flag  
-    // globsetting.set(ILPRINTER_plugged, 1);          // set the HP-IL printer plugged flag
-
-    // and HP-IL must be enabled of course
-    // globsetting.set(HP82160A_enabled, 1);           // set the HP-IL enabled flag
-    // globsetting.save();                             // save the settings
-    
+   
     initCliBinding();                               // initialization of the embedded-cli
 
     welcome();                                      // show welcome message on the 'old' user interface
@@ -158,8 +190,6 @@ int main() {
     adc_set_temp_sensor_enabled(true);      // enable the temperature sensor
     adc_select_input(4);                    // select the temperature sensor input
 
-    measure_freqs();                        // check the clocks and report in the old CLI
-
     // below is the main loop, it never ends
     
     while (true) {
@@ -179,6 +209,8 @@ int main() {
 
         HPIL_task();                // process the HP-IL task for transmitting and receiving frames
                                     // only if HP-IL is active
+
+        // Wand_task();               // process the HP41 wand input emulation
 
         // add a task to check for uSD card removal or insertion ??
         // see workaround on https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico

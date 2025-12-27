@@ -73,6 +73,8 @@ bool default_map_off = false;               // all ROMs off when true;
 
 enum HP41powermode HP41_powermode;
 
+bool USB_powered = false;                   // true when USB power is present
+
 char  TPrint[200];
 int   TPrintLen = 0;
 
@@ -111,7 +113,8 @@ bool sendflag = false;                      // indicates if any flag is set and 
 // Extended User Memory cache registers, for implementing XMEM in FRAM starting at 0x1E000
 uint32_t usermemCacheHi;                    // Extended User Memory cache D32..D55
 uint32_t usermemCacheLo;                    // Extended User Memory cache D00..D31
-uint64_t usermemCache;                      // for testing with all 56 (64) bits User Register
+// uint64_t usermemCache;                      // for testing with all 56 (64) bits User Register
+uint32_t usermemCache[2];                   // address of the cached user memory register
 
 
 int fram_offset;                            // offset into the FRAM
@@ -418,7 +421,6 @@ void wakemeup_41()
         pio_sm_exec(pio1_pio, isaout_sm, pio_encode_jmp(isaout_offset + hp41_pio_isaout_offset_handle_carry) | pio_encode_sideset(1, 0));
         pio_sm_exec(pio1_pio, isaout_sm, pio_encode_set(pio_pins, 0) | pio_encode_sideset(1, 0)); // set ISA_OUT and ISA_OE low
 
-
     }
 }
 
@@ -560,6 +562,42 @@ void PowerMode_task()
         "STANDBY",
         "OFF    " };
 
+    // check if there was a VBUS state change and modify the speed accordingly
+    if (gpio_get(PICO_VBUS_PIN)) {
+        // USB power is present
+        if (!USB_powered) {
+            // there has been a change, USB power is now present
+            USB_powered = true;
+            // set CPU to 150 MHz
+            // set_sys_clock_khz(TULIP_CLOCK_FAST, true);
+            clock_configure(
+                clk_sys,
+                CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                TULIP_CLOCK_FAST *1000,
+                TULIP_CLOCK_FAST *1000
+            );
+            // printf("USB power detected, CPU set to 150 MHz\n");
+        }
+    }
+    else {
+        // USB power is not present
+        if (USB_powered) {
+            // there has been a change, USB power is removed
+            USB_powered = false;
+            // set CPU to 125 MHz
+            // set_sys_clock_khz(TULIP_CLOCK_SLOW, true);
+            clock_configure(
+                clk_sys,
+                CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                TULIP_CLOCK_FAST,
+                TULIP_CLOCK_SLOW
+            );
+            // printf("USB power lost, CPU set to 75 MHz\n");
+        }
+    }
+
     prev_mode = HP41_powermode;
     if (gpio_get(P_PWO))
     {
@@ -614,6 +652,7 @@ void PowerMode_task()
             // if the banks are dirty we need to save the ROM map to FRAM
             Banks_dirty = false;            // reset dirty flag
             TULIP_Pages.save();             // save the ROM map to FRAM
+            
         }
     }
 }
@@ -764,18 +803,21 @@ void __not_in_flash_func(core1_pio)()
             rx_inst_t = rx_inst;            
             if (ourselected > 0) {
                 // regdata = usermemLo[ourselected - 0x200];
-                regdata = usermemCacheLo;
+                // regdata = usermemCacheLo;
+                regdata = usermemCache[0];   // get from cache
                 // TraceLine.xq_data1 = regdata;
                 pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);  // send the data
                 read_pending = true;
-            }              
-            else if (HP82153A_active && (prphselected == PRPH_wand))
-            {
+            }          
+            else if (globsetting.get(HP82153A_enabled) && (prphselected == PRPH_wand)){
                 // Wand active and selected, so may need to send data
                 // ROM has checked if data is actually in the buffer
                 // that is already in the cached Wand data due to speed 
+
+                // this is new
+                // queue_try_remove(&WandBuffer, &WandCached);
                 regdata = WandCached;
-                WandCached = 0xFFFF;          // mark as consumed
+                WandCached = 0xFFFF;       // mark cache as consumed
                 // TraceLine.xq_data1 = regdata;
                 pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);  // send the data
                 pio_sm_put_blocking(pio1_pio, dataout_sm, 0);  // send the data
@@ -804,14 +846,14 @@ void __not_in_flash_func(core1_pio)()
                         SLCT_PRPH = -1;          // return control back to the NUT
                     }
                     break;
-                case SELP9_POWON:               // 0x083, set carry if printer is ON, no SYNC bit!!
+                case SELP9_POWON:               // 0x043, set carry if printer is ON, no SYNC bit!!
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst;
                         sendcarry = globsetting.get(PRT_power);
                         SLCT_PRPH = -1;          // return control back to the NUT                    
                     }
                     break;
-                case SELP9_VALID:               // 0x043, set carry if status valid, no SYNC bit! 
+                case SELP9_VALID:               // 0x083, set carry if status valid, no SYNC bit! 
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst; 
                         if (globsetting.get(PRT_power)) {
@@ -1057,7 +1099,8 @@ void __not_in_flash_func(core1_pio)()
                 // the lower bits have already been saved
                 if (ourselected > 0) {
                     // usermemHi[ourselected - 0x200] = (rx_data2 >> 8);
-                    usermemCacheHi = (rx_data2 >> 8);           // now in cache
+                    // usermemCacheHi = (rx_data2 >> 8);           // now in cache
+                    usermemCache[1] = (rx_data2 >> 8);           // now in cache
                     // TraceLine.xq_data2 = (rx_data2 >> 8);
                     write_pending = false;       
                 }
@@ -1072,7 +1115,8 @@ void __not_in_flash_func(core1_pio)()
                 // TODO: check alignment
                 if (ourselected > 0) {
                     // regdata = usermemHi[ourselected - 0x200];
-                    regdata =usermemCacheHi;
+                    // regdata =usermemCacheHi;
+                    regdata = usermemCache[1];   // get from cache
                     // TraceLine.xq_data2 = regdata;
                     pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);  // send the data
                     read_pending = false;
@@ -1097,11 +1141,13 @@ void __not_in_flash_func(core1_pio)()
 
                 // and write to FRAM
                 // lower bits first
-                fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset, (uint8_t*)&usermemCacheLo, 4);
-                fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset + 4, (uint8_t*)&usermemCacheHi, 4);
+                // fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset, (uint8_t*)&usermemCacheLo, 4);
+                // fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset + 4, (uint8_t*)&usermemCacheHi, 4);
+                fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset, (uint8_t*)&usermemCache, 8);
+
             }
 
-            if (HP82153A_active)
+            if (globsetting.get(HP82153A_enabled))
             {
                 if (queue_is_empty(&WandBuffer) && (WandCached == 0xFFFF))
                 {
@@ -1475,8 +1521,10 @@ void __not_in_flash_func(core1_pio)()
 
                         // and read from FRAM
                         // lower bits first
-                        fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset, (uint8_t*)&usermemCacheLo, 4);
-                        fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset + 4, (uint8_t*)&usermemCacheHi, 4);
+                        // fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset, (uint8_t*)&usermemCacheLo, 4);
+                        // fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset + 4, (uint8_t*)&usermemCacheHi, 4);
+                        fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset, (uint8_t*)&usermemCache, 8);
+
                     }
                     else {
                         // not an existing register or not our register selected
@@ -1499,7 +1547,8 @@ void __not_in_flash_func(core1_pio)()
                     rx_inst_t = rx_inst; 
                     if (ourselected > 0) {
                         // usermemLo[ourselected - 0x200] = rx_data1;
-                        usermemCacheLo = rx_data1;   // read from cache
+                        // usermemCacheLo = rx_data1;   // read from cache
+                        usermemCache[0] = rx_data1;   // read from cache
                         // TraceLine.xq_data1 = rx_data1;
                         write_pending = true;       // mark as pending to handle high bits when data arrives
                     }

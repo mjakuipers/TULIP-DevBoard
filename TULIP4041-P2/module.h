@@ -35,6 +35,8 @@ extern "C" {
 #include "modfile.h"
 #include "fram.h"
 
+// extern void fram_read(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t *buf, size_t len);
+// extern void fram_write(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t * data, size_t len);
 
 // bit field for the Image flags, used for Pages
 enum {

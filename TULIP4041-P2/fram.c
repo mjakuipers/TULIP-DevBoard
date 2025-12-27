@@ -258,10 +258,11 @@ void fr_readid(uint8_t *buf)
 // erase all FRAM to zero
 void fr_nukeall()
 {
-    // erase all FRAM to zero
+    // erase all FRAM to zerofram dump 1000
     uint8_t buf[256] = {0};  // buffer to write 256 bytes at a time
     for (uint32_t addr = 0; addr < FRAM_SIZE; addr += 256) {
-        fr_write(addr, buf, sizeof(buf));  // write 256 bytes of zero
+      fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, addr, buf, 256);
+        // fr_write(addr, buf, sizeof(buf));  // write 256 bytes of zero
     }
     cli_printf("  All FRAM erased to zero");
 }
@@ -315,12 +316,10 @@ uint32_t fr_erased(uint32_t offs, uint32_t size, int num)
 }
 
 
-// for the FRAM File System managament
+
 
 // find the last free address in FRAM starting from offs
 // returns the address of the last free byte or 0xFFFFFFFF if none found    
-
-/*
 uint32_t fr_lastfree(uint32_t offs)
 {
     uint32_t addr = offs;               // our address counter, 
@@ -331,28 +330,218 @@ uint32_t fr_lastfree(uint32_t offs)
 
     uint32_t end = FRAM_SIZE;
 
-    while (offs < end) {
+    while (offs < (end - sizeof(ModuleMetaHeader_t))) {
 
-    #ifdef DEBUG
-      // cli_printf("  checking file at 0x%08X end at: 0x%08X", offs, end);
-    #endif
+      #ifdef DEBUG
+        // cli_printf("  checking file at 0x%08X end at: 0x%08X", offs, end);
+      #endif
 
-    // read the Filoe Header from FRAM
-    fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, offs, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+      // read the File Header from FRAM
+      fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, offs, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
 
-    if (MetaH.FileType == FILETYPE_FFFF) break;                // if it erased then it is useable
-    // check if this is a valid file to prevent looping
-    if ((MetaH.FileType > FILETYPE_4041)) {
-      // unsupported file type, this is not a valid file
-      return NOTFOUND;                                          // no free space found
+      if (MetaH.FileType == FILETYPE_FFFF) break;                 // if it is erased then it is useable
+      // check if this is a valid file to prevent looping
+      if ((MetaH.FileType > FILETYPE_4041)) {
+        // unsupported file type, this is not a valid file
+        return NOTFOUND;                                          // no free space found
+      }
+      offs = MetaH.NextFile;                                      // go to the next file
     }
-    offs = MetaH.NextFile;                                     // go to the next file
-  }
-  if (offs > end) return NOTFOUND;                              // no free space found
-  return offs;                                                  // return the offset of the last free slot
+    if (offs > end) return NOTFOUND;                              // no free space found
+    return offs;                                                  // return the offset of the last free slot
 }
 
-*/
+bool fr_isinited()
+{
+    // check if the fram file system is initialized
+    // this is done by checking the first file type
+
+    // Read the first byte from FRAM
+    uint8_t filetype = 0; 
+    fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, FF_SYSTEM_BASE, &filetype, 1); // read the byte
+    
+    if (filetype == FILETYPE_4041) {
+      // file system is initialized
+      return true;
+    } else {
+      // file system is not initialized
+      return false;
+    }
+
+
+
+}
+
+// find a free block of size bytes in FRAM starting from offs
+// returns the address of the first free byte or 0xFFFFFFFF if none found
+uint32_t fr_findfree(uint32_t offs, uint32_t size)
+{
+  uint32_t addr = offs;                         // our address counter, 
+  ModuleMetaHeader_t MetaH;                     // meta header for getting info of next file
+
+                                                  // start at the beginning of the file system
+  uint32_t fr_end = FRAM_SIZE;                  // end of the file system
+  uint32_t next;                                // offset to the next file
+  uint32_t candidate = 0;                       // candidate for the file slot
+  uint32_t cand_size = 0;                       // size of the candidate file slot
+  uint32_t current = 0;                         // current file slot under investigation
+  uint32_t space = 0;                           // size of the free space
+  uint32_t space_acc = 0;                       // accumulated size of the free space
+
+  size = size + sizeof(ModuleMetaHeader_t);     // required size of file plus header
+
+  #ifdef DEBUG
+    cli_printf("  searching for free space in FRAM, size %d / %d bytes", size, size - sizeof(ModuleMetaHeader_t));
+  #endif
+
+  while (offs < fr_end) {
+    // read the File Header from FRAM
+    fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, offs, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+    uint8_t filetype = MetaH.FileType;                      // get the file type
+
+    tud_task();  // keep the USB port updated
+
+    switch(filetype) {
+      case FILETYPE_FFFF:                                   // end of the file system
+        #ifdef DEBUG
+          cli_printf("  end of file system reached at %08X", offs);
+        #endif
+        // we have reached the end of the File System
+        // check the remaining space
+
+        if ((fr_end - offs) > size) {
+          // there is enough size left
+          // is this space is smaller than the current candidate then this is better
+          // and we can return the offset
+          if ((fr_end - offs) < cand_size) {
+            return offs;
+          }
+          // if the new slot is larger than the candidate then we use the candidate
+          // but we have to check if the candidate is valid as it could be 0
+          if (candidate == 0) {
+            // no candidate found yet, so this is the first one
+            return offs;
+          }
+        } else {
+          // not enough space left, this means that our candidate, if any, is now valid
+          // if the candidate was 0, then bad luck, no space available
+          return NOTFOUND;         // no free space found
+        }   
+
+        return candidate;
+        break;                      // we should never get here
+
+      case FILETYPE_DELETED:                                   
+      case FILETYPE_DUMMY:                  
+        // found an empty file or dummy, check if it is large enough
+        // get the offset to the next file to determine the size
+        // no check for subsequent dummy or deleted files, maybe add this later
+        next = MetaH.NextFile;             // pointer to the next file to get the available space
+        space = next - offs;               // available space in this file
+
+        #ifdef DEBUG
+          cli_printf("  deleted space at %08X of %d bytes", offs, space);
+        #endif
+
+        // if the file fits we report this space, if not we check if there is free space after this file
+        if (space >= size) {
+          // there is enough space in this file
+          // check if this is smaller than the current candidate then this is better
+          // and we can return the offset and continue the search
+          // if the candidate was still 0 this is a possible candidate
+          if (cand_size == 0) {
+            // no candidate found yet, so this is the first one
+            candidate = offs;              // remember the current file offset as a candidate
+            cand_size = space;             // remember the size of the candidate
+            #ifdef DEBUG
+              cli_printf("  first candidate found at %08X of %d bytes", offs, space);
+            #endif
+          } else if (space < cand_size) {
+            // this slot is smaller then the previous candidate and it fits
+            // this is now a better candidate
+            #ifdef DEBUG
+              cli_printf("  better candidate at %08X of %d bytes", offs, space);
+            #endif
+            candidate = offs;              // remember the current file offset as a candidate
+            cand_size = space;             // remember the size of the candidate
+          }
+        } 
+        offs = next;
+        
+        // the next part is skipped for now
+        // this is checking if 2 consecutive files are ok
+        /* 
+        else {
+          // if this slot is smaller then we can check if there is free space after this file
+          // get the filetype of the next file
+          MetaH_next = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + next);    // map header to struct
+
+          // if this slot is smaller then we can check if there is free space after this fil      
+          if ((MetaH_next->FileType != FILETYPE_FFFF) || (MetaH_next->FileType != FILETYPE_DELETED) || 
+            (MetaH_next->FileType != FILETYPE_DUMMY)) {
+            // there is a file which is in use, so the space cannot be used
+            // we keep the current candidate
+            offs = next;                  // go to the next file
+          } else {
+            // there is erased or free space after this
+            // for now we skip this, implement later
+            offs = next;                // go to the next file
+          }
+        }
+          */
+        break;
+      default:
+        // all other filetypes can be skipped, this is not potential free space
+        // move to the next file
+        #ifdef DEBUG
+          // cli_printf("  skipping file at %08X of type %02X, next is %08X", offs, filetype, MetaH.NextFile);
+        #endif
+        offs = MetaH.NextFile;                                     // go to the next file
+        break;
+    }
+  }
+
+  // if we get here then we have reached the end of the file system
+  // and most likely no free space is found and candidate is still 0
+  return candidate;                               
+
+}
+
+
+
+
+// find a file by name in FRAM starting from offs
+// returns the address of the file header or 0xFFFFFFFF if not found
+uint32_t fr_findfile(const char *name)
+{
+    uint32_t addr = FF_SYSTEM_BASE;      // our address counter, 
+                                        // start at the beginning of the file system
+    ModuleMetaHeader_t MetaH;           // meta header for getting info of next file
+
+    do {
+      // read the File Header from FRAM
+      fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, addr, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+
+      if (MetaH.FileType == FILETYPE_FFFF) break;                 // if it is erased then file not found
+      // check if this is a valid file to prevent looping
+      if ((MetaH.FileType > FILETYPE_4041)) {
+        // unsupported file type, this is not a valid file
+        return NOTFOUND;                                          // file not found
+      }
+      // compare the name
+      if (strncmp(MetaH.FileName, name, sizeof(MetaH.FileName)) == 0) {
+        // found the file
+        return addr;
+      }
+      addr = MetaH.NextFile;                                      // go to the next file
+    } while (addr < FRAM_SIZE);                                   // until end of file system
+
+    return NOTFOUND;                                              // file not found
+
+
+}
+
+
 
 
 

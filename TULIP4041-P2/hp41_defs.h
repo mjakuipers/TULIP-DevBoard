@@ -158,8 +158,8 @@ extern "C" {
 // including SYNC and a copy of the msb
 #define inst_SELP9      0xE64                 // 0x264, SELP 9 NUT instruction, starts SELP9 mode, SYNC bit set!
 #define SELP9_BUSY      0x003                 // 0x003, set carry if printer busy, no SYNC bit!
-#define SELP9_POWON     0x083                 // 0x083, set carry if printer is ON, no SYNC bit!
-#define SELP9_VALID     0x043                 // 0x043, set carry if status valid, no SYNC bit!
+#define SELP9_POWON     0x043                 // 0x043, set carry if printer is ON, no SYNC bit!
+#define SELP9_VALID     0x083                 // 0x083, set carry if status valid, no SYNC bit!
 #define SELP9_PRINTC    0x007                 // 0x007, send byte on C[0..1] to the printbuffer, no SYNC bit!
 #define SELP9_RDPTRN    0x03A                 // 0x03A, transfer printer status word to C[10..13], no SYNC bit!
 #define SELP9_RTNCPU    0x005                 // 0x005, return control to the HP41 CPU, ends SELP mode, no SYNC bit!

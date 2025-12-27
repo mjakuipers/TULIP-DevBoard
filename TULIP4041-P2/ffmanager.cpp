@@ -232,6 +232,19 @@ void ff_delay500()
   }
 }
 
+void ff_delay(int ms)
+{
+    int waitcount = ms;
+    while(waitcount > 0) {
+    sleep_ms(2);
+    waitcount -= 2;
+  
+    // flush the outpout buffer
+    cdc_flush(ITF_CONSOLE);
+    tud_task();  // must keep the USB port updated
+  }
+}
+
 // erase all FLASH in the filesystem area
 void ff_nuke()
 {
@@ -330,6 +343,7 @@ void ff_init()
   MetaH = (ModuleMetaHeader_t*)buf;
 
   cli_printfn("  Checking if FLASH is fully erased ... ");
+  ff_delay(200);  // wait for 0.2 seconds to flush the console output
 
   uint32_t addr = ff_erased(0, FF_SYSTEM_SIZE - 256, 1);
 
@@ -339,7 +353,7 @@ void ff_init()
     cli_printf("  FLASH is erased, now creating file system");
   } else {
     // FLASH is not erased, do not overwrite
-    cli_printf("  FLASH is not erased at address %08X, cannot create file system", addr);
+    cli_printf("  FLASH is not erased at address %08X, cannot create file system, please use flash NUKEALL to erase flash", addr);
     return;
   }
 

@@ -47,7 +47,8 @@ extern "C" {
 static spi_t spis[] = {
     {   // spis[0]
     .hw_inst = SPI_PORT_uSD,            // RP2350 SPI component
-    .spi_mode = 0,
+    // .spi_mode = 3,
+    .spi_mode = 3,
     .miso_gpio = P_uSD_DI,              // GPIO number, GPIO 11 for TULIP
     .sck_gpio = P_uSD_SCK,              // GPIO number, GPIO 10 for TULIP
     .mosi_gpio = P_uSD_DO,              // GPIO number, GPIO 8 for TULIP
@@ -95,8 +96,8 @@ static sd_card_t sd_cards[] = {  // One for each SD card
 };
 
 sd_timeouts_t sd_timeouts = {
-    .sd_command = 1000,                 // 1000 ms
-    .sd_command_retries = 10,            // 3 retries
+    .sd_command = 1000,                  // 1000 ms
+    .sd_command_retries = 3,            // 3 retries
 };
 
 /* ********************************************************************** */

@@ -143,15 +143,12 @@ void Trace_task();
 #define     BRK_SIZE ((ADDR_MASK+1)/(32/2)) // 2 bits per brkpt
 
 
-
-
 // #define BRK_MASK(a,w) ((m_brkpt[a>>4]w >> ((a & 0xF)<<1)) & 0b11)
 // #define BRK_SHFT(a) ((a & 0xF)<<1)
 // #define BRK_WORD(a) (a >> 4)
 
-
-#define FILTER_BLOCK_THIS   0b00
-#define FILTER_PASS_THIS    0b01
+#define FILTER_PASS_THIS    0b00
+#define FILTER_BLOCK_THIS   0b01
 #define FILTER_TRIG_START   0b10
 #define FILTER_TRIG_END     0b11
 
@@ -160,8 +157,8 @@ class Filter {
 
     public:
 
-    uint32_t    m_filter[BRK_SIZE];      // BRK_SIZE expands to 4096, with 32 bits per word
-                                    // total size is 16 KByte for the breakpoints
+    uint32_t    m_filter[BRK_SIZE];     // BRK_SIZE expands to 4096, with 32 bits per word
+                                        // total size is 16 KByte for all breakpoints
 
     Filter() {
         // initialize to default settings

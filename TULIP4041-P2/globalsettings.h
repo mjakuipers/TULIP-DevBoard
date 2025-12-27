@@ -18,6 +18,10 @@
 #ifndef __GLOBALSETTINGS_H__
 #define __GLOBALSETTINGS_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -27,6 +31,9 @@
 #include "hpinterface_hardware.h"
 #include "fram.h"
 #include "emulation.h"
+
+// extern void fram_read(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t *buf, size_t len);
+// extern void fram_write(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t * data, size_t len);
 
 // settings below are used as an index in an array of words (uint16)
 //      0       = false/no
@@ -240,5 +247,9 @@ class GSettings {
         }
     }
 } ; // end of class GSettings
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif      // __GLOBALSETTINGS_H__

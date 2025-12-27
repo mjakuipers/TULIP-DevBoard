@@ -42,14 +42,14 @@ extern "C" {
 #include "hardware/structs/systick.h"
 #include "hardware/uart.h"                      // used for UART0 Printer port
 
-
 #include "hp41_defs.h"
 #include "cli-binding.h"
 #include "hpinterface_hardware.h"
-// #include "modfile.h"
+#include "modfile.h"
+// #include "globalsettings.h"
 // #include "module.h"
 
-#define SPI_FRAM_SPEED  (40*1000*1000)          // set speed to 30 (?) MHz
+#define SPI_FRAM_SPEED  (40*1000*1000)          // set speed to 40 (?) MHz
 
 // chip select macros
 #define CS_on           gpio_put(PIN_SPI0_CS,0) 
@@ -72,28 +72,6 @@ extern "C" {
 
 // definition of FRAM File System Addresses
 
-
-
-#define FRAM_FS_START           0x00000                                         // start of FRAM file system
-#define FRAM_HEADER             0x00000                                         // end of FRAM file system
-
-
-// #define FRAM_SETTINGS _HEADER   0x00100                                         // start of settings area
-
-// #define FRAM_SETTINGS_CONTENT   FRAM_SETTINGS_HEADER + (ModuleMetaHeader_t)     // start of settings contents
-
-// #define FRAM_ROMMAP_HEADER      FRAM_SETTINGS_CONTENT + sizeof(GSettings.gsettings) // start of ROM map header
-// #define FRAM_ROMMAP_CONTENT     FRAM_ROMMAP_HEADER + (ModuleMetaHeader_t)      // start of ROM map contents
-
-// #define FRAM_TRACER_HEADER       FRAM_ROMMAP_CONTENT + sizeof(Pages)            // start of tracer settings header
-
-// #define FRAM_TRACER_CONTENT      FRAM_TRACER_HEADER + (ModuleMetaHeader_t)     // start of tracer settings contents
-// #define FRAM_FS_CONTENT_START    FRAM_TRACER_CONTENT + sizeof(m_filter)     // start of file system contents
-
-
-#define FRAM_FS_END             0x3FFFF                 // end of FRAM file system
-
-#define FRAM_SIZE               0x40000                 // size of the FRAM device in bytes (256k*8 = 2 Mbit device)
 #define FRAM_gsettings_start    0x1D000                 // start of global peristent settings in FRAM
 #define FRAM_tracer_start       0x1D400                 // start of tracer settings
 #define XMEMstart               0x1E000                 // start address of XMEM modules in FRAM
@@ -101,6 +79,43 @@ extern "C" {
 #define FRAM_INIT_ADDR          0x00000                 // address to store the FRAM initialization value
 #define FRAM_INIT_VALUE         0x4041                  // value to indicate that the FRAM is initialized
 #define FRAM_ROMMAP_START       0x00010
+
+
+
+// #define FRAM_INIT_ADDR          0x10000                 // address to store the FRAM initialization value
+// #define FRAM_INIT_VALUE         0x4041                  // value to indicate that the FRAM is initialized
+// #define FRAM_ROMMAP_START       0x10010
+
+
+#define FRAM_FS_START           0x00000                 // start of FRAM file system
+#define FRAM_SIZE               0x40000                 // size of the FRAM device in bytes (256k*8 = 2 Mbit device)
+#define FRAM_FS_END             0x3FFFF                 // end of FRAM file system  
+#define FRAM_HEADER             0x00000                                             
+
+#define FRAM_SETTINGS_FILE      0x00100
+#define FRAM_SETTINGS_CONTENT   FRAM_SETTINGS_FILE + sizeof(ModuleMetaHeader_t)     // start of settings contents
+#define FRAM_SETTINGS_CONTENT_SIZE 126                    // size of global settings
+
+#define FRAM_ROMMAP_HEADER      FRAM_SETTINGS_CONTENT + FRAM_SETTINGS_CONTENT_SIZE         // start of ROM map header
+                                
+#define FRAM_ROMMAP_CONTENT     FRAM_ROMMAP_HEADER + sizeof(ModuleMetaHeader_t)     // start of ROM map contents
+
+#define FRAM_TRACER_HEADER      FRAM_ROMMAP_CONTENT + sizeof(TULIP_Pages.Pages)                 // start of tracer settings header
+
+#define FRAM_TRACER_CONTENT     FRAM_TRACER_HEADER + sizeof(ModuleMetaHeader_t)     // start of tracer settings contents
+#define FRAM_FS_CONTENT_START   FRAM_TRACER_CONTENT + sizeof(TraceFilter.m_filter)              // start of file system contents
+
+// The default file system at teh start of FRAM will then be the following:
+//  Address         Size                    Description
+//  0x00000         0x100                   FRAM Header
+//  0x00100         Global Settings File start
+//  0x00140         Global Settings contents
+//  ...             ...
+//  0x...           sizeof(ModuleMetaHeader_t) + sizeof(Pages)
+//  ...             ...
+//  0x...           sizeof(ModuleMetaHeader_t) + sizeof(m_filter)
+
+
 
 
 // FRAM commands
@@ -119,6 +134,7 @@ extern "C" {
 #define fram_read_cmd  (3)
 #define fram_we_cmd    (6)
 #define fram_wd_cmd    (4)
+
 
 void init_spi_fram();
 void fram_write(spi_inst_t *spi, uint cs_pin, uint32_t addr, uint8_t * data, size_t len);
@@ -145,11 +161,11 @@ void fram_show(uint32_t addr);
 
 // for the FRAM File System managament
 uint32_t fr_lastfree(uint32_t offs);
-// uint32_t fr_findfree(uint32_t offs, uint32_t size);
-// uint32_t fr_findnextf(uint32_t offs);
-// uint32_t fr_findfile(const char *name);
+uint32_t fr_findfree(uint32_t offs, uint32_t size);
+uint32_t fr_findfile(const char *name);
 
 void fr_nukeall();                     // erase all FRAM to zero
+bool fr_isinited();                    // check if FRAM is initialized
 
 
 #ifdef __cplusplus

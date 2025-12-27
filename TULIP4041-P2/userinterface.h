@@ -53,6 +53,7 @@ extern "C" {
 #include "i2c_devices.h"
 #include "cli-binding.h"
 #include "fram.h"
+#include "powermodes.h"
 
 #include "module.h"
 
@@ -113,7 +114,10 @@ void uif_tracer(int i, int bufsize);            // functions for the bus tracer
 
 void uif_rtc(int i, const char *args);          // RTC test functions
 
-void uif_emulate(int i, int p);                        // enable/disable hardware emulation functions
+void uif_emulate(int i, int p);                 // enable/disable hardware emulation functions
+
+void uif_wand(int i, const char* fname, char* instruction);       // wand functions
+void uif_w(const char *instruction);            // WAND Paper Keyboard functions
 
 void uif_welcome();
 void pio_welcome();

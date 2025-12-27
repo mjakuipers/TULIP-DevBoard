@@ -1008,3 +1008,77 @@ void HPIL_task()
         if (enable_AUTOIDY) HPIL_AutoIDYTask();
     }
 }
+
+void Wand_task()
+{
+    // first process the printbuffer
+    // need to add something to distinguish between printer types or preferred output (IR or serial)
+    // this routine is mainly for the HP82143 emulation and send the printcodes 
+    // to both the serial port and the IR led
+
+    // check for a first connection from the Printer CDC
+    if (cdc_connected(ITF_PRINT)) {
+        // only if the Print CDC interface is connected
+        if (!Print_firstconnect) {
+            // HPIL_firstconnect was false, so this is now a new CDC connection
+            Print_firstconnect = true;
+            cli_printf("  CDC Port 5 [printer] connected");
+        }
+    }
+
+    // check for disconnection of Printer
+    if ((Print_firstconnect) && (!cdc_connected(ITF_PRINT))) {
+        // CDC interface is disconnected
+        cli_printf("  CDC Port 5 [printer] disconnected");
+        Print_firstconnect = false;
+    }
+
+    if (!queue_is_empty(&PrintBuffer)) {
+        queue_remove_blocking(&PrintBuffer, &PrintChar);
+
+        /*  code below for testing throttling of the printer
+        ACA does not lead to a PRINTER ERROR, HP41 just hangs while PBUSY sends the carry
+        PRA does lead to a PRINTER ERROR, probably after an EOL
+        prev_level = level;
+        level = queue_get_level(&PrintBuffer);
+        if (level != prev_level) 
+        {
+            printf("level = %0d, prevlevel = %d\n", level, prev_level);
+        }
+        */
+
+       /* printer monitoring to the console is disabled here
+        if ((PrintChar == 0xE0) || (PrintChar == 0xE8)) {
+            printf("\nPRINT: ");       
+        }
+
+        if (PrintChar > 0x01F) {
+            printf("%c", PrintChar);
+        }
+            
+        uart_putc_raw(UART_ID, PrintChar);             // Send the character to the serial port
+
+        */
+
+        if (cdc_connected(ITF_PRINT))
+        {
+            // only if connected
+            // but this causes problems with the HP82240 simulator
+            // the beta version of this works fine with the CDC_connected function
+            cdc_send_printport(PrintChar);                 // send the character to the USB printport
+        }
+
+        // output to a real serial port if required
+        // if ((PrintChar == 0xE0) || (PrintChar == 0xE8)) {
+        //    uart_putc_raw(UART_ID, 13);             
+        // }
+            
+        // send the printcharacter to the IR LED
+        ir_code = calculate_frame_payload(PrintChar);
+        ir_frame = construct_frame(ir_code);
+        send_ir_frame(ir_frame);
+
+        // line below for debugging the construction of the IR frame
+        // printf("IR char = %02X, code = %04X, frame = %08X\n", PrintChar, ir_code, ir_frame);
+    }
+}

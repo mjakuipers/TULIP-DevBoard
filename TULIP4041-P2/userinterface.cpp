@@ -223,6 +223,313 @@ const char* __in_flash("flash_constants")gpio_names_[] = {
     #endif
 };
 
+typedef struct
+{
+  char command[10];
+  uint8_t hex1;
+  uint8_t hex2;
+  uint8_t type;
+} Wand_Commands;
+
+
+typedef struct 
+{
+  uint8_t hex1;
+  uint8_t hex2;
+} Wand_Alpha_Keys;
+
+const Wand_Commands __in_flash("wand_constants")wand_cmd_[] = {
+  {"0", 0x00, 0x00, 6},               // type 6, one-byte paper keyboard digit entry
+  {"1", 0x81, 0x00, 6},
+  {"2", 0x42, 0x00, 6},
+  {"3", 0xC3, 0x00, 6},
+  {"4", 0x24, 0x00, 6},
+  {"5", 0xA5, 0x00, 6},
+  {"6", 0x66, 0x00, 6},
+  {"7", 0xE7, 0x00, 6},
+  {"8", 0x18, 0x00, 6},
+  {"9", 0x99, 0x00, 6},
+  {".", 0x5A, 0x00, 6},
+  {"EEX", 0xDB, 0x00, 6},
+  {"CHS", 0x3C, 0x00, 6},
+  {"<-", 0xBD, 0x00, 6},
+  {"<", 0xBD, 0x00, 6},
+
+  {"CAT", 0x44, 0x00, 4},             // type 4, two-byte non-programmables
+  {"GTOL", 0x54, 0x01, 4},
+  {"DEL", 0x64, 0x02, 4},
+  {"COPY", 0x74, 0x03, 4},
+  {"CLP", 0x84, 0x04, 4},
+  {"R/S", 0x94, 0x05, 4},
+  {"RS", 0x94, 0x05, 4},
+  {"SIZE", 0xA4, 0x06, 4},
+  {"BST", 0xB4, 0x07, 4},
+  {"SST", 0xC4, 0x08, 4},
+  {"STAYON", 0xD4, 0x09, 4},
+  {"PACK", 0xE4, 0x0A, 4},
+  {"DELETE", 0xF4, 0x0B, 4},
+  {"ALPHA", 0x14, 0x0C, 4},
+  {"PRGM", 0x24, 0x0D, 4},
+  {"USER", 0x34, 0x0E, 4},
+  {"ASN", 0x44, 0x0F, 4},
+
+  {"IND", 0xA2, 0x80, 3},           // type 3, indirect
+
+  // single APLHA character keys (for testing only)
+  // {"X"  , 0xA8, 0x00, 2},           // 'X' = 0x58 = 0b0101.1000, 4 msb's doubled = 0b1010.1000 = 0xA8
+                                    // type 5, one-byte ALPHA character
+
+  // type 1, one-byte functions
+
+  {"+", 0x40, 0x40, 1},
+  {"-", 0x50, 0x41, 1},
+  {"*", 0x60, 0x42, 1},
+  {"/", 0x70, 0x43, 1},
+  {"X<Y?", 0x80, 0x44, 1},
+  {"X>Y?", 0x90, 0x45, 1},
+  {"X<=Y?", 0xA0, 0x46, 1},
+  {"S+", 0xB0, 0x47, 1},
+  {"S-", 0xC0, 0x48, 1},
+  {"HMS+", 0xD0, 0x49, 1},
+  {"HMS-", 0xE0, 0x4A, 1},
+  {"MOD", 0xF0, 0x4B, 1},
+  {"%", 0x10, 0x4C, 1},
+  {"%CH", 0x20, 0x4D, 1},
+  {"P-R", 0x30, 0x4E, 1},
+  {"R-P", 0x40, 0x4F, 1},
+  {"LN", 0x50, 0x50, 1},
+  {"X^2", 0x60, 0x51, 1},
+  {"SQRT", 0x70, 0x52, 1},
+  {"Y^X", 0x80, 0x53, 1},
+  {"CHS", 0x90, 0x54, 1},
+  {"E^X", 0xA0, 0x55, 1},
+  {"LOG", 0xB0, 0x56, 1},
+  {"10^X", 0xC0, 0x57, 1},
+  {"E^X-1", 0xD0, 0x58, 1},
+  {"SIN", 0xE0, 0x59, 1},
+  {"COS", 0xF0, 0x5A, 1},
+  {"TAN", 0x10, 0x5B, 1},
+  {"ASIN", 0x20, 0x5C, 1},
+  {"ACOS", 0x30, 0x5D, 1},
+  {"ATAN", 0x40, 0x5E, 1},
+  {"DEC", 0x50, 0x5F, 1},
+  {"1/X", 0x60, 0x60, 1},
+  {"ABS", 0x70, 0x61, 1},
+  {"FACT", 0x80, 0x62, 1},
+  {"X#0?", 0x90, 0x63, 1},
+  {"X>0?", 0xA0, 0x64, 1},
+  {"LN1+X", 0xB0, 0x65, 1},
+  {"X<0?", 0xC0, 0x66, 1},
+  {"X=0?", 0xD0, 0x67, 1},
+  {"INT", 0xE0, 0x68, 1},
+  {"FRC", 0xF0, 0x69, 1},
+  {"D-R", 0x10, 0x6A, 1},
+  {"R-D", 0x20, 0x6B, 1},
+  {"-HMS", 0x30, 0x6C, 1},
+  {"-HR", 0x40, 0x6D, 1},
+  {"RND", 0x50, 0x6E, 1},
+  {"OCT", 0x60, 0x6F, 1},
+  {"CLS", 0x70, 0x70, 1},
+  {"X<>Y", 0x80, 0x71, 1},
+  {"PI", 0x90, 0x72, 1},
+  {"CLST", 0xA0, 0x73, 1},
+  {"R^", 0xB0, 0x74, 1},
+  {"RDN", 0xC0, 0x75, 1},
+  {"LASTX", 0xD0, 0x76, 1},
+  {"CLX", 0xE0, 0x77, 1},
+  {"X=Y?", 0xF0, 0x78, 1},
+  {"X#Y?", 0x10, 0x79, 1},
+  {"SIGN", 0x20, 0x7A, 1},
+  {"X?0?", 0x30, 0x7B, 1},
+  {"MEAN", 0x40, 0x7C, 1},
+  {"SDEV", 0x50, 0x7D, 1},
+  {"AVIEW", 0x60, 0x7E, 1},
+  {"CLD", 0x70, 0x7F, 1},
+  {"DEG", 0x80, 0x80, 1},
+  {"RAD", 0x90, 0x81, 1},
+  {"GRAD", 0xA0, 0x82, 1},
+  {"ENTER^", 0xB0, 0x83, 1},
+
+  {"ENTER", 0xB0, 0x83, 1},     // alias of ENTER^
+
+  {"STOP", 0xC0, 0x84, 1},
+  {"RTN", 0xD0, 0x85, 1},
+  {"BEEP", 0xE0, 0x86, 1},
+  {"CLA", 0xF0, 0x87, 1},
+  {"ASHF", 0x10, 0x88, 1},
+  {"PSE", 0x20, 0x89, 1},
+  {"CLRG", 0x30, 0x8A, 1},
+  {"AOFF", 0x40, 0x8B, 1},
+  {"AON", 0x50, 0x8C, 1},
+  {"OFF", 0x60, 0x8D, 1},
+  {"PROMPT", 0x70, 0x8E, 1},
+  {"ADV", 0x80, 0x8F, 1},
+  {"RCL", 0x90, 0x90, 1},
+  {"STO", 0xA0, 0x91, 1},
+  {"ST+", 0xB0, 0x92, 1},
+  {"ST-", 0xC0, 0x93, 1},
+  {"ST*", 0xD0, 0x94, 1},
+  {"ST/", 0xE0, 0x95, 1},
+  {"ISG", 0xF0, 0x96, 1},
+  {"DSE", 0x10, 0x97, 1},
+  {"VIEW", 0x20, 0x98, 1},
+  {"SREG", 0x30, 0x99, 1},
+  {"ASTO", 0x40, 0x9A, 1},
+  {"ARCL", 0x50, 0x9B, 1},
+  {"FIX", 0x60, 0x9C, 1},
+  {"SCI", 0x70, 0x9D, 1},
+  {"ENG", 0x80, 0x9E, 1},
+  {"TONE", 0x90, 0x9F, 1},
+
+  {"SF", 0x30, 0xA8, 1},
+  {"CF", 0x40, 0xA9, 1},
+  {"FS?C", 0x50, 0xAA, 1},
+  {"FC?C", 0x60, 0xAB, 1},
+  {"FS?", 0x70, 0xAC, 1},
+  {"FC?", 0x80, 0xAD, 1},
+
+  // {"GO/XQ_IND", 0x90, 0xAE, 1},
+  // {"LBL\"", 0xC0, 0xC0, 1},          // LBL" 
+
+  {"X<>", 0xB0, 0xCE, 1},
+  {"LBL", 0xC0, 0xCF, 1},
+  {"GTO", 0xD0, 0xD0, 1},
+  {"XEQ", 0xE0, 0xE0, 1},
+
+};
+
+const Wand_Alpha_Keys __in_flash("wand_constants")wand_alpha_[] = {
+  {0x11, 0x00},
+  {0x21, 0x01},
+  {0x31, 0x02},
+  {0x41, 0x03},
+  {0x51, 0x04},
+  {0x61, 0x05},
+  {0x71, 0x06},
+  {0x81, 0x07},
+  {0x91, 0x08},
+  {0xA1, 0x09},
+  {0xB1, 0x0A},
+  {0xC1, 0x0B},
+  {0xD1, 0x0C},
+  {0xE1, 0x0D},
+  {0xF1, 0x0E},
+  {0x11, 0x0F},
+  {0x31, 0x20},
+  {0x41, 0x21},
+  {0x51, 0x22},
+  {0x61, 0x23},
+  {0x71, 0x24},
+  {0x81, 0x25},
+  {0x91, 0x26},
+  {0xA1, 0x27},
+  {0xB1, 0x28},
+  {0xC1, 0x29},
+  {0xD1, 0x2A},
+  {0xE1, 0x2B},
+  {0xF1, 0x2C},
+  {0x11, 0x2D},
+  {0x21, 0x2E},
+  {0x31, 0x2F},
+  {0x51, 0x40},
+  {0x61, 0x41},
+  {0x71, 0x42},
+  {0x81, 0x43},
+  {0x91, 0x44},
+  {0xA1, 0x45},
+  {0xB1, 0x46},
+  {0xC1, 0x47},
+  {0xD1, 0x48},
+  {0xE1, 0x49},
+  {0xF1, 0x4A},
+  {0x11, 0x4B},
+  {0x21, 0x4C},
+  {0x31, 0x4D},
+  {0x41, 0x4E},
+  {0x51, 0x4F},
+  {0x71, 0x60},
+  {0x81, 0x61},
+  {0x91, 0x62},
+  {0xA1, 0x63},
+  {0xB1, 0x64},
+  {0xC1, 0x65},
+  {0xD1, 0x66},
+  {0xE1, 0x67},
+  {0xF1, 0x68},
+  {0x11, 0x69},
+  {0x21, 0x6A},
+  {0x31, 0x6B},
+  {0x41, 0x6C},
+  {0x51, 0x6D},
+  {0x61, 0x6E},
+  {0x71, 0x6F},
+  {0x91, 0x80},
+  {0xA1, 0x81},
+  {0xB1, 0x82},
+  {0xC1, 0x83},
+  {0xD1, 0x84},
+  {0xE1, 0x85},
+  {0xF1, 0x86},
+  {0x11, 0x87},
+  {0x21, 0x88},
+  {0x31, 0x89},
+  {0x41, 0x8A},
+  {0x51, 0x8B},
+  {0x61, 0x8C},
+  {0x71, 0x8D},
+  {0x81, 0x8E},
+  {0x91, 0x8F},
+  {0xB1, 0xA0},
+  {0xC1, 0xA1},
+  {0xD1, 0xA2},
+  {0xE1, 0xA3},
+  {0xF1, 0xA4},
+  {0x11, 0xA5},
+  {0x21, 0xA6},
+  {0x31, 0xA7},
+  {0x41, 0xA8},
+  {0x51, 0xA9},
+  {0x61, 0xAA},
+  {0x71, 0xAB},
+  {0x81, 0xAC},
+  {0x91, 0xAD},
+  {0xA1, 0xAE},
+  {0xB1, 0xAF},
+  {0xD1, 0xC0},
+  {0xE1, 0xC1},
+  {0xF1, 0xC2},
+  {0x11, 0xC3},
+  {0x21, 0xC4},
+  {0x31, 0xC5},
+  {0x41, 0xC6},
+  {0x51, 0xC7},
+  {0x61, 0xC8},
+  {0x71, 0xC9},
+  {0x81, 0xCA},
+  {0x91, 0xCB},
+  {0xA1, 0xCC},
+  {0xB1, 0xCD},
+  {0xC1, 0xCE},
+  {0xD1, 0xCF},
+  {0xF1, 0xE0},
+  {0x11, 0xE1},
+  {0x21, 0xE2},
+  {0x31, 0xE3},
+  {0x41, 0xE4},
+  {0x51, 0xE5},
+  {0x61, 0xE6},
+  {0x71, 0xE7},
+  {0x81, 0xE8},
+  {0x91, 0xE9},
+  {0xA1, 0xEA},
+  {0xB1, 0xEB},
+  {0xC1, 0xEC},
+  {0xD1, 0xED},
+  {0xE1, 0xEE},
+  {0xF1, 0xEF},
+
+};
+
 // emulation control, this will be in GlobalSettings soon
 int trace_enabled          = 1;     // real-time tracing is enable
 int trace_outside          = 1;     // trace only addresses > 0x3000
@@ -259,6 +566,7 @@ prog_target prog_t = P_NONE;
 extern struct TLine TraceLine;      // the variable with the TraceLine
 
 extern CModules TULIP_Pages;
+extern Filter TraceFilter;
 
 bool enable_programming = false;    // enable FLASH/FRAM programming
 
@@ -567,7 +875,7 @@ void uif_bootsel()
   uint sleepcount = 500;
 
   cli_printf("  RESETTING THE TULIP4041 to BOOTSEL mode in 2 seconds!! press any key to cancel");
-  cli_printf("  will unplug all embedded modules upon REBOOT\n\n");
+  cli_printf("  will unplug all embedded modules before the REBOOT\n\n");
 
   while(true) {
     tud_task();                 // to process IO until the watchdog triggers
@@ -587,9 +895,18 @@ void uif_bootsel()
           TULIP_Pages.unplug(page, 2);
           TULIP_Pages.unplug(page, 3);
           TULIP_Pages.unplug(page, 4);
+          if (page == 6) {
+            // Printer Page
+            globsetting.set(HP82143A_enabled, 0); // disable the Printer ROM in the settings
+          } else if (page == 7) {
+            // HPIL Page
+            globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
+          }
+          globsetting.save();
           TULIP_Pages.save();
         }
       }
+
       // reboots the RP2350 when the counter expires, uses the standard LED for activity monitoring
       reset_usb_boot(1<<PICO_DEFAULT_LED_PIN, 0);      
     }
@@ -2144,7 +2461,7 @@ int LoadMOD(ModuleMetaHeader_t *MetaH)
       // (pMFH->Hardware == HARDWARE_PRINTER) || 
       (pMFH->Hardware == HARDWARE_CARDREADER) ||
       (pMFH->Hardware == HARDWARE_TIMER) ||
-      (pMFH->Hardware == HARDWARE_WAND) ||
+      // (pMFH->Hardware == HARDWARE_WAND) ||
       // (pMFH->Hardware == HARDWARE_HPIL) ||
       (pMFH->Hardware == HARDWARE_INFRARED) ||
       // (pMFH->Hardware == HARDWARE_HEPAX) ||   // there is no HEPAX hardware support, but HEPAX works with the modified 4H version
@@ -2559,10 +2876,11 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
             }
 
             rom_flags = BANK_ACTIVE | BANK_FLASH | BANK_ROM | BANK_ENABLED | BANK_EMBEDDED; // prepare the flags for the ROM
-            cli_printf("  plugging Embedded HPIL ROM in Page 7");        
+            cli_printf("  plugging Embedded HP-IL ROM in Page 7");        
             TULIP_Pages.plug_embedded(7, 1, rom_flags, embed_HPIL_rom); // plug the ROM in the given page
             TULIP_Pages.save(); // save the page settings in FRAM
             globsetting.set(HP82160A_enabled, 1); // enable the HP82160A ROM in the settings
+            globsetting.save();
             Page = 7; // set the page to 7, as this is the page we plugged the ROM in
             break;
 
@@ -2578,10 +2896,11 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
             }
 
             rom_flags = PAGE_ACTIVE | PAGE_FLASH | PAGE_ROM | PAGE_ENABLED | PAGE_EMBEDDED; // prepare the flags for the ROM
-            cli_printf("  plugging Embedded IL Printer ROM in Page 6");      
+            cli_printf("  plugging Embedded HP-IL Printer ROM in Page 6");      
             TULIP_Pages.plug_embedded(6, 1, rom_flags, embed_ILPRINTER_rom); // plug the ROM in the given page      
             TULIP_Pages.save(); // save the page settings in FRAM
             globsetting.set(HP82143A_enabled, 0); // disable the HP82143A ROM in the settings, in case it was plugged
+            globsetting.save();
             Page = 6; // set the page to 6, as this is the page we plugged the ROM in
             break;
 
@@ -2597,10 +2916,11 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
             }
 
             rom_flags = PAGE_ACTIVE | PAGE_FLASH | PAGE_ROM | PAGE_ENABLED | PAGE_EMBEDDED; // prepare the flags for the ROM
-            cli_printf("  plugging Embedded Printer ROM in Page 6");   
+            cli_printf("  plugging Embedded HP82143A Printer ROM in Page 6");   
             TULIP_Pages.plug_embedded(6, 1, rom_flags, embed_PRINTER_rom); // plug the ROM in the given page         
             TULIP_Pages.save(); // save the page settings in FRAM
             globsetting.set(HP82143A_enabled, 1);
+            globsetting.save();
             Page = 6;
             break;
 
@@ -2791,7 +3111,8 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
                 switch (res) {
                   case HARDWARE_PRINTER:
                     cli_printf("  HP82143A Printer hardware emulation enabled");
-                    globsetting.set(HP82143A_enabled, 1); // enable the Printer ROM in the settings
+                    globsetting.set(HP82143A_enabled, 1); // enable the Printer hardware in the settings
+                    globsetting.save();
                     break;
 
                   case HARDWARE_HEPAX:
@@ -2800,7 +3121,14 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
 
                   case HARDWARE_HPIL:
                     cli_printf("  HP-IL Hardware detected, HP-IL emulation enabled");
-                    globsetting.set(HP82160A_enabled, 1); // enable the HP82160A ROM in the settings
+                    globsetting.set(HP82160A_enabled, 1); // enable the HP82160A HP-IL hardware in the settings
+                    globsetting.save();
+                    break;
+
+                    case HARDWARE_WAND:
+                    cli_printf("  Barcode Wand Hardware detected, Wand emulation enabled");
+                    globsetting.set(HP82153A_enabled, 1); // enable the HP82153A WAND hardware in the settings
+                    globsetting.save();
                     break;
 
                   case HARDWARE_NONE:
@@ -2828,6 +3156,9 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
   }
 
   // and update the settings in FRAM
+  globsetting.save();
+
+
   // after plugging, read the first couple of words for checking the ROM contents
 
   uint16_t addr = Page * 0x1000; // address of the page in FLASH
@@ -2887,6 +3218,7 @@ void uif_unplug(int p, int bk)            // plug the selected ROM / bank
     }
     globsetting.set(HP82143A_enabled, 0); // disable the Printer ROM in the settings
     globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
+    globsetting.save();
     TULIP_Pages.save();             // save the page settings in FRAM
     cli_printf("  Unplugged all plugged ROMs except reserved Pages");
     return;
@@ -2905,6 +3237,7 @@ void uif_unplug(int p, int bk)            // plug the selected ROM / bank
     }
     globsetting.set(HP82143A_enabled, 0); // disable the Printer ROM in the settings
     globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
+    globsetting.save();
     TULIP_Pages.save();                   // save the page settings in FRAM
     cli_printf("  All ROMs unplugged and all reservations cancelled");
     return;
@@ -2936,7 +3269,6 @@ void uif_unplug(int p, int bk)            // plug the selected ROM / bank
     }
   }
 
-
   // must disable emulation of the page
   if (p == 6) {
     // Printer Page
@@ -2945,6 +3277,7 @@ void uif_unplug(int p, int bk)            // plug the selected ROM / bank
     // HPIL Page
     globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
   }
+  globsetting.save();
   
   TULIP_Pages.save();             // save the page settings in FRAM
 }
@@ -3221,8 +3554,9 @@ void uif_emulate(int i, int p) {
   {
     case emulate_status:         // list hardware emulation status
             cli_printf("  Emulation status:");
-            cli_printf("  - HP-IL             %s", globsetting.get(HP82160A_enabled) ? "enabled":"disabled");
-            cli_printf("  - HP82143A Printer  %s", globsetting.get(HP82143A_enabled) ? "enabled":"disabled");       
+            cli_printf("  - HP82160A HP-IL    %s", globsetting.get(HP82160A_enabled) ? "enabled":"disabled");
+            cli_printf("  - HP82143A Printer  %s", globsetting.get(HP82143A_enabled) ? "enabled":"disabled");      
+            cli_printf("  - HP82153A Wand     %s", globsetting.get(HP82153A_enabled) ? "enabled":"disabled");
             
             for (int j = 4; j < 16; j++) {
               // go through all Pages 4..F to check the ZEPROM emulation status
@@ -3274,6 +3608,16 @@ void uif_emulate(int i, int p) {
               TULIP_Pages.Pages[(p & 0xFE) + 1].m_bank |= bank_sticky;
               cli_printf("  ZEPROM emulation (sticky Bankswitching) enabled in Page %X + %X", p & 0xFE, (p & 0xFE) + 1);
               TULIP_Pages.save(); // save the page settings in FRAM
+            }
+            break;
+    case emulate_wand: // toggle HP82153A Wand emulation
+            if (globsetting.get(HP82153A_enabled) == 0) {
+              // HP-IL Wand is not enabled, so enable it
+              globsetting.set(HP82153A_enabled, 1);
+              cli_printf("  HP82153A Wand emulation enabled");
+            } else {
+              globsetting.set(HP82153A_enabled, 0);
+              cli_printf("  HP82153A Wand emulation disabled");
             }
             break;
     default: 
@@ -3758,6 +4102,206 @@ void uif_flash(int i, uint32_t addr) {
   }          
 }
 
+
+void fr_init_filesystem()
+{
+
+    // initialize the FRAM device by creating the FRAM file system  
+    cli_printf("  Initializing FRAM File System");
+
+    // create the first files in FRAM:
+    // - TULIP4041 FRAM HEADER          FRAM header
+    // - TULIP_Global_Settings.TGL      all persistent settings
+    // - TULIP_Module_MAP.TRM           the default rom map
+    // - TULIP_Tracefilters.TRF         the default trace filters
+
+    //create the FRAM header file
+    ModuleMetaHeader_t MetaH;
+
+    // FRAM Header file
+    MetaH.FileType = FILETYPE_4041;
+    strcpy(MetaH.FileName, "TULIP4041 FRAM HEADER");
+    MetaH.FileSize = 31; // for version string
+
+    // create the version string to be programmed in FRAM
+    char versionstring[32];
+    snprintf(versionstring, sizeof(versionstring), "%s", Version_Number);
+
+    MetaH.NextFile = FRAM_SETTINGS_FILE;    // always 0x100 for the settings file
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_HEADER, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_HEADER + sizeof(ModuleMetaHeader_t), (uint8_t*)versionstring, 31);
+    #ifdef DEBUG
+      cli_printf("  FRAM Header created at 0x%05X", FRAM_HEADER);
+    #endif
+
+    // Global Settings file
+    MetaH.FileType = FILETYPE_GLOB;
+    MetaH.FileSize = sizeof(globsetting.gsettings); // size of global settings
+    strcpy(MetaH.FileName, "TULIP_Config.TCF");
+    // MetaH.FileSize = sizeof(GSettings.gsettings); // size of global settings
+    MetaH.NextFile = FRAM_ROMMAP_HEADER;
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_SETTINGS_FILE, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+    // write default global settings
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_SETTINGS_CONTENT, (uint8_t*)globsetting.gsettings, sizeof(globsetting.gsettings));
+
+    #ifdef DEBUG
+      cli_printf("  Global Configuration file created at 0x%05X", FRAM_SETTINGS_FILE);
+    #endif
+
+    // ROM Map file
+    MetaH.FileType = FILETYPE_MMAP;
+    strcpy(MetaH.FileName, "TULIP_Module.TMM");
+    MetaH.FileSize = sizeof(TULIP_Pages.Pages); // size of rom map
+    MetaH.NextFile = FRAM_TRACER_HEADER;
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_ROMMAP_HEADER, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+    // write default rom map
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_ROMMAP_CONTENT, (uint8_t*)TULIP_Pages.Pages, sizeof(TULIP_Pages.Pages));
+    #ifdef DEBUG
+      cli_printf("  Module Map Map file created at 0x%05X", FRAM_ROMMAP_HEADER);
+    #endif
+
+    // Trace Filters file
+    MetaH.FileType = FILETYPE_TRAC;
+    strcpy(MetaH.FileName, "TULIP_Tracer.TRF");
+    MetaH.FileSize = sizeof(TraceFilter.m_filter) ; // size of trace filters
+    MetaH.NextFile = FRAM_FS_CONTENT_START;         // here is where the non-fixed files start
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_TRACER_HEADER, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+    // write default trace filters
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_TRACER_CONTENT, (uint8_t*)TraceFilter.m_filter, sizeof(TraceFilter.m_filter));
+    #ifdef DEBUG
+      cli_printf("  Tracer Filters file created at 0x%05X", FRAM_TRACER_HEADER);
+    #endif
+
+    // Finally we mark the type of the next file as empty
+    MetaH.FileType = FILETYPE_FFFF;
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_FS_CONTENT_START, (uint8_t*)&MetaH.FileType, sizeof(uint8_t));
+
+    cli_printf("  FRAM File System initialized"); 
+
+}
+
+void fr_list_files()
+{
+
+  // list the files in FRAM
+  uint32_t offs = FRAM_HEADER;
+  uint32_t end = FRAM_SIZE;
+  ModuleMetaHeader_t MetaH;          // pointer to meta header for getting info of next file
+
+  ModuleFileHeader_t *ModH;           // pointer to MOD header for getting MOD details
+  ModuleHeader_t *myPageHeader;       // pointer to the individual pages header
+  uint32_t ROMoffset;                 // offset to the ROM image in FLASH
+  uint16_t *myROMImage;               // buffer pointer for the ROM image
+  V1_t *myV1;                         // pointer to the module contents in BIN format (5120 bytes)
+  ModuleFileHeader_t *MODoffset;
+  int filecounter = 0;                // counter for the number of files found in the directory
+  
+  if (!fr_isinited()) {
+    cli_printf("  FRAM File system not initialized, please run INIT first");
+    cli_printf("  Total space in FRAM appr %d Kbytes free", FRAM_SIZE/1024);
+    return;
+  }
+
+  /*
+  // locate the file with the name fname
+  if (fname != NULL) {
+    // a filename is given so we only show the details of this file
+    offs = ff_findfile(fname);
+    if (offs == NOTFOUND) {
+      cli_printf("  file \"%s\" not found", fname);
+      return;
+    }
+    // show the file details here
+    MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+    cli_printf("  filename                         type      size  address     next file");
+    cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+    cli_printfn("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+              MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+    if (MetaH->FileType == FILETYPE_DELETED) {
+      // deleted file
+      cli_printf("  ** DELETED FILE **");
+      return;
+    } else if (MetaH->FileType == FILETYPE_DUMMY) {
+      // dummy file
+      cli_printf("  ** DUMMY FILE **");
+      return;
+    }
+  */
+
+  // no filename given, so we list all files
+  // with i = 1 - all we list all files, including deleted and dummy files
+  //      i = 2 - ext we list all files with more details
+  //      i = 3 - flash we list all files in FLASH only
+  //      i = 4 - fram we list all files in FRAM (not yet supported)
+
+  char line[80];
+
+  // layout for listing
+  //  filename                        type   size    address     next
+  // "...............................  ..  ........  ........  ........"
+  cli_printf("  filename                         type      size  address     next file");
+  cli_printf("  -------------------------------  ----  --------  ----------  ----------");
+
+  while (offs < end) {
+    tud_task();  // must keep the USB port updated
+
+    // read header of the file at offs from fram into MetaH
+    fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, offs, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
+
+    if (MetaH.FileType == FILETYPE_FFFF) {
+      // end of chain reached
+      uint32_t free = end - offs;
+      cli_printf("  ** Total files found:                            %d", filecounter);
+      cli_printf("  ** END OF FILE SYSTEM **                         0x%08X", offs);
+      cli_printf("  ** UNUSED SPACE UNTIL **                         0x%08X - appr %d Kbytes free", end, free/1024);
+      return;
+    }
+
+    // build the string for showing the listing
+    sprintf(line, "  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
+              MetaH.FileName, MetaH.FileType, MetaH.FileSize, offs, MetaH.NextFile);
+    cli_printfn(line);
+    filecounter++;  // count the number of files found
+    if (MetaH.FileType == FILETYPE_DELETED) {
+      // deleted file
+      cli_printfn("  ** DELETED FILE **");
+      filecounter--;  // count the number of files found
+    } else if (MetaH.FileType == FILETYPE_DUMMY) {
+      // dummy file
+      cli_printfn("  ** DUMMY FILE **");
+      filecounter--;  // count the number of files found
+    }
+    cli_printf(" ");
+
+    /*
+    if (i == 2) {
+      // extended listing, show more details
+      // show more details for the MOD/ROM content
+      // first check if the file is a ROM or MOD file
+      if ((MetaH->FileType == FILETYPE_MOD1) || (MetaH->FileType == FILETYPE_MOD2)) {
+        // MOD file, show the MOD header
+        ModH = (ModuleFileHeader_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t));
+        cli_printf("    MOD Format %s", ModH->FileFormat);
+        cli_printf("    MOD Title  %s", ModH->Title);
+        cli_printf("    MOD Pages  %d", ModH->NumPages);
+
+        // also add details of the ROM contents later
+      } else if (MetaH->FileType == FILETYPE_ROM) {
+        // ROM file, show the ROM header
+        ShowROMDetails((uint16_t*)(FF_SYSTEM_BASE + offs + sizeof(ModuleMetaHeader_t)));
+      } 
+        // allother filetypes, just show the info
+        // to be added later
+    }
+    */
+
+    offs = MetaH.NextFile;                                     // go to the next file
+  }    
+
+
+} 
+
+
 // functions for the flash command
 // #define fram_status    1
 // #define fram_dump      2
@@ -3808,6 +4352,7 @@ void uif_fram(int i, uint32_t addr) {
             break;
     case fram_nukeall: // nukeall
             cli_printf("  ERASING ALL FRAM in 4 seconds!! press any key to cancel");
+            cli_printf("  this will unplug all modules and reset all TULIP4041 settings to default");
             while(true) {
               tud_task();                 // to process IO until the watchdog triggers
               sleep_ms(2);
@@ -3825,6 +4370,22 @@ void uif_fram(int i, uint32_t addr) {
                 return;
               }
             }
+
+            // after nuking we initialize the FRAM file system
+            cli_printf("  initializing FRAM contents");
+            globsetting.set_default();
+            globsetting.save();
+            fram_rommap_init(); 
+            break;
+
+    case fram_newinit:
+            cli_printf("  initializing FRAM FILE SYSTEM");
+            fr_init_filesystem();
+            break;
+
+    case fram_list:
+            cli_printf("  Listing FRAM files:");
+            fr_list_files();
             break;
 
     default:
@@ -3832,6 +4393,886 @@ void uif_fram(int i, uint32_t addr) {
             ;         
   }          
 }
+
+void scan_file(const char *fname)
+{
+  TCHAR str[256];  // buffer for reading text from the file
+  char ffname[32];
+  int result = 0;
+  int rslt = 0;
+
+  uint8_t buf[128];
+  int buflen = 0;
+  char *ptr = (char*)str;
+
+  // first sort out the file to be scanned
+  FIL fil;
+  FRESULT fr = f_open(&fil, fname, FA_READ);
+  if (FR_OK != fr) {
+      cli_printf("  cannot open file: %s, %s (%d)", fname, FRESULT_str(fr), fr);
+      return;
+  }
+
+  // make a copy of fname in ffname
+  strcpy(ffname, fname);
+
+  // convert the filename to upper case
+  for (int i = 0; i < strlen(ffname); i++) {
+    ffname[i] = toupper(ffname[i]);
+  }
+
+  // get the file extension from the filename
+  char *ext = strrchr(ffname, '.');
+  
+  // file is open now for reading, first get the file size
+  uint filesize = f_size(&fil);
+  cli_printfn("  file %s opened, size %d bytes ", fname, filesize);
+
+  // remove the directory indicator from the filename
+  char *p = strrchr(fname, '/');
+  if (p != NULL) {
+    fname = p + 1;
+  }
+
+  // read the first line of the file, if it is not empty this is the name of the program
+  f_gets(str, sizeof(str), &fil);
+
+  // if the lengthof the strinbg >1 this is valid program name
+  if (strlen((char*)str) > 1) {
+    cli_printf("  Program name: %s", str);
+  } else {
+    cli_printf("  No valid program name found in file");
+  }
+
+  // now we can read the file line by line
+  cli_printf("  starting scanning of file %s, press X to abort ", fname);
+
+
+  // start reading the file. This is must be a text file but that is not checked here
+  while (!f_eof(&fil)) {
+    tud_task();  // keep the USB port alive
+
+    // read a block of data from the file
+    f_gets(str, sizeof(str), &fil);
+
+    if (f_error(&fil)) {
+      cli_printf("  error reading file: %s, %s (%d)", fname, FRESULT_str(fr), fr);
+      result = -1;
+      f_close(&fil);
+      break;
+    }
+
+    // we now have a valid string
+    #ifdef DEBUG
+      cli_printf("  read line: %s", str);
+    #endif
+
+    // if the line is empty skip it
+    if (strlen((char*)str) < 1) {
+      continue;
+    } 
+
+    // if the line starts with a 'P' it is a comment line, skip it
+    if (str[0] == 'P' || str[0] == 'p') {
+      continue;
+    }
+
+    // If the line starts with an 'R' is is the Row indicator, print it and skip it
+    if (str[0] == 'R' || str[0] == 'r') {
+      // remove any CR/LF from the string
+      str[strcspn((char*)str, "\r\n")] = 0;
+      cli_printfn("  %-25s   ", str);
+      continue;
+    }
+
+    // If the string starts with a valid hex character is is a scan line
+    // get the values from the line 
+    // each byte is represented by 2 hex characters
+    // store the bytes in the buffer buf  
+    // check if the string starts with a valid hex character
+    if (!isxdigit(str[0])) {
+      // not a valid scan line, skip it
+      #ifdef DEBUG
+        cli_printf("  skipping invalid scan line: %s", str);
+      #endif
+      continue;
+    }
+
+    buflen = 0;
+    ptr = (char*)str;
+
+    while (*ptr != '\0' && *ptr != '\r' && *ptr != '\n') {
+      // read 2 hex characters
+      char hexstr[3] = {0};
+      hexstr[0] = *ptr++;
+      if (*ptr == '\0' || *ptr == '\r' || *ptr == '\n') break;
+      hexstr[1] = *ptr++;
+      // convert to byte
+      buf[buflen] = (uint8_t)strtol(hexstr, NULL, 16);
+      buflen++;
+    }
+
+    // and send the line to the Wand emulation buffer
+    for (int i = 0; i < buflen; i++) {
+      queue_add_blocking(&WandBuffer, &buf[i]);
+    }
+    setflag_FI0();
+    wakemeup_41();
+
+    // we now have buflen bytes in buf
+    cli_printfn("  scanned %d bytes: ", buflen); 
+    // and show the bytes
+    for (int i = 0; i < buflen; i++) {
+      cli_printfn(" %02X", buf[i]);
+    }
+    cli_printf(""); 
+
+    // wait for a key to be pressed to continue
+    // cli_printf("  scanned one line of %s completed, press any key to continue, press X to exit", fname);
+    // while (!cdc_available(ITF_CONSOLE)) {
+    //   tud_task();  // keep the USB port alive
+    //   sleep_ms(10);
+    // }
+    tud_task();  // keep the USB port alive
+    char ch = cdc_read_char(ITF_CONSOLE);
+    if (ch == 'X' || ch == 'x') {
+      cli_printf("  scanning of file %s aborted by user", fname);
+      break;
+    }
+  }
+
+  // close the file
+  f_close(&fil);
+  cli_printf("  file %s closed", fname);
+
+}
+
+
+
+bool process_wand_instruction(const char *instruction)
+{
+  uint8_t barcode; 
+  uint8_t code_ascii;
+  uint16_t checksum;
+  char hexstr[3] = {0};
+  size_t len = strlen(instruction);
+  char alpha_barcode[32]; // buffer for building the alpha barcode string
+  char numeric_barcode[16]; // buffer for building the numeric barcode string
+  bool result = true;  
+  bool CHS_used = false;
+  bool digit_decoded = false;
+
+  // here we receive single token to be processed as a WAND instruction
+  #ifdef DEBUG
+    cli_printf("  processing W command instruction: %s", instruction);
+  #endif
+
+  // first check if the instruction is a string starting with a double quote 
+  if (instruction[0] == '\"' ) {
+    // this is a string to be sent to the wand buffer
+
+    // first we start building the code to be sent in a new array
+    // lenghth is maximum 14 characters:
+    //   Byte 1    - 8 bit checksum (end-around carry)
+    //   Byte 2    - 4-bit Type indicator  7: alpha replace
+    //                                     8: alpha append
+    //               4-bit number of ASCII characters (1-14)
+    //   Byte 3..n - ASCII characters (max 14)
+
+    // the '\' is used as escape character
+
+    int j = 2; // index for alpha_barcode
+    alpha_barcode[0] = 0;     // checksum placeholder
+    alpha_barcode[1] = 0x70;  // type and length placeholder, set to ALPHA replace
+                              // will be set to 0x80 for ALPHA append if needed
+
+    for (size_t i = 1; i < len; i++) {
+      char ch = instruction[i];
+      if (ch == '\\') {
+        // next character is escaped
+        // if it is a hex digit we read the next two characters as hex value
+        i++;
+        if (i >= len) {
+          // invalid escape sequence, ignore
+          continue;
+        } 
+        ch = instruction[i];
+        if (isxdigit((unsigned char)ch)) {
+          // read two hex digits
+          code_ascii = ch - '0';
+          if (ch >= 'A' && ch <= 'F') code_ascii = ch - 'A' + 10;
+          if (ch >= 'a' && ch <= 'f') code_ascii = ch - 'a' + 10;       
+          alpha_barcode[j] = code_ascii << 4;
+          i++; 
+
+          if (i >= len) {
+            // invalid escape sequence, ignore
+            continue;
+          }
+
+          ch = instruction[i];
+          if (isxdigit((unsigned char)ch)) {
+            code_ascii = ch - '0';
+            if (ch >= 'A' && ch <= 'F') code_ascii = ch - 'A' + 10;
+            if (ch >= 'a' && ch <= 'f') code_ascii = ch - 'a' + 10;       
+            alpha_barcode[j] |= code_ascii & 0x0F;
+            j++;
+            if (j >= sizeof(alpha_barcode)) {
+              // buffer overflow, stop processing
+              break;
+            }
+            if (alpha_barcode[j-1] < 0x10) {
+              // can crash the HP41
+              // convert to SPACE character
+              alpha_barcode[j-1] = 0x20; // space character instead
+            }
+            continue;    // next character
+          } else {
+            // invalid escape sequence, ignore
+            continue;
+          }
+        }   // end of isxdigit
+
+        // other escape characters
+        switch (ch)
+        {
+          case '\\': // send backslash
+                     alpha_barcode[j] = (uint8_t)'\\';   
+                     j++;
+                     continue;       
+                     break;
+          case 'S':  // send sigma
+                     alpha_barcode[j] = 0x7E;      
+                     j++;
+                     continue;        
+                     break;
+          case '+':  // this is append
+                     alpha_barcode[j] = 0x80; // set to ALPHA append;
+                     // i++;
+                     continue;
+                     break;
+          case 't':  // hanging t
+                     alpha_barcode[j] = 0x60;
+                     j++;
+                     continue;
+                     break;
+          case '#':  // not equal symbol
+                     alpha_barcode[j] = 0x1D;
+                     j++;
+                     continue;
+                     break;
+          case 's':  // space
+                     alpha_barcode[j] = 0x20;
+                     j++;
+                     continue;
+                     break;
+          // case 'u':  // greek mu
+          //            alpha_barcode[j] = 0x0C; 
+          //            j++;
+          //            continue;
+          //            break;
+          // case 'a':  // angle symbol
+          //            alpha_barcode[j] = 0x0D;
+          //            j++;
+          //            continue;
+          //            break;
+          case '\'': // single quote
+                     alpha_barcode[j] = 0x27;
+                     j++;
+                     continue;
+                     break;
+          // case '\"': // double quote
+          //            alpha_barcode[j] = 0x22;
+          //            j++;
+          //            continue;
+          //            break;  
+          default:   // character not supported, ignore
+                     continue;
+                     break;
+        }
+      }  // end of handling escape characters
+
+      // here are only the normal ASCII characters
+      // check for the end of the string
+      if (ch == '\"') {
+        // end of string
+        break;
+      } else {
+        // normal character
+        alpha_barcode[j] = (uint8_t)ch;
+        j++;
+        if (j >= sizeof(alpha_barcode)) {
+          // buffer overflow, stop processing
+          break;
+        }
+      }
+    } // end of for loop over the string
+
+    // the string is processed now, we have j bytes in alpha_barcode
+    // set the length in byte 1, but maximum 14 characters
+    if (j - 2 > 14) {
+      j = 16; // set to maximum length, what is left is truncated
+    } 
+    alpha_barcode[1] |= (j - 2) & 0x0F; // set length
+    // now calculate the checksum
+    checksum = 0;
+    for (int k = 1; k < j; k++) {
+      checksum += alpha_barcode[k];
+      if (checksum > 0xFF) {
+        checksum = (checksum & 0xFF) + 0x01; // end-around carry
+      }
+
+    }
+    alpha_barcode[0] = checksum & 0xFF; // set checksum
+    // now we have the complete barcode in alpha_barcode with j bytes
+    // send the barcode to the wand buffer
+    #ifdef DEBUG
+      cli_printfn("  WAND ALPHA barcode to be scanned (%d bytes) ", j);
+      for (int k = 0; k < j; k++) {
+        cli_printfn(" %02X", alpha_barcode[k]);
+      }
+      cli_printf(""); 
+    #endif
+
+    for (int k = 0; k < j; k++) {
+      barcode = alpha_barcode[k];
+      queue_add_blocking(&WandBuffer, &barcode);  
+    }
+
+    setflag_FI0();
+    wakemeup_41();
+    return true; // exit the function
+
+
+  }  // end of string handling
+
+  // handle instructions starting with a single quote
+  // sends a single ALPHA character as a keystroke
+  if (instruction[0] == '\'') {
+    if (len == 1) {
+      // only a single quote, send the ALPHA key
+      alpha_barcode[0] = 0x14; // ALPHA keycode
+      alpha_barcode[1] = 0x0C; // ALPHA keycode
+
+      // send the barcode to the wand buffer
+      #ifdef DEBUG
+        cli_printfn("  WAND ALPHA single ALPHA key barcode to be scanned ");
+        cli_printf(" %02X %02X", alpha_barcode[0], alpha_barcode[1]);
+      #endif
+      // must wait until the previous barcode is processed
+      while (gpio_get(P_PWO) == 1) {
+        // wand is busy
+        tud_task();  // keep the USB port alive
+        if (cdc_available(ITF_CONSOLE)) {
+          char ch = cdc_read_char(ITF_CONSOLE);
+          cli_printf("  WAND instruction processing aborted by user");
+          return false;
+        }
+        sleep_ms(20);
+      }
+      barcode = alpha_barcode[0];
+      queue_add_blocking(&WandBuffer, &barcode);
+      barcode = alpha_barcode[1];
+      queue_add_blocking(&WandBuffer, &barcode);
+      setflag_FI0();
+      wakemeup_41();
+      return true; // exit the function
+    }
+    for (size_t i = 1; i < len; i++) {
+      char ch = instruction[i];
+      if (ch == '\\') {
+        // next character is escaped
+        // if it is a hex digit we read the next two characters as hex value
+        i++;
+        if (i >= len) {
+          // invalid escape sequence, ignore
+          continue;
+        }
+
+        int idx = 0;      // index to alpha char array
+        
+        // handle escape characters
+        switch (instruction [i]) {
+          case '\\':  // send backslash
+                      idx = 0x5C;
+                      break;           
+          case 'S':   // send sigma
+                      idx = 0x7E;      
+                      break;        
+          case '+':   // this is append
+                      idx = 0x7F;
+                      break;
+          case 't':   // hanging t
+                      idx = 0x60;
+                      break;
+          case '#':   // not equal symbol
+                      idx = 0x1D;
+                      break;
+          case 's':   // space
+                      idx = 0x20;
+                      break;
+          case 'u':   // greek mu
+                      idx = 0x0C; 
+                      break;
+          case 'a':   // angle symbol
+                      idx = 0x0D;
+                      break;
+          case '\'':  // single quote
+                      idx = 0x27;
+                      break;
+          case '\"':  // double quote
+                      idx = 0x22;
+                      break;  
+          default:    // process hex digits
+                      // read two hex digits
+                      if (isxdigit((unsigned char)instruction[i])) {
+                        char ch1 = instruction[i];
+                        i++; 
+                        if (i >= len) {
+                          // invalid escape sequence, ignore
+                          break;
+                        }
+                        char ch2 = instruction[i];
+                        if (isxdigit((unsigned char)ch2)) {
+                          // convert to byte
+                          hexstr[0] = ch1;
+                          hexstr[1] = ch2;
+                          idx = (uint8_t)strtol(hexstr, NULL, 16);
+                        } else {
+                          // invalid escape sequence, ignore
+                          break;
+                        }
+                      } else {
+                        // invalid escape sequence, ignore
+                        break;
+                      }                      
+        }
+
+        #ifdef DEBUG
+          cli_printf("  WAND ALPHA escaped character to be scanned: index %02X, code %02X %02X", idx, wand_alpha_[idx].hex1, wand_alpha_[idx].hex2);
+        #endif
+
+        alpha_barcode[0] = wand_alpha_[idx].hex1;
+        alpha_barcode[1] = wand_alpha_[idx].hex2;
+
+      } else if (ch == ' ') {
+        // end of string reached when there is a space, get out
+        break;
+      } else {
+        // normal character, get the index from the wand_alpha_ array
+        #ifdef DEBUG
+          cli_printf("  WAND ALPHA normal character to be scanned: character %c, code %02X %02X", ch, wand_alpha_[(uint8_t)ch].hex1, wand_alpha_[(uint8_t)ch].hex2);
+        #endif
+
+        // normal character, send as ALPHA keystroke
+        // build the barcode for a single ALPHA character
+
+        // catch the single quote at the end of the string
+        if (ch == '\'') {
+          // send ALPHA key
+          alpha_barcode[0] = 0x14; // ALPHA keycode
+          alpha_barcode[1] = 0x0C; // ALPHA keycode
+        } else {
+          // normal character
+          alpha_barcode[0] = wand_alpha_[ch].hex1;
+          alpha_barcode[1] = wand_alpha_[ch].hex2;
+        }
+      }
+
+      // send the barcode to the wand buffer
+      #ifdef DEBUG
+        cli_printfn("  WAND ALPHA single character barcode to be scanned ");
+        cli_printf(" %02X %02X", alpha_barcode[0], alpha_barcode[1]);
+      #endif
+
+      // must wait until the previous barcode is processed
+      while (gpio_get(P_PWO) == 1) {
+        // wand is busy
+        tud_task();  // keep the USB port alive
+        if (cdc_available(ITF_CONSOLE)) {
+          char ch = cdc_read_char(ITF_CONSOLE);
+          cli_printf("  WAND instruction processing aborted by user");
+          return false;
+        }
+        sleep_ms(20);
+      }
+
+      barcode = alpha_barcode[0];
+      queue_add_blocking(&WandBuffer, &barcode);  
+      barcode = alpha_barcode[1];
+      queue_add_blocking(&WandBuffer, &barcode);
+
+      setflag_FI0();
+      wakemeup_41();
+    }
+
+    return true; // exit the function
+
+
+  }
+
+  // now check if the instruction is one that is stored in the wand_cmd_ array
+  // convert the string to upper case for comparison
+  char instr_uc[32];
+  strncpy(instr_uc, instruction, sizeof(instr_uc));
+  for (int i = 0; instr_uc[i]; i++) {
+    instr_uc[i] = toupper((unsigned char)instr_uc[i]);
+  }
+
+  // get the number of elements in the wand_cmd_ array
+  int wand_cmd_count = sizeof(wand_cmd_) / sizeof(wand_cmd_[0]);
+
+  // find the given instruction in the Wand Command set wand_cmd_
+  for (int i = 0; i < wand_cmd_count; i++) {
+    if (strcmp(instr_uc, wand_cmd_[i].command) == 0) {
+      // found the command, execute it
+
+      #ifdef DEBUG
+        cli_printf("  WAND command found: %s, type %d, barcode %02X %02X", wand_cmd_[i].command, wand_cmd_[i].type, wand_cmd_[i].hex1, wand_cmd_[i].hex2);
+      #endif
+
+      switch (wand_cmd_[i].type) {
+        case 0: // type 0 means not supported
+                cli_printf("  Instruction %s not supported", instruction);
+                return false;
+                break;
+        case 1: // type 1 are the 2-byte programmable functions
+                queue_add_blocking(&WandBuffer, &wand_cmd_[i].hex1);
+                queue_add_blocking(&WandBuffer, &wand_cmd_[i].hex2);
+                setflag_FI0();
+                wakemeup_41();
+                return true;
+                break;
+        case 2: // type 2 are the ALPHA character keys, not yet supported
+                // cli_printf("  Instruction %s not supported", instruction);
+                queue_add_blocking(&WandBuffer, &wand_cmd_[i].hex1);
+                setflag_FI0();
+                wakemeup_41();
+                break;           
+        case 3: // Indirect function IND, treat as type 1 for now
+                queue_add_blocking(&WandBuffer, &wand_cmd_[i].hex1);
+                queue_add_blocking(&WandBuffer, &wand_cmd_[i].hex2);
+                setflag_FI0();
+                wakemeup_41();
+                return true;
+                break;
+        case 4: // type 4 are the 2-byte non-programmable functions
+                queue_add_blocking(&WandBuffer, &wand_cmd_[i].hex1);
+                queue_add_blocking(&WandBuffer, &wand_cmd_[i].hex2);
+                setflag_FI0();
+                wakemeup_41();
+                return true;
+                break;
+        case 5: // type 5 are the XROM commands, not yet supported
+                cli_printf("  Instruction %s not supported", instruction);
+                return false;
+                break;         
+        case 6: // type 6 are the 1-byte keypad functions
+                queue_add_blocking(&WandBuffer, &wand_cmd_[i].hex1);
+                setflag_FI0();
+                wakemeup_41();
+                return true;
+                break;
+        default:
+                // command not found or supported
+                cli_printf("  Instruction %s not available", instruction);
+                break;
+                
+      }  // switch  
+    }
+  }
+
+
+  // The last option is a number to be sent as barcode
+  // the number can be positive
+
+  // we have the following possibilities:
+  // instruction is a number that starts with a -, + or a digit -> this is a barcode to be scanned
+  // this is a barcode to be scanned as single digit (type 6) instructions
+  // the - is executed as CHS after the first digit
+  // a + is ignored
+  // the E is executed as EEX
+  // there can be a - before the E
+  // the number can start with an E followed by maximum 2 digits
+
+  if (isdigit((unsigned char)instruction[0]) || instruction[0] == '-'  || instruction[0] == 'E' || instruction[0] == 'e' || instruction[0] == '.') {
+
+    // we now have correct digit entry
+    // len is the number of characters to process
+    size_t i = 0;
+    while (i < len) {
+      digit_decoded = false;
+      // char ch = instruction[i];
+      switch (instruction[i]) {
+        case '0':  barcode = 0x00;  digit_decoded = true; break;    // send 0
+        case '1':  barcode = 0x81;  digit_decoded = true; break;    // send 1
+        case '2':  barcode = 0x42;  digit_decoded = true; break;    // send 2
+        case '3':  barcode = 0xC3;  digit_decoded = true; break;    // send 3 
+        case '4':  barcode = 0x24;  digit_decoded = true; break;    // send 4
+        case '5':  barcode = 0xA5;  digit_decoded = true; break;    // send 5
+        case '6':  barcode = 0x66;  digit_decoded = true; break;    // send 6
+        case '7':  barcode = 0xE7;  digit_decoded = true; break;    // send 7
+        case '8':  barcode = 0x18;  digit_decoded = true; break;    // send 8
+        case '9':  barcode = 0x99;  digit_decoded = true; break;    // send 9
+        case '.':  barcode = 0x5A;  digit_decoded = true; break;    // send decimal point
+        case 'E':  barcode = 0xDB;  digit_decoded = true; break;    // send EEX
+        case 'e':  barcode = 0xDB;  digit_decoded = true; break;    // send EEX
+        case '-': // CHS, but can be applied only after the next digit is sent
+                  CHS_used = true;
+                  i++;
+                  continue;   // next character
+        default:  break;
+      }
+
+      #ifdef DEBUG
+        cli_printf("  WAND DIGIT barcode to be scanned: %02X", barcode);  
+      #endif
+
+      if (digit_decoded) {
+        // send digit
+        while (gpio_get(P_PWO) == 1) {
+          // wand is busy
+          tud_task();  // keep the USB port alive
+          if (cdc_available(ITF_CONSOLE)) {
+            char ch = cdc_read_char(ITF_CONSOLE);
+            cli_printf("  WAND instruction processing aborted by user");
+            return false;
+          }
+          sleep_ms(20);
+        }
+        queue_add_blocking(&WandBuffer, &barcode);
+        setflag_FI0();
+        wakemeup_41();
+      }
+
+      if (digit_decoded && CHS_used) {
+        // there was a previous CHS, a dgit has been decoded, so send CHS now
+        barcode = 0x3C; // CHS code
+        CHS_used = false;
+
+        #ifdef DEBUG
+          cli_printf("  WAND CHS barcode to be scanned: %02X", barcode);
+        #endif
+
+        while (gpio_get(P_PWO) == 1) {
+          tud_task();  // keep the USB port alive
+          if (cdc_available(ITF_CONSOLE)) {
+            char ch = cdc_read_char(ITF_CONSOLE);
+            cli_printf("  WAND instruction processing aborted by user");
+            return false;
+          }
+          sleep_ms(20);
+        }
+        queue_add_blocking(&WandBuffer, &barcode);
+        setflag_FI0();
+        wakemeup_41();
+
+      }
+
+      digit_decoded = false;
+      i++;
+    } // end of while over the characters
+
+
+  } else {
+    // invalid instruction
+    // cli_printf("  invalid WAND instruction: %s", instruction);
+    return false;
+  }
+
+  return true;
+}
+
+void uif_w(const char *instruction) 
+{
+
+  uint8_t barcode; 
+  char instr_copy[128];
+  char current_instr[64];
+
+  // only do this when PWO is low
+  // if (!uif_pwo_low()) return;
+
+  #ifdef DEBUG
+    cli_printf("  W command invoked: %s", instruction);
+  #endif
+
+  if (!globsetting.get(HP82153A_enabled)) {
+    cli_printf("  WAND EMULATION not enabled, plug the WAND ROM and enable WAND emulation");
+    return;
+  }
+
+
+  // the string may contain various elements as it is not tokenized
+  // in the main loop we extract the tokens one by one and process them until the string is empty
+  // if there is a token enclosed with quotes the quotes are passed with the token!
+
+  // first copy the instruction to a local buffer
+  strncpy(instr_copy, instruction, sizeof(instr_copy));
+  instr_copy[sizeof(instr_copy) - 1] = '\0';  // ensure null termination
+  
+  // now process the string until it is empty
+  char *ptr = instr_copy;
+  while (*ptr != '\0') {
+    // skip leading spaces
+    while (*ptr == ' ') ptr++;
+    // extract the next token into current_instr
+    int i = 0;
+    if (*ptr == '\"') {
+      // token starts with a quote, copy until the closing quote
+      current_instr[i++] = *ptr++; // copy the opening quote
+      while (*ptr != '\0' && *ptr != '\"' && i < sizeof(current_instr) - 1) {
+        current_instr[i++] = *ptr++;
+      }
+      if (*ptr == '\"') {
+        current_instr[i++] = *ptr++; // copy the closing quote
+      }
+    } else {
+      // token does not start with a quote, copy until the next space
+      while (*ptr != '\0' && *ptr != ' ' && i < sizeof(current_instr) - 1) {
+        current_instr[i++] = *ptr++;
+      }
+    }
+
+    current_instr[i] = '\0'; // null terminate the current instruction
+    #ifdef DEBUG
+      cli_printf("  extracted WAND instruction: %s", current_instr);
+    #endif
+    
+    // process the current instruction
+    // wait until the wand buffer is empty, cancel on a key press
+    cli_printf("  processing WAND instruction: %s", current_instr);   
+
+    while (gpio_get(P_PWO) == 1) {
+      tud_task();  // keep the USB port alive
+      if (cdc_available(ITF_CONSOLE)) {
+        char ch = cdc_read_char(ITF_CONSOLE);
+        cli_printf("  WAND instruction processing aborted by user");
+        return;
+      }
+      sleep_ms(20);
+    }
+
+    if (!process_wand_instruction(current_instr)) {
+      cli_printf("  error processing WAND instruction: %s", current_instr);
+      break;
+    }
+
+  } 
+
+}
+
+
+/*
+#define wand_status    1
+#define wand_test      2
+#define wand_scan      3
+#define wand_list      4
+
+#define WAND_HELP_TXT "wand functions\r\n\
+        [no argument]     shows the wand status\r\n\
+        status            shows the wand status\r\n\
+        scan [filename]   scan the named file \r\n\
+        list              activates the WAND Paper Keyboard\r\n\
+        test              performs a wand test sequence, use with WNDTST\r\n"
+*/
+void uif_wand(int i, const char* fname, char* instruction)
+{
+  // only do this when PWO is low
+  // if (!uif_pwo_low()) return;
+
+  uint16_t barcode; 
+
+  #ifdef DEBUG
+    cli_printf("  WAND command invoked %d", i);
+  #endif
+
+  if (!globsetting.get(HP82153A_enabled)) {
+    cli_printf("  WAND EMULATION not enabled, plug the WAND ROM and enable WAND emulation");
+    return;
+  }
+
+  switch (i) {
+    case 1: // status
+            cli_printfn("  HP82153A Wand emulation %s", globsetting.get(HP82153A_enabled) ? "enabled":"disabled");
+            cli_printf(", check with cat if the WAND ROM is plugged");
+            break;
+    case 2: // test
+            cli_printf("  WAND test: send BEEP to the HP41");
+            barcode = 0xE0; queue_try_add(&WandBuffer, &barcode);
+            barcode = 0x86; queue_try_add(&WandBuffer, &barcode);
+            setflag_FI0();
+            wakemeup_41();
+            break;
+    case 3: // scan      
+            scan_file(fname);
+            break;           
+    case 4: // list
+            // list the functions supported by the Paper Keyboard
+            cli_printf("  WAND Paper Keyboard instructions");
+            for (int j = 0; j < sizeof(wand_cmd_) / sizeof(wand_cmd_[0]); j++) {
+              cli_printfn("    %-15s  type %2d  code %02X %02X", wand_cmd_[j].command, wand_cmd_[j].type, wand_cmd_[j].hex1, wand_cmd_[j].hex2);
+              switch (wand_cmd_[j].type) {
+                case 0: // not supported
+                        cli_printf("      not supported");
+                        break;
+                case 1: // 2-byte programmable functions
+                        cli_printf("      2-byte programmable function");
+                        break;
+                case 2: // 2-byte programmable functions
+                        cli_printf("      ALPHA character keys");
+
+                        break;
+                case 3: // indirect function
+                        cli_printf("      indirect function");
+                        break;
+                case 4: // 2-byte non-programmable functions
+                        cli_printf("      2-byte non-programmable function");
+                        break;
+                case 5: // XROM functions
+                        cli_printf("      XROM function, not supported");
+                        break;
+                case 6: // 1-byte keypad functions
+                        cli_printf("      1-byte keypad function");
+                        break;
+                default:
+                        // unknown type ?? should never get here
+                        cli_printf("      unknown function type");
+                        break;
+              }
+            }
+            break;
+    case 5: // send direct WAND instructions from command line
+            if (instruction == NULL || *instruction == '\0') {
+              cli_printf("  nothing to send ...");
+              break;
+            }
+            while (instruction != NULL && *instruction != '\0') {
+              // tokenize the string instruction by spaces
+              // the string consists of a series of integers separated by spaces
+              char *token = strtok((char*)instruction, " ");
+              uint8_t value;
+              if (token == NULL) {
+                break; // no more tokens
+              }
+                          
+              // convert the token to a number
+              value = (uint8_t)strtol(token, NULL, 0);
+              cli_printf("  sending WAND instruction byte: 0x%02X   decimal %d", value, value);
+              queue_add_blocking(&WandBuffer, &value);
+
+              // move to the next token
+              instruction += strlen(token) + 1;
+            }
+            setflag_FI0();
+            wakemeup_41();
+            break;
+    default: break;
+    
+  }  // switch (i)
+
+}
+
 
 //************************************************************ */
 // Below are the functions for the 'old' user interface
@@ -4126,6 +5567,7 @@ void print_status()
   printf(" HLD  %01d - bit  2 - HLD, Hold for Paper\n", (SELP9_status >> 2) & 0x0001);
   printf(" bt1  %01d - bit  1 - not used, always returns 0\n", (SELP9_status >> 1) & 0x0001);
   printf(" bt0  %01d - bit  0 - not used, always returns 0\n", (SELP9_status >> 0) & 0x0001);
+
 }
 
 
@@ -4213,7 +5655,6 @@ void ident_cdc()
         {
           printf("  CDC Port %d NOT connected: %s \n", i, ITF_str[i]);
         }
-
     }
 }
 
@@ -4222,12 +5663,28 @@ void sdcard_test()
   sd_status();
 }
 
+void test_fram()
+{
+  uint8_t buf[128];
+  printf("FRAM read test\n");
+
+  // read 64 bytes from FRAM address 0
+  fr_read(0, buf, 64);
+
+  printf("FRAM data at address 0:\n");
+  for (int i = 0; i < 64; i++) {
+    printf("%02X ", buf[i]);
+    if ((i & 0x0F) == 0x0F) printf("\n");
+  }
+}
+
 // supported commands for the user interface, main level
 SERIAL_COMMAND serial_cmds[] = {
   { 'h', serial_help,     "Serial command help"  },
   { '?', serial_help,     "Serial command help"  },
   { 'P', power_on,        "Power On - drive ISA for 20 us"  },
   { 'p', print_f,         "Printer functions subcommands"},
+  { 'f', test_fram,       "FRAM test"},
   { 'w', welcome,         "show welcome message"  },
   { 'i', pio_welcome,     "show PIO status"},
   // { 'W', wandcode,      "send one of the barcode test commands"},

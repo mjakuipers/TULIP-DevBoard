@@ -2,6 +2,19 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
+VERSION 0.96 BETA, December 2025
+-   Added rudimentary power management. The RP2350 CPU clock is now 150MHz when USB power is connected 
+    and switches to 75MHz when powered by the HP41. This reduces the TULIP power consumption from ~20mA to ~14mA
+    Switchover is fully automatic and keeps the UART and SPI clocks at the same speed
+    The TULIP will still be running at all times, further power management to be implemented
+    Modified the PIO state machines running at 12.5MHz to have a shorter delay to support 2* speedup calculators
+-   Peripheral clock speed is increased to 150 MHz, this allows the FRAM SPI speed to be increased to 40MHZ
+    This speed helps implementing handling of the READ instructions as 16 registers can now be cached with an HP41 SYNC-SYNC cycle
+-   Fixed an issue when plugging an embedded ROM fails to save the emulation status to FRAM
+-   Partial implemented the FRAM File System, this is not yet used
+-   Implemented Wand emulation and the commands wand and w, updated documentation
+    Wand emulation is enabled when plugging the Wand MOD file
+
 VERSION 0.95 BETA 3, November 2025
 -   Added Page 4 bankswitching to support Library4 in HP41C/CV/MAXX machines
 -   Reset into BOOTSELmode now unplugs all embedded modules

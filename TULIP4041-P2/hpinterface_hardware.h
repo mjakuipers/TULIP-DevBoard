@@ -148,7 +148,9 @@ extern "C" {
 // #define DEBUG                   1        // generate DEBUG output messages to the CLI
 
 #define DEFAULT_CLOCK           150000   // default clock frequency in kHZ for the Pico
-#define TULIP_CLOCK             125000   // clock frequency in kHz for the TULIP4041
+#define TULIP_CLOCK_FAST        150000   // fast clock frequency in kHZ for the TULIP4041
+#define TULIP_CLOCK_MID         125000   // clock frequency in kHz for the TULIP4041
+#define TULIP_CLOCK_SLOW         75000   // slow clock frequency in kHz for the TULIP4041
 
 #define DBG_OUT0                0b0000000000000001
 #define DBG_OUT1                0b0000000000000101

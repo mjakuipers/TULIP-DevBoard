@@ -86,8 +86,9 @@ void  __not_in_flash_func(core1_pio)();
 void pwo_callback(uint gpio, uint32_t events);
 void shutdown_41();
 enum HP41powermode {eAwake, eLightSleep, eDeepSleep};       // sleep modes  
-
 void uif_pio_report();
+
+extern bool USB_powered;                   // true when USB power is present
 
 extern uint16_t SELP9_status;      // contains the HP82143A printer status bits, set to default values
 extern uint8_t HPIL_REG[9];

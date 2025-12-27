@@ -260,6 +260,7 @@ uint32_t sd_sect_count()
     return tot_sect;
 }
 
+
 // return the number of total sector in the SD card
 // called by msc_device_disk callbacks from the TinyUSB stack
 // alternative version to works with exFAT on macOS
@@ -273,7 +274,7 @@ uint32_t sd_sect_count_alt()
 
     DRESULT dr = disk_ioctl(DRIVENUM, GET_SECTOR_COUNT, &tot_sect_lba);
 
-    if (FR_OK != dr) {
+    if (RES_OK != dr) {
         cli_printf("  ioctl error: %d)", dr);
         return 0;
     }

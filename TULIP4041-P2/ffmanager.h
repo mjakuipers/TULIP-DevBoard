@@ -55,6 +55,7 @@ bool otp_write_serial(char *serial_string);
 bool otp_read_serial(char *serial_string);
 
 void ff_delay500();
+void ff_delay(int ms);
 void ff_show(uint32_t addr);
 void ff_init();
 void ff_nuke();

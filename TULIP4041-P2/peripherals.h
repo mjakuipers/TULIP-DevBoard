@@ -54,6 +54,9 @@ extern "C" {
 
 #define NO_PIL 0xFFFF  // indicate no PILBox connected
 
+
+// Array for Wand Paper Keyboard
+
 // function definitions in peripherals.cpp
 void gpio_toggle(uint signal);
 void gpio_pulse(uint signal, uint numtimes);
@@ -65,6 +68,7 @@ void PrintBuffer_init();
 void getIL_mnemonic(uint16_t wFrame, char *mnem);
 void HPIL_init();
 void HPIL_task();
+void Wand_task();
 
 extern int m_eMode;          // HP-IL controller/device mode
 extern uint32_t cycles();

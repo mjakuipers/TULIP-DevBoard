@@ -250,8 +250,8 @@ extern "C" {
                       always lists 4K bytes\r\n\
                       subsequent use of dump without [ADDR] lists the next 4K\r\n\
         INIT          initializes the FLASH file system\r\n\
-        NUKEALL       erases all FLASH pages\r\n\
-        fram [ADDR]   creates a dump of FRAM\r\n"
+        NUKEALL       erases all FLASH pages\r\n"
+        // fram [ADDR]   creates a dump of FRAM\r\n"
 
         #define flash_status    1
         #define flash_dump      2
@@ -270,17 +270,24 @@ extern "C" {
         INIT          initializes the FRAM file system\r\n\
                       limited to the ROM MAP portion of the FRAM\r\n\
         NUKEALL       erases all FRAM to zero\r\n"
+        //newinit       initializes the FRAM file system\r\n\
+        // list          lists all files in FRAM\r\n"
 
         #define fram_status    1
         #define fram_dump      2
         #define fram_init      3
         #define fram_nukeall   4
+        #define fram_newinit   5
+        #define fram_list      6
 
-#define import_no_match -1
-#define import_no_arg   0
-#define import_all      1
-#define import_update   2
-#define import_compare  3
+#define import_no_match         -1
+#define import_no_arg           0
+#define import_all              1
+#define import_update           2
+#define import_compare          3
+#define import_fram             4
+#define import_fram_compare     5
+#define import_fram_update      6
 
 #define IMPORT_HELP_TXT "import functions\r\n\
         [filename]                   import a single file to FLASH\r\n\
@@ -289,21 +296,27 @@ extern "C" {
         [directory] [ALL]            import all files in a directory to FLASH\r\n\
         [directory] [compare] [ALL]  compare all files in a directory with FLASH\r\n\
         [directory] [UPDATE] [ALL]   update all files in a directory in FLASH\r\n"
-
-        /*
-        [filename]  [FRAM]           import a single file in FRAM\r\n\
-        [filename]  [compare] <FRAM> compare a single file with the one in FLASH (or FRAM)\r\n\
-        */
+        // - import functions for FRAM:\r\n\
+        // [filename]  [q]             import a single file in QROM space (FRAM)\r\n\
+        // [filename]  [q] [compare]   compare a single file with the one in QROM space (FRAM)\r\n\
+        // [filename]  [q] [UPDATE]    update a single file in QROM space (FRAM)\r\n"
+        
 
 #define DELETE_HELP_TXT "delete function, removes a file from FLASH\r\n\
         [filename]    delete the named file from FLASH\r\n\
                       only marks the file for deletion\r\n"
 
 #define LIST_HELP_TXT "list functions\r\n\
-        [no argument] lists all files\r\n\
+        [no argument] lists all files in FLASH\r\n\
         <filename>    show details of named file\r\n\
         ext           extended listing with more details per file for all files\r\n\
         all           include erased files in the listing\r\n"
+        // fr            list all files in FRAM\r\n\
+        // <filename> fr show details of named file in FRAM\r\n"
+
+#define EXPORT_HELP_TXT "export functions\r\n\
+        [filename]       export a single file from FRAM to the uSD card\r\n\
+        [directory] all  export all files from FRAM to the uSD card into the named directory\r\n"
 
 #define CAT_HELP_TXT "cat functions\r\n\
         [no argument] shows the status of the plugged ROMs\r\n\
@@ -311,14 +324,15 @@ extern "C" {
                       if B is given, it shows the Bank (1..4) of that Page\r\n\
                       with a dump of that complete ROM\r\n"
 
-
 #define emulate_status    1
 #define emulate_hpil      2
 #define emulate_printer   3
 #define emulate_zeprom    4
-#define emulate_xmem      5
-#define emulate_blinky    6
-#define emulate_timer     7
+#define emulate_wand      5
+#define emulate_xmem      6
+#define emulate_blinky    7
+#define emulate_timer     8
+
 
 #define EMULATE_HELP_TXT "enable/disable hardware emulation functions\r\n\
         toggles the emulation status. Do not enable if the real hardware is used!\r\n\
@@ -326,6 +340,7 @@ extern "C" {
         status        shows the status of the emulated hardware\r\n\
         hpil          toggle HPIL hardware emulation\r\n\
         printer       toggle HP82143A printer emulation\r\n\
+        wand          toggle HP82153A WAND emulation\r\n\
         zeprom P      toggle ZEPROM emulation in Page P (hex) for sticky bankswitching\r\n\
                       sticky bankswitching is active in both odd and even Pages of a Port\r\n\
                       P is the Page number in hex (0..F) \r\n"
@@ -364,6 +379,33 @@ extern "C" {
         get               get the current date and time from the RTC\r\n\
         reset             reset the RTC\r\n\
         dump              dump the RTC registers\r\n"
+
+#define wand_status     1
+#define wand_test       2
+#define wand_scan       3
+#define wand_list       4
+#define wand_send       5
+
+#define WAND_HELP_TXT "wand functions\r\n\
+        [no argument]     shows the wand status\r\n\
+        status            shows the wand status\r\n\
+        scan [filename]   scan the named file, must be in .WND format \r\n\
+                          interrupt scanning by pressing x or X\r\n\
+        list              shows all HP41 instructions supported by the paper keyboard emulation\r\n\
+        test              sends the BEEP instruction just for testing\r\n\
+        send              send up to 8 barcodes (decimals 0..255) to the HP41 via the Wand emulation\r\n\
+                          for exampe : wand send 123 23 46 7 230\r\n\
+                          WARNING: do not send ALPHA strings with chards <0x10 when not in PRGM mode!\r\n"
+
+#define W_HELP_TXT "WAND Paper Keyboard functions\r\n\
+        [HP41 FUNCTION]   executes the HP41 function instruction via the Wand emulation\r\n\
+                          or inserts in a program in PRGM mode, case insensitive \r\n\
+                          use the command 'wand list' to see all supported functions\r\n\
+                          refer to the manual for details and escape codes\r\n\
+                            w \"abc\" for ALPHA string, characters <0x10 are converted to space!\r\n\
+                            w 'ABC' for single ALPHA characters\r\n\
+                            w -123.56E12 for numbers\r\n\
+                            w PI SIN x^2 for HP41 functions\r\n"
 
 
 // list all functions in userinterface.cpp called from cli-bindings here:
@@ -405,20 +447,23 @@ extern "C" {
   extern void uif_cat(int p, int b);    // show the plugged ROMs
   extern void uif_reserve(int i, int p, const char *comment);     // reserve a Page for a module
 
-  extern void uif_printer(int i);       // function for the HP82143A printer
+  extern void uif_printer(int i);                       // function for the HP82143A printer
 
-  extern void uif_xmem(int i);          // functions for Extended Memory control
+  extern void uif_xmem(int i);                          // functions for Extended Memory control
 
-  extern void uif_tracer(int i, int bufsize);      // functions for the bus tracer
+  extern void uif_tracer(int i, int bufsize);           // functions for the bus tracer
 
-  extern void uif_flash(int i, uint32_t addr);   // functions for the FLASH test
-  extern void uif_fram(int i, uint32_t addr);    // functions for the FRAM test
+  extern void uif_flash(int i, uint32_t addr);          // functions for the FLASH test
+  extern void uif_fram(int i, uint32_t addr);           // functions for the FRAM test
 
-  extern void uif_list(int i, const char *fname);    // list
+  extern void uif_list(int i, const char *fname);       // list
 
-  extern void uif_rtc(int i, const char *args);    // RTC test functions
+  extern void uif_rtc(int i, const char *args);         // RTC test functions
 
-  extern void uif_emulate(int i, int p);        // enable/disable hardware emulation functions
+  extern void uif_emulate(int i, int p);                // enable/disable hardware emulation functions
+
+  extern void uif_wand(int i, const char* fname, char* instruction);       // wand functions
+  extern void uif_w(const char *instruction);           // WAND Paper Keyboard functions
 
 // extern void uif_trace_mode(int m);    // trace [mode]
 

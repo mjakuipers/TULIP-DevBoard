@@ -1127,6 +1127,7 @@ extern struct TLine TraceLine;             // the variable with the TraceLine
 
 extern int sample_break;
 
+Filter TraceFilter;        // the trace filter settings
 
 // initialize the trace buffer
 void TraceBuffer_init()
