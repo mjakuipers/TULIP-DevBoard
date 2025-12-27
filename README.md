@@ -1,6 +1,12 @@
 # TULIP-DevBoard and TULIP-Module
 README for the TULIP4041 DevBoard and Module.
 
+WARNING for firmware version 0.96:
+When experimenting with the Wand please be aware that sending strings with characters < 0x10 can lead to
+a crash of the calculator that can be recoverd from only by completely removing power (and batteries) and 
+the TULIP. The firmware replaces these characters with a space. With the wand send command it is still 
+possible to construct these strings and send this.
+
 To order, contact me directly with your email address to receive an order form.
 
 Please be aware that the firmware files are in the TULIP4041-P2/build subdirectory. The firmware files are:
@@ -19,6 +25,19 @@ There are now a number of MOD files prepared for use in the TULIP:
 - XOSX_BS4X.MOD      4-bank version of CCD OSX for HP41C/CV systems (plugs in any lower port Page)
 - LIBRARY4-MAXX.MOD  2-bank switching version of Library4. Must be plugged in Page 4 for HP41C/CV systems
                      the system MUST support bankswitching in Page 4. Is supported in TULIP from firmware 0.95!
+
+VERSION 0.96 BETA, December 2025
+-   Added rudimentary power management. The RP2350 CPU clock is now 150MHz when USB power is connected 
+    and switches to 75MHz when powered by the HP41. This reduces the TULIP power consumption from ~20mA to ~14mA
+    Switchover is fully automatic and keeps the UART and SPI clocks at the same speed
+    The TULIP will still be running at all times, further power management to be implemented
+    Modified the PIO state machines running at 12.5MHz to have a shorter delay to support 2* speedup calculators
+-   Peripheral clock speed is increased to 150 MHz, this allows the FRAM SPI speed to be increased to 40MHZ
+    This speed helps implementing handling of the READ instructions as 16 registers can now be cached with an HP41 SYNC-SYNC cycle
+-   Fixed an issue when plugging an embedded ROM fails to save the emulation status to FRAM
+-   Partial implemented the FRAM File System, this is not yet used
+-   Implemented Wand emulation and the commands wand and w, updated documentation
+    Wand emulation is enabled when plugging the Wand MOD file
 
 VERSION 0.95 BETA 3, November 2025
 -   Added Page 4 bankswitching to support Library4 in HP41C/CV/MAXX machines
