@@ -1,7 +1,7 @@
 # TULIP-DevBoard and TULIP-Module
 README for the TULIP4041 DevBoard and Module.
 
-WARNING for firmware version 0.96:
+**WARNING for firmware version 0.96:**
 When experimenting with the Wand please be aware that sending strings with characters < 0x10 can lead to
 a crash of the calculator that can be recoverd from only by completely removing power (and batteries) and 
 the TULIP. The firmware replaces these characters with a space. With the wand send command it is still 
@@ -25,6 +25,9 @@ There are now a number of MOD files prepared for use in the TULIP:
 - XOSX_BS4X.MOD      4-bank version of CCD OSX for HP41C/CV systems (plugs in any lower port Page)
 - LIBRARY4-MAXX.MOD  2-bank switching version of Library4. Must be plugged in Page 4 for HP41C/CV systems
                      the system MUST support bankswitching in Page 4. Is supported in TULIP from firmware 0.95!
+Many other MOD files are available at http://www.hp41.org/mod/, and the website http://www.hp41.org/Intro.cfm is a great resource
+for manuals, ROM and MOD images and tools.
+My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
 
 VERSION 0.96 BETA, December 2025
 -   Added rudimentary power management. The RP2350 CPU clock is now 150MHz when USB power is connected 
