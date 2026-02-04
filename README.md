@@ -1,6 +1,8 @@
 # TULIP-DevBoard and TULIP-Module
 README for the TULIP4041 DevBoard and Module.
 
+![TULIP_small](https://github.com/user-attachments/assets/48ce1872-c028-45d0-808b-75ce184649b9)
+
 **WARNING for firmware version 0.96:**
 When experimenting with the Wand please be aware that sending strings with characters < 0x10 can lead to
 a crash of the calculator that can be recoverd from only by completely removing power (and batteries) and 
