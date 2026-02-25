@@ -125,6 +125,8 @@ Here are links to some videos I made:
 
 Robert Prosperi gave a talk about the TULIP on the 2025 HHC confernce in Orlando, with a Q+A session where I particpated online: https://www.youtube.com/watch?v=4R3ebXHAJd4, here is the presentation PDF: https://hhuc.us/2025/Presentations/TULIP4041%20-%20The%20Next%20Chapter.pdf
 
+If you wish to use the infrared printer output, you can use theRedEye IR Receiver here: https://github.com/mjakuipers/HP-RedEye-Receiver, base on Martin Hepperle's project https://www.mh-aerotools.de/hp/red-eye/index.htm 
+
 The housing design is now also available here: https://github.com/blackjetrock/hp41c-tulip-module-case. Thanks Andrew for the design!
 
 ![IMG_20240925_110722543](https://github.com/user-attachments/assets/33102d0d-1736-4b8a-81de-e93384321606)
