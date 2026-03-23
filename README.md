@@ -3,24 +3,49 @@ README for the TULIP4041 DevBoard and Module.
 
 ![TULIP_small](https://github.com/user-attachments/assets/48ce1872-c028-45d0-808b-75ce184649b9)
 
-**WARNING for firmware version 0.96:**
-When experimenting with the Wand please be aware that sending strings with characters < 0x10 can lead to
-a crash of the calculator that can be recoverd from only by completely removing power (and batteries) and 
-the TULIP. The firmware replaces these characters with a space. With the wand send command it is still 
-possible to construct these strings and send this.
+
 
 To order, contact me directly with your email address to receive an order form.
 
 The firmware binaries are now in the Firmware directory. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module
    - tulip4041_devboard.uf2    For the TULIP DevBoard
-DO NOT mix up the firmware files, some hardware I/O and memory sized are different.
-
-The TULIP Hardware V1.0 Schematics are added, following the succesful verification of the production units
+DO NOT mix up the firmware files, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues
 
 The MOD files are now in their own subdirectory with explanation and instructions for using HEPAX RAM.
 
 My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
+
+***This is a BIG firmware change. Most important is to initialize the FRAM according to the instructions below*** (text in bold and italic are CLI commands)
+- Be aware that you will lose all settings and the rom map, sorry
+- Step 1: unplug all everything, ensure that cat is empty: ***unplug ALL***
+- Step 2: use the command ***fram NUKEALL*** to erase all FRAM
+- Step 3: use the command ***fram INIT*** to initialize the FRAM file system
+- Step 4: use the ***list*** command to verify that the file system is created with some standard files
+- Step 6: enjoy the new firmware. To use the QROM features, use ***import [filename] qrom*** to import files from the uSD card in the QROM (FRAM) area, and plug these files in a Page. Filenames must be unique, you cannot have files with teh same name in both FLASH and FRAM
+- The User Manual is not yet up to date, working on that ...
+
+VERSION 0.97 BETA, March 2026
+-   Changed handling of FI in the tracer. Instead of tracing the full FI line (64 bits) the flags
+    are now compressed in a single 16-bit word, reducing a traceline to 40 bytes instead of 44
+-   Added m_emu_flags to the CPage struct to assist in disabling emulation when unplugging a Page
+    (but not implemented yet)
+-   Removed the CPU temperature from the system overview, the value is inaccurate without calibration 
+-   Implemented User Memory (1..4 Memory Modules) and the umem command
+-   Re-implemented Extended Memory including the XFunctions Memory and the xmem command
+-   Added an asterisk to the tracer selected RAM register if it is inside the TULIP emulation
+-   Added the trace filter size to the system overview (trace filters not yet implemented)
+-   Adjusted the IR clock rate to the updated clock speed of 150MHz (IR clock was actually too fast)
+    irout state machine clock divider is now a parameter
+-   Adjusted the IR clock speed with the CPU clock speed change when removing USB power (IR clock was too slow and printing did not work with USB power removed)
+-   Implemented the FRAM file system
+-   Implemented QROM support and the qrom command
+-   Implemented HEPAX and HEPRAM support and the hepram command
+-   Implemented the export command to save files (MOD and ROM) from FRAM to the uSD card
+-   Added the cd command to change or show the current working directory on the uSD card
+-   CLI now supports ASCI characters >0x7F, useful when entering names in the Owner String
+    the terminal emulation must be set accordingly (usually to UTF-* support)
+-   Added HP41 cycle frequency from the last RUN state to the system output
 
 VERSION 0.96 BETA, December 2025
 -   Added rudimentary power management. The RP2350 CPU clock is now 150MHz when USB power is connected 
@@ -75,6 +100,12 @@ VERSION 0.91 BETA 2, July 2025, Functional changes:
 **ONLY USE THE .UF2 VERSION FOR THE DEVBOARD!**
 
 Some users with a Mac as their host computer have reported issues with the uSD card. It works fine on the TULIP itself, but refuse to connect to the host PC as a drive while in the TULIP. The solution is to format the to the ExFAT format using the official SD CArd Formatting software available at https://www.sdcard.org/downloads/formatter/
+
+**WARNING for Wand users:**
+When experimenting with the Wand please be aware that sending strings with characters < 0x10 can lead to
+a crash of the calculator that can be recoverd from only by completely removing power (and batteries) and 
+the TULIP. The firmware replaces these characters with a space. With the wand send command it is still 
+possible to construct these strings and send this.
 
 **TULIP4041 Quick Start**
 
