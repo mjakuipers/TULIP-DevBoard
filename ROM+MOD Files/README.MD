@@ -32,7 +32,9 @@ Modified HEPAX-4H for TULIP, plugs in any Page 8-F, contains only the 4-0banks o
   OSX+ version that includes LIBRARY4
 
 **QROM-4K.MOD and QROM-8K.MOD**
+
   Empty QROM files. These MUST be imported in QROM to make any sense
+
 
 
 
