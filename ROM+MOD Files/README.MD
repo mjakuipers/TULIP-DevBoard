@@ -36,7 +36,7 @@ Modified HEPAX-4H for TULIP, plugs in any Page 8-F, contains only the 4-0banks o
 
 
 
-**Using HEPAX and HEPAX RAM with the TULIP. Text in bold and italic are TUILIP CLI commands.
+**Using HEPAX and HEPAX RAM with the TULIP. Text in bold and italic are TUILIP CLI commands**
 
 Step 1: plug the HEPAX4H and LIBRARY4 ROM images (after importing of course)
 
