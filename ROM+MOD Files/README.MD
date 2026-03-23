@@ -33,8 +33,8 @@
 - Step 2: import the HEPRAM files of choice in QROM with the command ***import hepram-8k.mod qrom***
 - Step 3: you can now plug the MOD file: ***plug hepram-8k.mod***, and check with ***cat*** in which Pages the HEPRAM is plugged
 - Step 4: mark the HEPRAM Pages to be included in the HEPRAM chain: ***hepram release P*** for both HEPRAM pages
-- Step 5: initilaize the HEPRAM chain: ***hepram INIT***, this will initialize the HEPRAM chain
-- Step 6: on the HP41, type HEPROOM and HEPDIR to check the amount of avaialble registers
+- Step 5: initialize the HEPRAM chain: ***hepram INIT***, this will initialize the HEPRAM chain. The Page is not erased, use ***hepram CLRAM P*** to erase the Page before initializing the chain
+- Step 6: on the HP41, type HEPROOM and HEPDIR to check the amount of available registers
 
 Any changes in a file that is plugged from QROM/FRAM are __immediately__ available in the file in FRAM. This file can be exported to the uSD card and then used in other HP41 systems (emulated or real). Be careful when moving a HEPRAM chained MOD file to another system. The Page numbers are hardcoded in the HEPRAM itself and when this ends up in another Page the effects may be undesirable. Either edit the chain manually or use one of Ángels tools (in the HPX-Plus ROM for example). Best is to enforce the HEPRAM in exactly the same Page configuration, but this may not always be easy.
 
