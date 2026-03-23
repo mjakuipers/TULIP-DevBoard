@@ -7,10 +7,10 @@
 - Library4 MOD file for the HP41C or CV, 2 banks loaded in Page 4
 
 **LIBRARY4-CX.MOD**
-- Library4 MOD file for the HP41CX, signle bank loaded in Page 4
+- Library4 MOD file for the HP41CX, single bank loaded in Page 4
 
 **HEPRAM-4K.MOD, HEPRAM-8K.MOD. HEPRAM-16K.MOD**
-- HEPAX RAM files with repectively 4, 8 an 16K RAM. Must be loaded in QROM to be useful
+- HEPAX RAM files with repectively 4, 8 an 16K RAM. Must be loaded in QROM to be useful. Before use the Pages must be released and the HEPRAM chain must be initialized (see instructions later in the README.MD)
 
 **OSX_BS4X-CX.MOD**
 - If you have an HP41, the OSX+ ROM is a must. Based upon the original CCD-ROM Ángel Martin built this 4-bank ROM to extend the HP41 system. Uses LIBRARY4. This version is for the HP41CX
@@ -28,9 +28,7 @@
 - Empty QROM files. These MUST be imported in QROM to make any sense
 
 
-
-
-**Using HEPAX and HEPAX RAM with the TULIP. Text in bold and italic are TULIP CLI commands**
+**Using HEPAX and HEPAX RAM with the TULIP**, text in bold and italic are TULIP CLI commands
 - Step 1: plug the HEPAX4H and LIBRARY4 ROM images (after importing of course)
 - Step 2: import the HEPRAM files of choice in QROM with the command ***import hepram-8k.mod qrom***
 - Step 3: you can now plug the MOD file: ***plug hepram-8k.mod***, and check with ***cat*** in which Pages the HEPRAM is plugged
