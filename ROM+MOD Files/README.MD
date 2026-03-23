@@ -1,4 +1,4 @@
-**A number of prepared MOD files are prvided here for use with the TULIP4041**
+**A number of prepared MOD files are provided here for use with the TULIP4041**
 
 **HEPAX-4HT**
 Modified HEPAX-4H for TULIP, plugs in any Page 8-F, contains only the 4-0banks of the HEPAX ROM. Written by Steen Petersen, portions A. Martin. This HEPAX version was built for use together with the LIBRARY4 ROM
@@ -38,7 +38,7 @@ Modified HEPAX-4H for TULIP, plugs in any Page 8-F, contains only the 4-0banks o
 
 
 
-**Using HEPAX and HEPAX RAM with the TULIP. Text in bold and italic are TUILIP CLI commands**
+**Using HEPAX and HEPAX RAM with the TULIP. Text in bold and italic are TULIP CLI commands**
 
 Step 1: plug the HEPAX4H and LIBRARY4 ROM images (after importing of course)
 
