@@ -11,7 +11,7 @@ possible to construct these strings and send this.
 
 To order, contact me directly with your email address to receive an order form.
 
-Please be aware that the firmware files are in the TULIP4041-P2/build subdirectory. The firmware files are:
+The firmware binaries are now in the Firmware directory. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module
    - tulip4041_devboard.uf2    For the TULIP DevBoard
 DO NOT mix up the firmware files, some hardware I/O and memory sized are different.
