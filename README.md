@@ -18,17 +18,8 @@ DO NOT mix up the firmware files, some hardware I/O and memory sized are differe
 
 The TULIP Hardware V1.0 Schematics are added, following the succesful verification of the production units
 
-There are now a number of MOD files prepared for use in the TULIP:
-- HEPAX_4H.MOD       4-Bank modified HEPAX with RAM pages (plugs in any even Page)
-- OSX-BS4X.MOD       standard 4-bank CCD OSX (plugs in any lower port Page) for HP41CX
-- OSX_BS4X-LIB4.MOD  standard 4-bank CCD OSX (plugs in any lower port Page) with LIBRARY4 (plugs in Page 4) for HP41CX
+The MOD files are now in their own subdirectory with explanation and instructions for using HEPAX RAM.
 
-  For the HP41C/CV Use the following:
-- XOSX_BS4X.MOD      4-bank version of CCD OSX for HP41C/CV systems (plugs in any lower port Page)
-- LIBRARY4-MAXX.MOD  2-bank switching version of Library4. Must be plugged in Page 4 for HP41C/CV systems
-                     the system MUST support bankswitching in Page 4. Is supported in TULIP from firmware 0.95!
-Many other MOD files are available at http://www.hp41.org/mod/, and the website http://www.hp41.org/Intro.cfm is a great resource
-for manuals, ROM and MOD images and tools.
 My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
 
 VERSION 0.96 BETA, December 2025
