@@ -30,7 +30,7 @@
 
 **Using HEPAX and HEPAX RAM with the TULIP**, text in bold and italic are TULIP CLI commands
 - Step 1: plug the HEPAX4H and LIBRARY4 ROM images (after importing of course)
-- Step 2: import the HEPRAM files of choice in QROM with the command ***import hepram-8k.mod qrom***
+- Step 2: import the HEPRAM files of choice in QROM with the command ***import hepram-8k.mod qrom*** (or use the 4K or 16K variants), and import from the correct directory on the uSD card
 - Step 3: you can now plug the MOD file: ***plug hepram-8k.mod***, and check with ***cat*** in which Pages the HEPRAM is plugged
 - Step 4: mark the HEPRAM Pages to be included in the HEPRAM chain: ***hepram release P*** for both HEPRAM pages
 - Step 5: initialize the HEPRAM chain: ***hepram INIT***, this will initialize the HEPRAM chain. The Page is not erased, use ***hepram CLRAM P*** to erase the Page before initializing the chain
