@@ -1235,10 +1235,9 @@ int compare_openfile(FIL* fp, uint32_t offs, bool comp_qrom)
   uint8_t qr_buf[0x1000];       // 4K buffer for QROM data, which is stored in a different format in FLASH
 
   ModuleMetaHeader_t MetaHH;    // save the File Header if QROM
-  ModuleMetaHeader_t *MetaH;          // pointer to meta header for getting info of next file  
+  ModuleMetaHeader_t *MetaH;    // pointer to meta header for getting info of next file  
 
   uint filesize = f_size(fp);   // get the filesize
-
 
   #ifdef DEBUG
     cli_printf("  comparing open file size %d bytes with FLASH/QROM file at %08X", filesize, offs);
@@ -1256,10 +1255,10 @@ int compare_openfile(FIL* fp, uint32_t offs, bool comp_qrom)
   }
 
   #ifdef DEBUG
-  cli_printf("  filename                         type  size      address     next file");
-  cli_printf("  -------------------------------  ----  --------  ----------  ----------");
-  cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
-                MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);
+  cli_printf("  filename                         type  size      address     next file   uSD filesize");
+  cli_printf("  -------------------------------  ----  --------  ----------  ----------  --------");
+  cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X  %8d", 
+                MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile, filesize);
   #endif
 
   // verify size infomation
@@ -1483,7 +1482,7 @@ int import_file(const char *fname, int option, bool imp_qrom)
     // file exists, is this UPDATE or compare?
     if ((option == import_update) || (option == import_compare)) {
       // file UPDATE or compare, first compare the file
-      result = compare_openfile(&fil, offs, imp_qrom);
+      result = compare_openfile(&fil, offs_qr, imp_qrom);
       if (result == COMPARE_SAME) {
         cli_printf("  file in FLASH/QROM is identical, no update needed");
         f_close(&fil);
@@ -2721,7 +2720,7 @@ void ShowMODDumpQ(uint32_t MODoffset)
   myPageHeader = &myPageHeaderCopy;
   myImage = myPageHeader->Image;
 
-  // NO CHECK ON MOD2 IM<AGES!
+  // NO CHECK ON MOD2 IMAGES!
   // we do not yet support MOD2 files
   // if (strcmp(myMODImage->FileFormat, "MOD2") == 0) {
   //   cli_printf("  MOD2 files not yet supported");
@@ -2987,7 +2986,7 @@ void fr_list_files(int option) {
       return;
     }
 
-    if (((MetaH.FileType == FILETYPE_DELETED) || (MetaH.FileType == FILETYPE_DUMMY)) && ((option & list_all) == list_all)) {
+    if ((option & list_all) == list_all && ((MetaH.FileType == FILETYPE_DELETED) || (MetaH.FileType == FILETYPE_DUMMY ))) {
       // this is the FRAM header file, show the version string
       char versionstring[32];
       fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, offs + sizeof(ModuleMetaHeader_t), (uint8_t*)versionstring, 31);
@@ -3008,7 +3007,7 @@ void fr_list_files(int option) {
         filecounter--;  // count the number of files found
       }
       cli_printf(" ");
-    } else {
+    } else if ((MetaH.FileType != FILETYPE_DELETED) && (MetaH.FileType != FILETYPE_DUMMY)) {
       //normal file, show the info
       sprintf(line, "  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
               MetaH.FileName, MetaH.FileType, MetaH.FileSize, offs, MetaH.NextFile);
@@ -3060,7 +3059,7 @@ void fr_list_files(int option) {
 #define list_no_arg         0   // filename only
 #define list_dump           1    
 #define list_ext          100
-#define list_all           10
+#define list_all            8
 #define list_q              2        
 #define list_f              4    
 */
@@ -3141,7 +3140,7 @@ void uif_list(int option, const char *fname)
         cli_printf("  file \"%s\" found in FLASH at 0x%08X", fname, offs);
       #endif
     }
-
+   
     // show the file details here
     cli_printf("  filename                         type      size  address     next file");
     cli_printf("  -------------------------------  ----  --------  ----------  ----------");
@@ -3225,7 +3224,7 @@ void uif_list(int option, const char *fname)
   #define list_no_arg         0   // filename only
   #define list_dump           1    
   #define list_ext          100
-  #define list_all           10
+  #define list_all            8
   #define list_q              2        
   #define list_f              4   
   */
@@ -4780,17 +4779,18 @@ void uif_hepram(int func, int p)
                                                                                  TULIP_Pages.Pages[pg].m_banks[1].b_img_name);
           } else {
             // not a HEPRAM page, so show QROM information, and N/A for the HEPRAM specific information
-            cli_printf("  %3X    %3d    %04X    %s   %s   n/a     n/a     %s", pg, 
-                                                                               TULIP_Pages.getword(pg << 12, 1), 
-                                                                               flags,
-                                                                               status_str, wp_status,
-                                                                               TULIP_Pages.Pages[pg].m_banks[1].b_img_name);
+            cli_printf("  %3X    %3d    %04X    %s   %s   n/a         n/a         %s", pg, 
+                                                                                  TULIP_Pages.getword(pg << 12, 1), 
+                                                                                  flags,
+                                                                                  status_str, wp_status,
+                                                                                  TULIP_Pages.Pages[pg].m_banks[1].b_img_name);
           }
         }
       }
       break;
 
     case hepram_init:
+    case hepram_initall:
       // initialize the HEPRAM pages, first find the HEPRAM Page
       // pages are initialized even if there is already data!
       // ALL HEPRAM Pages are initialized unless the word at xFF3 is not 0x100 oe 0x200
@@ -4809,10 +4809,14 @@ void uif_hepram(int func, int p)
           // we have to skip initialization if the HEPRAM page is reserved
           // this is the case if the word at 0xFF3 is not 0x100 or 0x200, as this indicates that the page 
           // is reserved for a module and should not be initialized
-          int wd = (TULIP_Pages.getword((pg << 12) + 0xFF3, 1)); 
-          if ((wd != 0x100) && (wd != 0x200)) {
-            cli_printf("  No initialization of HEPRAM Page %X, it is reserved (0xFF3 is marked 0x%03X)", pg, wd  );
-            continue; // skip the initialization of this page and go to the next one
+
+          if (func != hepram_initall) {
+            // skip reserved pages
+            int wd = (TULIP_Pages.getword((pg << 12) + 0xFF3, 1)); 
+            if ((wd != 0x100) && (wd != 0x200)) {
+              cli_printf("  No initialization of HEPRAM Page %X, it is reserved (0xFF3 is marked 0x%03X)", pg, wd  );
+              continue; // skip the initialization of this page and go to the next one
+            }
           }
 
           if ((flags & PAGE_WRITEABLE) == 0) {

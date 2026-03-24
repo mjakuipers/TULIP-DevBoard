@@ -2,16 +2,16 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
-VERSION 0.97 BETA, December 2025
+VERSION 0.97 BETA, March 2026
 -   Changed handling of FI in the tracer. Instead of tracing the full FI line (64 bits) the flags
-    are now compressed in a single 16-bit word, reducing a trace line to 40 bytes instead of 44
+    are now compressed in a single 16-bit word, reducing a traceline to 40 bytes instead of 44
 -   Added m_emu_flags to the CPage struct to assist in disabling emulation when unplugging a Page
     (but not implemented yet)
 -   Removed the CPU temperature from the system overview, the value is inaccurate without calibration 
 -   Implemented User Memory (1..4 Memory Modules) and the umem command
--   Re-implemented Extended Memory including help umemthe XFunctions Memory and the xmem command
+-   Re-implemented Extended Memory including the XFunctions Memory and the xmem command
 -   Added and asterisk to the tracer selected RAM register if it is inside the TULIP emulation
--   Added the trace filter size to the system overview (but not implemented yet)
+-   Added the trace filter size to the system overview
 -   Adjusted the IR clock rate to the updated clock speed of 150MHz (IR clock was actually too fast)
     irout state machine clock divider is now a parameter
 -   Adjusted the IR clock speed with the CPU clock speed change when removing USB power

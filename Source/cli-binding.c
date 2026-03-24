@@ -1726,6 +1726,7 @@ void onHepramCLI(EmbeddedCli *cli, char *args, void *context) {
     uint8_t pos_reserve = embeddedCliFindToken(args, "reserve");
     uint8_t pos_release = embeddedCliFindToken(args, "release");
     uint8_t pos_init    = embeddedCliFindToken(args, "INIT");
+    uint8_t pos_initall = embeddedCliFindToken(args, "INITALL");
 
     uint8_t num_tokens = embeddedCliGetTokenCount(args);
     uint8_t num_found_tokens = (pos_status > 0) + (pos_ramtog > 0) + (pos_clram > 0) + (pos_reserve > 0) + (pos_release > 0) + (pos_init > 0);
@@ -1757,6 +1758,11 @@ void onHepramCLI(EmbeddedCli *cli, char *args, void *context) {
         uif_hepram(hepram_init, 0); 
         return;
     }   
+
+    if (pos_initall > 0) {
+        uif_hepram(hepram_initall, 0); 
+        return;
+    }
 
     int p = 0;
     if (pos_ramtog > 0) {
@@ -1825,7 +1831,7 @@ void onHepramCLI(EmbeddedCli *cli, char *args, void *context) {
         } else {
             // check for a valid Page number in arg2
             int res = sscanf(arg2, "%X", &p);          // if one decimal is found then res = 1
-            if ((res != 1) | (p > 15) | (p < 4)) {
+            if ((res != 1) | (p > 16) | (p < 4)) {
                 // no valid result and no valid command, so get out
                 cli_printf("invalid Page number %s: must be between 4 and F (hex)", arg2);    // unknown command
                 return;

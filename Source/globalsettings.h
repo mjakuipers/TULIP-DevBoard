@@ -138,6 +138,7 @@ extern "C" {
 #define     tracer_offset       96          // default tracer settings offset in FRAM
 #define     usermem_offset      97          // default user memory settings offset in FRAM
 #define     xmem_offset         98          // default xmem settings offset in FRAM
+#define     debug_level         99          // debug level for console output, 0 = no debug, higher values more verbose
 #define     gsettings_end       255         // end of gsettings
 #define     gsettings_lastitem  (gsettings_end + 1)  // to get the total number of items in the array
 

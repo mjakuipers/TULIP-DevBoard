@@ -48,7 +48,7 @@ extern "C" {
 #include "peripherals.h"
 #include "globalsettings.h"
 #include "module.h"
-#include "embed_roms.h"
+#include "embed_roms.h"  
 
 // Definitions for HP41 peripheral mode
 

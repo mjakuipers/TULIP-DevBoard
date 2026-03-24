@@ -378,7 +378,8 @@ extern "C" {
         release p     Page p will be marked to be included in the HEPRAM chain\r\n\
         CLRAM p       clear the HEPRAM Page p (hex)\r\n\
         INIT          initialize the HEPRAM chain, does NOT erase the HEPRAM\r\n\
-                      only for pages that are marked as HEPRAM and not reserved\r\n"
+                      only for pages that are marked as HEPRAM and not reserved\r\n\
+        INITALL       initialize all HEPRAM, including reserved Pages, will erase all HEPRAM\r\n"
                       
 #define hepram_status   1
 #define hepram_ramtog   2
@@ -386,6 +387,7 @@ extern "C" {
 #define hepram_reserve  4
 #define hepram_release  5
 #define hepram_init     6
+#define hepram_initall  7
 
 #define CAT_HELP_TXT "cat functions\r\n\
         [no argument] shows the status of the plugged ROMs\r\n\

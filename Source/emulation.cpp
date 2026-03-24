@@ -1446,7 +1446,7 @@ void __not_in_flash_func(core1_pio)()
             if ((enabled_bank > 1) && !TULIP_Pages.isEnabled(rom_pg, enabled_bank) && TULIP_Pages.isEnabled(rom_pg, 1)) {
                 // get the word from Bank 1
                 // special case for the Advantage Module
-                isa_out_data = TULIP_Pages.getword(rom_addr, enabled_bank);  // get the word from Page/Bank
+                isa_out_data = TULIP_Pages.getword(rom_addr, 1);  // get the word from Bank 1
             } else {            
                 if (TULIP_Pages.isEnabled(rom_pg, enabled_bank)) {
                     // check if the page is enabled, if not then return empty data
