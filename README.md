@@ -23,7 +23,7 @@ My favourite community for HP calculators is https://www.hpmuseum.org/forum/inde
 - Step 3: use the command ***fram INIT*** to initialize the FRAM file system
 - Step 4: use the ***list*** command to verify that the file system is created with some standard files
 - Step 6: enjoy the new firmware. To use the QROM features, use ***import [filename] qrom*** to import files from the uSD card in the QROM (FRAM) area, and plug these files in a Page. Filenames must be unique, you cannot have files with teh same name in both FLASH and FRAM
-- The User Manual is not yet up to date, working on that ...
+- The User Manual and Backgronud document are both uodated
 
 VERSION 0.97 BETA, March 2026
 -   Changed handling of FI in the tracer. Instead of tracing the full FI line (64 bits) the flags
