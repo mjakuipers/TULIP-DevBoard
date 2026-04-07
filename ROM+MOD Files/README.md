@@ -1,6 +1,8 @@
 Some ready made MOD files are provided here for convenience. Take care that these configurations may work differently in non-TULIP environments. 
 Text in ***bold and italics*** are commands for the TULIP CLI.
 
+**IMPORTANT: I have probably mixed up the CV and CX versions of the OSX MOD files. This is under review**
+
 **HEPAX-4HT.MOD**
 - A variation of the HEPAX-4H+ (original by Steen Petersen, modifications by Ángel Martin) that will plug in any page, odd or even.
 This MOD file has 4 banks! This HEPAX version is modified to be used with LIBRARY4!
