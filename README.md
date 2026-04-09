@@ -118,7 +118,7 @@ The instructions below will guide you through the steps to get up and running wi
 4.	Connect a Terminal Emulator with the TULIP Command Line Interface. Try the newly discovered serial ports until you see the TULIP welcome message. Use the sdcard connect command in the CLI to connect with the host if the USB drive was not visible. When using the FAT file system the detection by the host can take some time, even up to several minutes when a large capacity SC card is used.
 5.	Update to the latest firmware (see the instructions in the documentation) if needed
 6.	Type the command dir myromrepo (do not care about the case of the subdirectory name) and verify if all your files are visible
-7.	Type the list command to check which ROMs are already in FLASH. If this is the first time the TULIP is used it will contain the ROM files used for production testing. Go to step 12 in case the list is garbled or if no files are visible at all. If the system is newly initialized it will show only the “TULIP4041 FLASH HEADER” file of type 41.
+7.	Type the ***list*** command to check which ROMs are already in FLASH. If this is the first time the TULIP is used it will contain the ROM files used for production testing. Go to step 12 in case the list is garbled or if no files are visible at all. If the system is newly initialized it will show only the “TULIP4041 FLASH HEADER” file of type 41.
 8.	Type the command import myromrepo ALL (ALL must be uppercase!). This will copy your ROM repository to FLASH memory which is needed for the ROMs to be pluggable. 
 9.	Use list again to verify if all your roms are imported
 10.	Connect the TULIP with your calculator. While doing that check which ports are physically occupied. You can now use the plug command. Say that you have imported the set of PPC roms, PPCL.rom and PPCU.rom. Assuming that you have Port 4 free (this is Page E and F) you can type (the case of the ROM name and the Page do not matter)
@@ -130,9 +130,16 @@ The instructions below will guide you through the steps to get up and running wi
 12.	Use cat in the TULIP CLI to confirm that the ROMs are plugged and enter CAT 2 on the HP41 to confirm that the PPC ROM is now plugged in the calculator. The configuration is saved in FRAM and will be available again after a power cycle
 13.	In case the file system is corrupted or not yet initialized you need to fully initialize the FLASH File System with the following steps:
 
+
     TULIP> flash NUKEALL
 
     TULIP> flash INIT
+
+    and/or
+ 
+    TULIP> fram NUKEALL
+
+    TULIP> fram INIT
 
 And go back to step 7
 
@@ -144,6 +151,8 @@ Here are links to some videos I made:
 - Harvest a connector from an HP41 module: https://www.youtube.com/watch?v=I3a0NojwHeg
 - Preview of the pre-production units, firmware and housing: https://www.youtube.com/watch?v=8PRu2yhQjck
 - Overview of the pre-production units: https://www.youtube.com/watch?v=zgKlAMlz9vY
+- Demonstration of the Wand emulation: https://youtu.be/-Lm2CUnrXPQ
+- Assembly and soldering of the new battery board: https://youtu.be/wtu5E9yf-MI
 
 Robert Prosperi gave a talk about the TULIP on the 2025 HHC confernce in Orlando, with a Q+A session where I particpated online: https://www.youtube.com/watch?v=4R3ebXHAJd4, here is the presentation PDF: https://hhuc.us/2025/Presentations/TULIP4041%20-%20The%20Next%20Chapter.pdf
 
