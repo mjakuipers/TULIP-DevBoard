@@ -1,0 +1,130 @@
+TULIP4041 RELEASE NOTES
+
+The TULIP4041 soft- and hardware is released under the MIT copyright license
+
+VERSION 0.97b BETA
+-   Bug fix release
+-   Fixed the issue of showing deleted files in normal list mode
+-   Fixed the import and update functions for files in FRAM (FRAM)
+-   Added the possibility to interrupt mass import by pressing a key
+-   Used a packed struct for the traceline, saving bytes and freeing up memory
+-
+
+VERSION 0.97 BETA, March 2026
+-   Changed handling of FI in the tracer. Instead of tracing the full FI line (64 bits) the flags
+    are now compressed in a single 16-bit word, reducing a traceline to 40 bytes instead of 44
+-   Added m_emu_flags to the CPage struct to assist in disabling emulation when unplugging a Page
+    (but not implemented yet)
+-   Removed the CPU temperature from the system overview, the value is inaccurate without calibration 
+-   Implemented User Memory (1..4 Memory Modules) and the umem command
+-   Re-implemented Extended Memory including the XFunctions Memory and the xmem command
+-   Added and asterisk to the tracer selected RAM register if it is inside the TULIP emulation
+-   Added the trace filter size to the system overview
+-   Adjusted the IR clock rate to the updated clock speed of 150MHz (IR clock was actually too fast)
+    irout state machine clock divider is now a parameter
+-   Adjusted the IR clock speed with the CPU clock speed change when removing USB power
+-   Implemented the FRAM file system
+-   Implemented QROM support and the qrom command
+-   Implemented HEPAX and HEPRAM support and the hepram command
+-   Implemented the export command to save files (MOD and ROM) from FRAM to the uSD card
+-   Added the cd command to change or show the current working directory on the uSD card
+-   CLI now supports ASCI characters >0x7F, useful when entering names in the Owner String
+    the terminal emulation must be set accordingly (usually to UTF-* support)
+-   Added HP41 cycle frequency from the last RUN state to the system output
+
+VERSION 0.96 BETA, December 2025
+-   Added rudimentary power management. The RP2350 CPU clock is now 150MHz when USB power is connected 
+    and switches to 75MHz when powered by the HP41. This reduces the TULIP power consumption from ~20mA to ~14mA
+    Switchover is fully automatic and keeps the UART and SPI clocks at the same speed
+    The TULIP will still be running at all times, further power management to be implemented
+    Modified the PIO state machines running at 12.5MHz to have a shorter delay to support 2* speedup calculators
+-   Peripheral clock speed is increased to 150 MHz, this allows the FRAM SPI speed to be increased to 40MHZ
+    This speed helps implementing handling of the READ instructions as 16 registers can now be cached with an HP41 SYNC-SYNC cycle
+-   Fixed an issue when plugging an embedded ROM fails to save the emulation status to FRAM
+-   Partial implemented the FRAM File System, this is not yet used
+-   Implemented Wand emulation and the commands wand and w, updated documentation
+    Wand emulation is enabled when plugging the Wand MOD file
+
+VERSION 0.95 BETA 3, November 2025
+-   Added Page 4 bankswitching to support Library4 in HP41C/CV/MAXX machines
+-   Reset into BOOTSELmode now unplugs all embedded modules since these are likley to move to other addresses
+-   Changed reading uSD card number of sectors, now with ioctl call to fix issue with exFAT on MacOS
+-   Fixed issue with enabling hpil emulation upon reboot/powercycle causing a real HP-IL module to malfunction
+-   Fixed unplug ALL command which did not clear reservations
+-   Fixed flash INIT command, would sometimes hang
+-   Fixed driving ISA to powerup the calculator
+-   Fixed tracer output which showed all instructions in column 7, it now correctly shows only TULIP decoded instructions
+
+VERSION 0.94 BETA 2, September 2025
+-   Fixed issue with non-working bank switching in Page 8
+
+VERSION 0.93 BETA 2, September 2025
+-   Fixed issue with reserving Page 5, 6, 7
+-   Increased GPIO drive strength for IR LED to 12 mA
+-   Added support for MOD file plugging
+-   Added import UPDATE and compare functions for mass update from a directory on the uSD card into FLASH
+-   Cosmetic changes to the cat listing
+
+VERSION 0.92 BETA 2, July 2025
+-   Fixed issue with autoplug
+-   Added command 'printer irtog' to toggle IR LED on or off constanty to facilitate current measurement
+-   Added command 'system gpio' to list all GPIO's
+-   Updated to Pico SDK V2.2.0
+
+VERSION 0.91 BETA 2, July 2025
+-   Various changes under the hood to prepare for MOD files and Tracer enhancements
+
+Functional changes:
+-   Support for Bank Switching and loading .ROM files in individual Banks
+-   Support for ZEPROM Sticky Bank Switching (use the CLI emulate command to enable)
+-   Flexible sizing of Trace Buffer (change requires restart)
+-   A ROM can now be plugged with a Page nmber. This works only for Bank 1
+    and the first available Page is used
+-   The reserve command is added to reserve a Page for a physical Module
+    Plugging without a Page number respects this reservation
+
+VERSION 0.9 BETA 1, June 2025
+-   Public beta, second version for the Pico2-RP2350
+-   Updated to the Pico SDK 2.1.0
+-   FatFS no-OS-FatFS-SD-SDIO-SPI-RPi-Pico Version 3.7.0
+-   USBD_PID Manufacturere and Product ID updated for TULIP4041
+-   Development tree with versions for DevBoard and Module, two binaries!
+-   uSD card will automatically mount and connect to host computer
+-   Many changes under the hood to prepare for the Module version, MOD files and Bank Switching
+
+Functional changes:
+-   SDCard FAT and exFAT supported, subdirectories and dir command
+-   FLASH File system with NUKEALL, INIT, delete, dump, list and import functions
+-   FRAM management functions, initialization and dump
+-   plug and unplug functions, ROM mapping stored in FRAM
+-   cat function
+-   emulate function
+-   HP-IL, IL Printer and 82143A Printer still embedded and easy to plug without import in FLASH
+-   tracer now registers active bank
+-   RTC support in the firmware for the Module using I2C
+
+Limitations:
+-   uSD card must be >2 GByte
+-   No Bank Switching
+-   Only ROM files supported for plugging
+-   NO power management!
+-   exFAT file system on the uSD card is recommended, FAT seems to be slow when registering with the host PC
+
+READ THE DOCUMENTATION BEFORE USE!
+
+USB virtual serial port assignment
+-   ITF 0		main console, user interface
+-   ITF 1		trace output HP41 bus tracer 
+-   IFT 2		HP-IL frames (connect with ILPer or pyILPer  )
+-   ITF 3		HP-IL frame tracing
+-   ITF 4		Printer output for HP82143A
+
+The UART on GPIO 0 and 1 is used by the 'old' user interface and can be 
+used for simple monitoring. DO NOT USE THE FLASH FUNCTIONS!
+
+USE AT YOUR OWN RISK
+This is a preliminary public BETA release. 
+The sources contain may functions that are still in development and very subject to changes
+Please report any issues on the github issue tracker.
+
+The .uf2 file is ready to be loaded in the Pico.
