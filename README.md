@@ -7,7 +7,7 @@ README for the TULIP4041 DevBoard and Module.
 
 To order, contact me directly with your email address to receive an order form.
 
-The firmware binaries are now in the Firmware directory. The firmware files are:
+The firmware binaries are now in the Firmware directory, updated to 0.97b. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module
    - tulip4041_devboard.uf2    For the TULIP DevBoard
 DO NOT mix up the firmware files, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues
@@ -15,6 +15,13 @@ DO NOT mix up the firmware files, some hardware I/O and memory sized are differe
 The MOD files are now in their own subdirectory with explanation and instructions for using HEPAX RAM.
 
 My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
+
+VERSION 0.97b, April 2026
+-   Bug fix release
+-   Fixed the issue of showing deleted files in normal list mode
+-   Fixed the import and update functions for files in FRAM (FRAM)
+-   Added the possibility to interrupt mass import by pressing a key
+-   Used a packed struct for the traceline, saving bytes and freeing up memory
 
 ***This is a BIG firmware change. Most important is to initialize the FRAM according to the instructions below*** (text in bold and italic are CLI commands)
 - Be aware that you will lose all settings and the rom map, sorry
