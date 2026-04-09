@@ -10,6 +10,10 @@
  *  - IO definitions and initialization
  *
  * This is free software: you are free to change and redistribute it.
+ * 
+ * HP-IL emulation is based on the V41 sources by Christoph Giesselink en
+ * EMU41 by Jean-Francois Garnier
+ * PILBox emulation is based on the PILBox project by Jean-Francois Garnier
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of

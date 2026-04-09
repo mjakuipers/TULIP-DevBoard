@@ -58,7 +58,7 @@ set(SOURCES
                 module.cpp              # embedded modules and functions for ROM management
                 msc_device_disk.c       # functions to implement the uSDCard msc USB device
                 i2c_devices.cpp         # I2C devices (RTC, display)
-                // pio_uart.c              # PIO UART implementation
+                pio_uart.c              # PIO UART implementation is not used
 )
 
 set(LINK_LIBRARIES
@@ -101,7 +101,7 @@ add_executable( tulip4041_module        # main application
 )
 target_compile_definitions(tulip4041_module PUBLIC 
                            TULIP_HARDWARE=1                           # define the TULIP_HARDWARE macro
-                           VERSION_STRING="0.97 BETA"
+                           VERSION_STRING="0.97b"
 )
 
 pico_set_program_name(tulip4041_module "tulip4041")
@@ -149,7 +149,7 @@ add_executable( tulip4041_devboard      # main application
 )
 target_compile_definitions(tulip4041_devboard PUBLIC 
                            TULIP_HARDWARE=0     # define the TULIP_HARDWARE macro
-                           VERSION_STRING="0.97 BETA"
+                           VERSION_STRING="0.97b"
                           ) 
 
 pico_set_program_name(tulip4041_devboard "tulip4041")

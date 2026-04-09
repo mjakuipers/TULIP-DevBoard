@@ -34,76 +34,69 @@ extern "C" {
 // definition of the structure for the analyzer functions
 // different variations to support dynamic sizing of the tracebuffer
 
+
+// TODO: use spare bits in xq_carry as a status to indicate if the TULIP is driving the output:
+// useful for ISA, DATA, FI, carry
+// there are spare bits in DATA, FI, ISA instruction and Bank
+
 // TLine  is for the maximum possible trace line structure with FI and HP-IL
-struct TLine  {
+struct __attribute__((packed))TLine {                                       //      bytes     total   spare bits
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4    0
+    uint32_t    data1;              // DATA D31..D00                                4 bytes      8    0
+    uint32_t    data2;              // DATA D55..D32                                4 bytes     12    8
+    uint16_t    isa_address;        // ISA address                                  2 bytes     14    0
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16    4   add decoded by TULIP
+    uint16_t    ramslct;            // selected RAM chip                            2 bytes     18    3   includes ourselected
+    uint16_t    fi;                 // compressed FI                                2 bytes     20    2
+    uint16_t    xq_instr;           // instruction decoded                          2 bytes     22    4
+    uint16_t    frame_in;           // HP-IL frame input                            2 bytes     24    0
+    uint16_t    frame_out;          // HP-IL frame output                           2 bytes     26    0
+    uint8_t     bank;               // current selected bank                        1 byte      27    6
+    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     36    0
+    bool        xq_carry;           // when carry is sent                           1 byte      37    7
+}; 
+
+
+// tracer individual bits to pass:
+// RAMSLCT bit 15 is 1 if our RAM access, 0 if other RAM access or ROM access
+// FI is compressed to 16 bits, with 1 bit per digit, so we can
+
+// TLine  is for basic tracing with FI
+struct __attribute__((packed))TLine_FI {
     uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4
     uint32_t    data1;              // DATA D31..D00                                4 bytes      8
     uint32_t    data2;              // DATA D55..D32                                4 bytes     12
-    uint16_t    fi;                 // for testing compresses FI                    2 bytes     14
-    uint16_t    ramslct;            // selected RAM chip                            4 bytes     18
-    uint16_t    isa_address;        // ISA address                                  2 bytes     20
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     22
-    uint16_t    xq_instr;           // instruction decoded                          2 bytes     24   
-    uint16_t    frame_in;           // HP-IL frame input                            2 bytes     26
-    uint16_t    frame_out;          // HP-IL frame output                           2 bytes     28    
-    uint8_t     bank;               // current selected bank                        1 byte      29
-    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     38 
-    bool        xq_carry;           // when carry is sent                           1 byte      39
-} ; 
-
-// TLine  is for basic tracing with FI
-struct TLine_FI {
-    uint32_t    cycle_number;       // to count the cycles since the last PWO       // 4 bytes      4
-    uint32_t    data1;              // DATA D31..D00                                // 4 bytes     12  
-    uint32_t    data2;              // DATA D55..D32                                // 4 bytes     16
-    uint32_t    fi1;                // for FI line tracing                          // 4 bytes     20
-    uint32_t    fi2;                //                                              // 4 bytes     24
-    uint16_t    isa_address;        // ISA address                                  // 2 bytes      6    
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status             // 2 bytes      8
-    uint16_t    ramslct;            // selected RAM chip                            // 4 bytes     28
-    // uint16_t    xq_instr;           // instruction decoded              
-    // bool        xq_carry;           // when carry is sent
-    // uint16_t    frame_in;           // HP-IL frame input
-    // uint16_t    frame_out;          // HP-IL frame output
-    // uint8_t     HPILregs[9];        // HP-IL registers
+    uint16_t    isa_address;        // ISA address                                  2 bytes     14
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16
+    uint16_t    ramslct;            // selected RAM chip                            2 bytes     18
+    uint16_t    fi;                 // compressed FI                                2 bytes     20
+    
+ // uint16_t    xq_instr;           // instruction decoded                          2 bytes     22   
+ // uint16_t    frame_in;           // HP-IL frame input                            2 bytes     24
+ // uint16_t    frame_out;          // HP-IL frame output                           2 bytes     26    
+ // uint8_t     bank;               // current selected bank                        1 byte      27
+ // uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     36 
+ // bool        xq_carry;           // when carry is sent                           1 byte      37
 } ;
 
 
 // TLine basic is for the smallest possible trace line structure
-struct TLine_basic {
-    uint32_t    cycle_number;       // to count the cycles since the last PWO       // 4 bytes      4
-    uint32_t    data1;              // DATA D31..D00                                // 4 bytes     10   
-    uint32_t    data2;              // DATA D55..D32                                // 4 bytes     14
-    uint16_t    isa_address;        // ISA address                                  // 2 bytes      6
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status             // 2 bytes      8       
-    // uint32_t    fi1;                // for FI line tracing
-    // uint32_t    fi2;   
-    // uint16_t    xq_instr;           // instruction decoded                
-    // bool        xq_carry;           // when carry is sent
-    // uint32_t    ramslct;            // selected RAM chip
-    // uint16_t    frame_in;           // HP-IL frame input
-    // uint16_t    frame_out;          // HP-IL frame output
-    // uint8_t     HPILregs[9];        // HP-IL registers
+struct __attribute__((packed))TLine_basic {
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4
+    uint32_t    data1;              // DATA D31..D00                                4 bytes      8
+    uint32_t    data2;              // DATA D55..D32                                4 bytes     12
+    uint16_t    isa_address;        // ISA address                                  2 bytes     14
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16    
+
+ // uint16_t    ramslct;            // selected RAM chip                            2 bytes     18
+ // uint16_t    fi;                 // compressed FI                                2 bytes     20
+ // uint16_t    xq_instr;           // instruction decoded                          2 bytes     22   
+ // uint16_t    frame_in;           // HP-IL frame input                            2 bytes     24
+ // uint16_t    frame_out;          // HP-IL frame output                           2 bytes     26    
+ // uint8_t     bank;               // current selected bank                        1 byte      27
+ // uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     36 
+ // bool        xq_carry;           // when carry is sent                           1 byte      37
 };
-
-// TLine basic is for the basic trace with HP-IL registers
-struct TLine_IL {
-    uint32_t    cycle_number;       // to count the cycles since the last PWO       // 4 bytes      4
-    uint32_t    data1;              // DATA D31..D00                                // 4 bytes     12
-    uint32_t    data2;              // DATA D55..D32                                // 4 bytes     16
-    uint16_t    isa_address;        // ISA address                                  // 2 bytes      6 
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status             // 2 bytes      8
-    // uint32_t    fi1;                // for FI line tracing
-    // uint32_t    fi2;                
-    // uint16_t    xq_instr;           // instruction decoded   
-    // bool        xq_carry;           // when carry is sent
-    uint16_t    ramslct;            // selected RAM chip                            // 4 bytes     20
-    uint16_t    frame_in;           // HP-IL frame input                            // 2 bytes     22
-    uint16_t    frame_out;          // HP-IL frame output                           // 2 bytes     24    
-    uint8_t     HPILregs[9];        // HP-IL registers                              // 9 bytes     33
-};
-
-
 
 
 

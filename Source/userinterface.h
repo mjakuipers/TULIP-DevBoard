@@ -94,7 +94,7 @@ void uif_sdcard_mount();                        // mount the uSD card
 void uif_sdcard_unmount();                      // unmount the uSD card
 void uif_sdcard_mounted();
 
-void uif_import(const char *fname, int a2, int a3);              // import a file and program in FLASH/FRAM
+void uif_import(const char *fname, int func);              // import a file and program in FLASH/FRAM
 void uif_export(int func, const char *fname,  const char *dir);  // export a file to the uSD card
 void uif_cd(int function, const char *dir);                      // change working directory
 

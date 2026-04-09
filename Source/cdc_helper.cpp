@@ -69,7 +69,7 @@ static void wait_for_write(int itf, uint32_t len)
 // does not flush the buffer, can be done by the caller if needed
 void cdc_sendbuf(int itf, char* buffer, int len)
 {
-    int sent;       // number of bytes really sent
+    uint32_t sent;       // number of bytes really sent
 
     // TODO: consider a time-out here to prevent a lock-up if the buffer is not emptied on the receiving end
     wait_for_write(itf, len);                   // wait until enough room is in the output queue

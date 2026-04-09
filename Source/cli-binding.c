@@ -332,211 +332,92 @@ void onSDCardCLI(EmbeddedCli *cli, char *args, void *context)
 }
 
 /*
-#define import_no_match        -1
 #define import_no_arg           0
 #define import_all              1
 #define import_update           2
 #define import_compare          3
-#define import_fram             4
-#define import_fram_compare     5
-#define import_fram_update      6
+#define import_qrom             4
+#define import_compare_all      5
+#define import_update_all       6
 */
-
-
 
 /*
 #define IMPORT_HELP_TXT "import functions\r\n\
         [filename]                   import a single file to FLASH\r\n\
-        [filename]  [compare]        compare a single file with the one in FLASH\r\n\
-        [filename]  [UPDATE]         update a single file in FLASH\r\n\
+        [filename]  [qrom]           import a single file in QROM space (FRAM)\r\n\
+        [filename]  [compare]        compare a single file with the one in FLASH or QROM\r\n\
+        [filename]  [UPDATE]         update a single file in FLASH or QROM\r\n\
         [directory] [ALL]            import all files in a directory to FLASH\r\n\
         [directory] [compare] [ALL]  compare all files in a directory with FLASH\r\n\
-        [directory] [UPDATE] [ALL]   update all files in a directory in FLASH\r\n\
-        - import functions for FRAM:\r\n\
-        [filename]  [fr]             import a single file in FRAM\r\n\
-        [filename]  [compare] [fr]   compare a single file with the one in FRAM\r\n\
-        [filename]  [UPDATE] [fr]    update a single file in FRAM\r\n"
+        [directory] [UPDATE]  [ALL]  update all files in a directory in FLASH\r\n"
 */
 
-const char* __in_flash()import_cmds[] =
-// list of arguments for the import command
-// import [filename]
-{
-    "ALL",      // import all files in the directory
-    "UPDATE",   // update files in the file sysytem
-    "compare",  // compare files in the file system prior to an update
-    "qrom",     // import to QROM (FRAM) instead of FLASH
-};
-
-// the following commans line options are possible:
-// import [filename] <q> 
-// import [filename] <UPDATE> <q>
-// import [filename] <compare> <q>
-// import [directory] [ALL]
-// import [directory] [ALL] <compare>
-// import [directory] [ALL] <UPDATE>
-// - import functions for FRAM:
-// import [filename] [q]             import a single file in QROM space (FRAM)\r\n\
-// import [filename] [compare] [q]   compare a single file with the one in QROM space (FRAM)\r\n\
-// import [filename] [UPDATE]  [q]   update a single file in QROM space (FRAM)\r\n"
 
 void onImportCLI(EmbeddedCli *cli, char *args, void *context)
 {
-    const char *arg1 = embeddedCliGetToken(args, 1);        // filename or directory
-    const char *arg2 = embeddedCliGetToken(args, 2);        // ALL, UPDATE or compare
-    const char *arg3 = embeddedCliGetToken(args, 3);        // ALL, UPDATE or compare
+    // check for a known token
+    // arg1 is always the filename or directory, this is handled in the uif_import function, so we do not check for it here
+    uint8_t pos_all     = embeddedCliFindToken(args, "ALL");
+    uint8_t pos_update  = embeddedCliFindToken(args, "UPDATE");
+    uint8_t pos_compare = embeddedCliFindToken(args, "compare");
+    uint8_t pos_qrom    = embeddedCliFindToken(args, "qrom");
 
-    int cmd = -1;
-    int num_cmds = sizeof(import_cmds) / sizeof(char *);
+    const char *arg1 = embeddedCliGetToken(args, 1);   // filename or directory, this is handled in the uif_import function
+    uint8_t num_tokens = embeddedCliGetTokenCount(args);
 
 
-
-    // arg1 is always a filename or directory, this is handled in the uif_import function
-    if ((arg1 == NULL)) {
+    if ((num_tokens == 0) || (num_tokens > 3)) {
         // no argument given, this does nothing       
-        cli_printf("arguments missing, use: import [file/directory] <ALL> <UPDATE/compare/q>");    
+        cli_printf("invalid arguments, see help");    
         return;
     }
 
-    if (arg2 == NULL) {
-        // no second argument, import a single file, name in arg1
+    if (num_tokens == 1) {
         // this is a single file import, so pass the filename only
-        uif_import((char*)arg1, import_no_arg, import_no_arg);     // pass the filename only
+        uif_import((char*)arg1, import_no_arg);     // pass the filename only
         return;
     }
 
-    // scan arg2 for something known, this can be ALL, UPDATE, compare or q
-    int a2 = 0;
-    while (cmd != 0 && a2 < num_cmds) {
-        cmd = strcmp(arg2, import_cmds[a2]);
-        a2++;
-    }
-
-    if (cmd != 0) {   // no match in the argument
-        a2 = -1;
-    }
-
-    // if arg2 is an unknown argument we get out
-    if (a2 == -1) {
-        // there is an argument in arg2 but it is not valid
-        cli_printf("import: unknown 2nd argument %s", arg2);
-        return;
-    }
-
-    // scan arg3 for something known, this can be ALL, UPDATE, compare or q
-    // but of course only if there is an argument
-    int a3 = 0;
-    cmd = -1;
-    if (arg3 != NULL) {
-        while (cmd != 0 && a3 < num_cmds) {
-            cmd = strcmp(arg3, import_cmds[a3]);
-            a3++;
-        }
-        if (cmd != 0) {
-            // there is an argument in arg3 but it is not valid
-            cli_printf("import: unknown 3rd argument %s", arg3);
+    if (num_tokens == 2) {
+        // this can be either a single file import with an argument or a directory import without ALL
+        if (pos_all == 2) {
+            // this is an import of all files in a directory, so pass the directory and the ALL argument
+            uif_import((char*)arg1, import_all);     // pass the directory and the ALL argument
             return;
         }
-    } else {
-        // if arg3 == NULL
-        a3 = 0;
+        else if (pos_update == 2) {
+            // this is an update of a single file, so pass the filename and the UPDATE argument
+            uif_import((char*)arg1, import_update);     // pass the filename and the UPDATE argument
+            return;
+        }
+        else if (pos_compare == 2) {
+            // this is a compare of a single file, so pass the filename and the compare argument
+            uif_import((char*)arg1, import_compare);     // pass the filename and the compare argument
+            return;
+        }
+        else if (pos_qrom == 2) {
+            // this is an import of a single file to QROM space (FRAM), so pass the filename and the qrom argument
+            uif_import((char*)arg1, import_qrom);     // pass the filename and the qrom argument
+            return;
+        }
     }
 
-    // a2 or a3 can be any of the following:
-    // #define import_no_arg            0
-    // #define import_all               1
-    // #define import_update            2
-    // #define import_compare           3
-    // #define import_q                 4
-    // 
-    // and are validated according to the following:
-    //   a2        a3       command                                 meaning
-    //   0         *        - import [file]                           single file import, handled above
-    //   1         0        - import [directory] ALL                  import ALL files in a directory
-    //   1         1        - import [directory] ALL ALL              * not valid
-    //   1         2        - import [directory] ALL UPDATE           update all files in a directory
-    //   1         3        - import [directory] ALL compare          compare all files in a directory
-    //   2         0        - import [file] UPDATE                    single file update
-    //   2         1        - import [directory] UPDATE ALL           update all files in a directory
-    //   2         2        - import [file] UPDATE UPDATE             * not valid
-    //   2         3        - import [file] UPDATE compare            * not valid
-    //   3         0        - import [file] compare                   single file compare
-    //   3         1        - import [directory] compare ALL          compare all files in a directory
-    //   3         2        - import [file] compare UPDATE            * not valid
-    //   3         3        - import [file] compare compare           * not valid
-    //   4         0        - import [file] q                         import single file to FRAM
-    //   3         4        - import [file] compare q                 compare single file with FRAM
-    //   2         4        - import [file] UPDATE q                  update single file in FRAM
-
-    // call to uif_import can be the following:
-    // a2              a3
-    // import_no_arg   import_no_arg
-    // import_all      import_no_arg            import [directory] ALL
-    // import_update   import_no_arg            import [file] UPDATE
-    // import_compare  import_no_arg            import [file] compare
-    // import_all      import_update            import [directory] ALL UPDATE
-    // import_all      import_compare           import [directory] ALL compare
-
-    // import_q        import_no_arg            import [file] q
-    // import_q        import_update            import [file] UPDATE q
-    // import_q        import_compare           import [file] compare q
-
-
-    if ((a2 == import_all) && (a3 == import_no_arg)) {
-        // import [directory] ALL
-        uif_import((char*)arg1, import_all, import_no_arg);     // pass the arguments
-        return;
-    }
-
-    if ((a2 == import_update) && a3 == import_no_arg) {
-        // import [file] UPDATE
-        uif_import((char*)arg1, import_update, import_no_arg);     // pass the arguments
-        return;
-    }   
-
-    if ((a2 == import_compare) && (a3 == import_no_arg)) {
-        // import [file] compare
-        uif_import((char*)arg1, import_compare, import_no_arg);     // pass the arguments
-        return;
-    }
-
-    if (((a2 == import_all)    && (a3 == import_update)) ||
-        ((a2 == import_update) && (a3 == import_all))) {
-        // import [directory] ALL UPDATE
-        uif_import((char*)arg1, import_all, import_update);     // pass the arguments
-        return;
-    }
-
-    if (((a2 == import_all)    && (a3 == import_compare)) ||
-        ((a2 == import_compare) && (a3 == import_all))) {
-        // import [directory] ALL compare
-        uif_import((char*)arg1, import_all, import_compare);     // pass the arguments
-        return;
-    }    
-
-    if (((a2 == import_no_arg) && (a3 == import_q)) ||
-        ((a2 == import_q)      && (a3 == import_no_arg))) {
-        // import [file] q
-        uif_import((char*)arg1, import_q, import_no_arg);     // pass the arguments
-        return;
-    }
-
-    if (((a2 == import_update) && (a3 == import_q)) || 
-        ((a2 == import_q)      && (a3 == import_update)))  {
-        // import [file] UPDATE q
-        uif_import((char*)arg1, import_q, import_update);     // pass the arguments
-        return;
-    }
-
-    if (((a2 == import_compare) && (a3 == import_q)) ||
-        ((a2 == import_q)       && (a3 == import_compare))) {
-        // import [file] compare q
-        uif_import((char*)arg1, import_q, import_compare);     // pass the arguments
-        return;
+    if (num_tokens == 3) {
+        // this can only be a directory import with ALL and an argument, so we check for ALL and then for the argument
+        if ((pos_compare ==2) && (pos_all == 3)) {
+            // this is a compare of all files
+            uif_import((char*)arg1, import_compare_all);     
+            return;
+        }
+        else if ((pos_update == 2) && (pos_all == 3)) {
+            // this is an update of all files in a directory
+            uif_import((char*)arg1, import_update_all);     
+            return;
+        }
     }
 
     // if we get here this is an unsupported comnbination of arguments
-    cli_printf("argument combination not supported, see help");
+    cli_printf("invalid arguments, see help");
 }
 
 

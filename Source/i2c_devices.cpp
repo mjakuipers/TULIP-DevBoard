@@ -72,15 +72,10 @@ void i2c_scan() {
         // Skip over any reserved addresses.
         int ret;
         uint8_t rxdata;
-        if (reserved_addr(addr)) {
-            ret = PICO_ERROR_GENERIC;
-            cli_printfn("x  ");
-        } else {
-            ret = i2c_read_blocking(I2C_PORT, addr, &rxdata, 1, false);
 
-            cli_printfn(ret < 0 ? "." : "#");
-            cli_printfn(addr % 16 == 15 ? "\n\r" : "  "); 
-        }
+        ret = i2c_read_blocking(I2C_PORT, addr, &rxdata, 1, false);
+        cli_printfn(ret < 0 ? "." : "#");
+        cli_printfn(addr % 16 == 15 ? "\n\r" : "  ");         
     }
     cli_printf("");
 }

@@ -894,14 +894,14 @@ void __not_in_flash_func(core1_pio)()
                         SLCT_PRPH = -1;          // return control back to the NUT
                     }
                     break;
-                case SELP9_POWON:               // 0x043, set carry if printer is ON, no SYNC bit!!
+                case SELP9_VALID:               // 0x043,  set carry if status valid, no SYNC bit! 
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst;
                         sendcarry = globsetting.get(PRT_power);
                         SLCT_PRPH = -1;          // return control back to the NUT                    
                     }
                     break;
-                case SELP9_VALID:               // 0x083, set carry if status valid, no SYNC bit! 
+                case SELP9_POWON:               // 0x083, set carry if printer is ON, no SYNC bit!!
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst; 
                         if (globsetting.get(PRT_power)) {
@@ -910,8 +910,7 @@ void __not_in_flash_func(core1_pio)()
                         }
                         SLCT_PRPH = -1;          // return control back to the NUT                      
                     }
-                    break;           
-                                                                
+                    break;                                                                        
                 case SELP9_RDPTRN:              // 0x03A, transfer printer status word to C[10..13], no SYNC bit!
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst; 
@@ -926,9 +925,7 @@ void __not_in_flash_func(core1_pio)()
                             // SELP9_status = SELP9_status & 0xC0FF;
                             SELP9_status = SELP9_status & (~prt_ADV_mask);
                             SELP9_status = SELP9_status & (~prt_PRT_mask);
-                        }
-                        else
-                        {
+                        } else {
                             keycount_print--;
                         }                                                       
                     }
@@ -936,8 +933,7 @@ void __not_in_flash_func(core1_pio)()
             }   // switch
         }
 
-        if (globsetting.get(HP82160A_enabled))
-        {
+        if (globsetting.get(HP82160A_enabled)) {
             // handling of HP82160A (HP-IL) specific instructions
             // filter out SELP0..SELP9: 0x024 to 0x1E4, 
             // this is a class 0 instruction PPPPIIII00, where IIII = 0b1001, PPPP = 0..7
@@ -1608,6 +1604,7 @@ void __not_in_flash_func(core1_pio)()
 
                 case SELP9_RTNCPU:              // 0x005, return control to the HP41 CPU, ends SELP mode, no SYNC bit!
                                                 // does not need any data
+                                                // TODO: any word with the lsb set should return control to the NUT
                     // TraceLine.xq_instr = rx_inst;    
                     rx_inst_t = rx_inst; 
                     // if ((SLCT_PRPH == 9) && HP82143A_active) { 
@@ -1672,6 +1669,13 @@ void __not_in_flash_func(core1_pio)()
 
                     // catch the HP-IL=C(0..7) instructions, copy C[0..1] to the HP-IL register
                     // instructions 0x200..0x3C0, bit pattern: 0b1nnn000000, with SYNC bit set: 0b111nnn000000 0xE00
+
+                    if (SLCT_PRPH == 9) {
+                        // if the printer was selected and we get here this was an illegal printer instruction
+                        // return control to the NUT to handle it and prevent getting stuck in the printer emulation
+                        SLCT_PRPH = -1;   
+                        break;
+                    }
                     
                     // if (HP82160A_active && ((rx_inst & 0xE3F) == 0xE00))
                     if (globsetting.get(HP82160A_enabled) && ((rx_inst & 0xE3F) == 0xE00))

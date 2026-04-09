@@ -3,6 +3,8 @@
  *
  * This file is part of the TULIP4041 project.
  * Copyright (C) 2024 Meindert Kuipers
+ * 
+ * LoadMOD function based on V41 sources by Warren Furlow and Christoph Giesselink(MODFile.c)
  *
  * This is free software: you are free to change and redistribute it.
  *
@@ -43,7 +45,7 @@ const char* __in_flash("flash_constants")glob_set_[] = {
     "Bankswitching enabled",                    // 10   bankswitch instructions enabled  
     "Expanded Memory enabled",                  // 11   Expandend Memory enabled (MAXX emulation)
     "Tiny41 Instructions enabled",              // 12   enable decoding of TT specific instructions for device control
-    "",                                         // 13   Write Protect all QROM (same effact as #8 ??)
+    "",                                         // 13   Write Protect all QROM (same effect as #8 ??)
 
     "",                                         // 14   placeholder
 
@@ -1213,7 +1215,7 @@ const char* file_types[] =
     "printer",
 };
 
-// copmare the current open file with the one in FLASH at offset offs
+// compare the current open file with the one in FLASH at offset offs
 // the file is already open, and the file in FLASH is found at offs
 // returns the following values:
 // 0 - file is not in FLASH or file read error
@@ -1366,15 +1368,23 @@ bool wildcard_match(const char *str, const char *pattern) {
   return !*str && !*pattern; // Both strings must be at the end
 }
 
-// import a file with a given filename
-// import a file and program in FLASH
-// also called by the import_all function
-// a2 (option) and a3 are passed with the following values:
-// a2              a3
-// import_no_arg   import_no_arg            import [file]
-// import_update   import_no_arg            import [file] UPDATE
-// import_compare  import_no_arg            import [file] compare
-//
+// import all files in the directory
+// argument arg is passed as follows:
+// #define import_all              1    - passed from import_all
+// #define import_compare_all      5    - passed from import_all
+// #define import_update_all       6    - passed from import_all
+
+// or passed from uif_import 
+/*
+#define import_no_arg           0
+#define import_all              1
+#define import_update           2
+#define import_compare          3
+#define import_qrom             4
+#define import_compare_all      5
+#define import_update_all       6
+*/
+
 
 // the following values are returned:
 #define import_nofile             0             // no file found or cannot open file
@@ -1387,9 +1397,10 @@ bool wildcard_match(const char *str, const char *pattern) {
 #define import_file_exists        7             // file exists and cannot be imported again
 #define import_file_imported      8             // file imported successfully
 #define import_filesys_full       9             // import not OK, file system full
-#define import_nospace           10            // import not OK, not enough space in FLASH
+#define import_nospace           10             // import not OK, not enough space in FLASH
 
 // if qrom = true then the import is in QROM, otherwise in FLASH
+// but for update and compare it does not matter, as there is only one target file
 
 int import_file(const char *fname, int option, bool imp_qrom)
 {
@@ -1397,11 +1408,12 @@ int import_file(const char *fname, int option, bool imp_qrom)
   char ffname[32];
   int result = 0;
   int rslt = 0;
+  bool import_fram = imp_qrom;    // if true, then the file is imported in QROM, otherwise in FLASH
 
   uint32_t offs = NOTFOUND;       // offset in FLASH where the file is found, if it exists
   uint32_t offs_qr = NOTFOUND;    // offset in QROM where the file is found, if it exists
 
-  // first sort out the file to be imported
+  // first sort out the file to be imported from the uSD card
   FIL fil;
   FRESULT fr = f_open(&fil, fname, FA_READ);
   if (FR_OK != fr) {
@@ -1457,37 +1469,83 @@ int import_file(const char *fname, int option, bool imp_qrom)
       cli_printf("  findfile result FLASH at offset 0x%08X", offs);
   #endif
 
-  if (imp_qrom) offs_qr = fr_findfile(fname);
+  // the file could be a deleted file, this must be checked
+  if (offs != NOTFOUND) {
+    // file found, check if it is a deleted file
+    ModuleMetaHeader_t *MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
+    if (MetaH->FileType == FILETYPE_DELETED) {
+      // this is a deleted file, so we treat it as not found
+      #ifdef DEBUG
+        cli_printf("  file found in FLASH at offset 0x%08X, but it is a deleted file, treating as not found", offs);
+      #endif
+      offs = NOTFOUND;
+    }
+  }
+
+  offs_qr = NOTFOUND;
+  if (offs == NOTFOUND) offs_qr = fr_findfile(fname);
+  
   #ifdef DEBUG
       cli_printf("  findfile result QROM  at offset 0x%08X", offs_qr);
   #endif
 
+  // now check if the options passed match the file existence and the target of the import
+  
   // if the file exists in FLASH and the target is QROM we exit
-  if ((offs != NOTFOUND) && imp_qrom) {
+  if ((offs != NOTFOUND) && import_fram) {
     cli_printf("  file exists in FLASH at 0x%08X, but target is QROM, cannot import", offs);
     f_close(&fil);
     return import_file_exists;
   } 
   
+  // if the file exists in QROM and this is an import ALL to FLASH, we exit, as we do not want to import a QROM file in FLASH
+  if ((offs_qr != NOTFOUND) && ((option == import_all) || (option == import_update_all) || (option == import_compare_all)) ) {
+    cli_printf("  file exists in QROM at 0x%08X, but target is FLASH, cannot import or compare all)", offs_qr);
+    f_close(&fil);
+    return import_file_exists;
+  }
+
+  // if the file already exists in QROM or FLASH we do a copmpare first (if requested)
   
   if ((offs != NOTFOUND) || (offs_qr != NOTFOUND))  {
     // file exists in FLASH or in FRAM
     if (offs != NOTFOUND) {
-      cli_printf("  file exists in FLASH at 0x%08X", offs);
+      cli_printf("  file found in FLASH at 0x%08X", offs);
     }
     if (offs_qr != NOTFOUND) {
-      cli_printf("  file exists in QROM at 0x%08X", offs_qr);
+      cli_printf("  file found in QROM at 0x%08X", offs_qr);
+      import_fram = true;   
     } 
 
+    #ifdef DEBUG
+      cli_printf("  file exists in FLASH or QROM, now checking if UPDATE or compare requested");
+      cli_printf("  options: %d - file %s - fram %d", option, fname, imp_qrom);
+    #endif
+
     // file exists, is this UPDATE or compare?
-    if ((option == import_update) || (option == import_compare)) {
+    if ((option == import_update) || (option == import_compare) || (option == import_compare_all) || (option == import_update_all)) {
       // file UPDATE or compare, first compare the file
-      result = compare_openfile(&fil, offs_qr, imp_qrom);
-      if (result == COMPARE_SAME) {
-        cli_printf("  file in FLASH/QROM is identical, no update needed");
-        f_close(&fil);
-        return import_file_same;
+
+      if (offs != NOTFOUND) {
+        // comparefile in FLASH
+        result = compare_openfile(&fil, offs, false);
+        if (result == COMPARE_SAME) {
+          cli_printf("  file in FLASH is identical, no update needed");
+          f_close(&fil);
+          return import_file_same;
+        }
+      } else {
+        // compare file in QROM
+        if (offs_qr != NOTFOUND) {
+          result = compare_openfile(&fil, offs_qr, true);
+          if (result == COMPARE_SAME) {
+            cli_printf("  file in QROM is identical, no update needed");
+            f_close(&fil);
+            return import_file_same;  
+          }
+        }
       }
+
       if (result == COMPARE_NOT_FOUND) {
         // in case the file is not found in FLASH, should never get here
         cli_printf("  file not found in FLASH/QROM");
@@ -1499,12 +1557,12 @@ int import_file(const char *fname, int option, bool imp_qrom)
         f_close(&fil);
         return import_file_sizediff;
       }
-      if ((result == COMPARE_DIFF_ERASE) && !imp_qrom) {
-        cli_printf("  file in FLASH/QROM is different, requires erasing before updating");
+      if (result == COMPARE_DIFF_ERASE) {
+        cli_printf("  file in FLASH/QROM is different, requires erasing before updating when in FLASH");
         rslt = import_file_diff_erase;
       }
-      if ((result == COMPARE_DIFFERENT) && !imp_qrom) {
-        cli_printf("  file in FLASH/QROM is different, can update without erasing");
+      if (result == COMPARE_DIFFERENT) {
+        cli_printf("  file in FLASH/QROM is different, can update without erasing when in FLASH");
         rslt = import_file_diff;
       }
     } else {
@@ -1514,7 +1572,7 @@ int import_file(const char *fname, int option, bool imp_qrom)
       return import_file_exists;
     }
 
-    // we get here if the file was found in FLASH but different
+    // we get here if the file was found in FLASH or QROM but different
     // if this was compare only we get out here
     // if this was an update whe can write the file with or without prior erasing
     if (option == import_compare) {
@@ -1531,10 +1589,7 @@ int import_file(const char *fname, int option, bool imp_qrom)
     return import_file_notinflash;
   }
 
-  // TODO: insert code to detect if the MOD file has the RAM flag set
-  // and if it should be imported in FRAM instead of FLASH
-
-  if (!imp_qrom) {
+  if (!import_fram) {
     // handle FLASH import
     // offs now contains the address where to start programming
     // first construct the header 
@@ -1710,8 +1765,13 @@ int import_file(const char *fname, int option, bool imp_qrom)
         cli_printf("  no free space in QROM for this file");
         f_close(&fil);
         return import_nospace;
+      } else {
+        cli_printf("  importing file %s in QROM at 0x%08X", fname, offs_qr);
       }
-    } 
+    } else {
+      // file exists, this is an UPDATE
+      cli_printf("  updating existing file %s in QROM at 0x%08X", fname, offs_qr);
+    }
 
     // we have found free space at offs_qr for a new file
     // or this is a file update of the file at offs_qr
@@ -1739,7 +1799,7 @@ int import_file(const char *fname, int option, bool imp_qrom)
       end_of_filesystem = FILETYPE_END;
     }
 
-    // if thsi was a deleted file we must check if this was the last file in the filesystem
+    // if this was a deleted file we must check if this was the last file in the filesystem
     // if it was the last file then we can set the next file offset to the end of the filesystem
     else if (old_header.FileType == FILETYPE_DELETED) {
       // read the next file offset from the deleted file header
@@ -1755,8 +1815,6 @@ int import_file(const char *fname, int option, bool imp_qrom)
       // this is not the end of the filesystem, so we can set the next file offset to the next file in the filesystem
       header.NextFile = old_header.NextFile;
     }
-
-
 
     #ifdef DEBUG
       cli_printf("  end of file system entry at 0x%08X is 0x%02X", offs_qr, end_of_filesystem);
@@ -1805,11 +1863,10 @@ int import_file(const char *fname, int option, bool imp_qrom)
 
 
 // import all files in the directory
-// argument i is passed as follows:
-// #define import_no_arg   0
-// #define import_all      1
-// #define import_update   2
-// #define import_compare  3
+// argument arg is passed as follows:
+// #define import_all              1
+// #define import_compare_all      5
+// #define import_update_all       6
 
 void uif_import_all(const char *dir, int arg)
 {
@@ -1819,7 +1876,6 @@ void uif_import_all(const char *dir, int arg)
   if (!ff_isinited()) {
     cli_printf("  FLASH File system not initialized, please run INIT first");
     cli_printf("  Total space in FLASH appr %d Kbytes free", FF_SYSTEM_SIZE/1024);
-    
     return;
   }
 
@@ -1851,6 +1907,13 @@ void uif_import_all(const char *dir, int arg)
   while (fr == FR_OK && fno.fname[0]) { /* Repeat while an item is found */
     tud_task();  // must keep the USB port updated
 
+    // check for any keypress to allow the user to abort the mass import
+    if (cdc_available(ITF_CONSOLE)) {
+      cdc_read_flush(ITF_CONSOLE);
+      cli_printf("  import cancelled");
+      break;
+    }
+
     // create string with full path and filename
     char fname[80];
     strcpy(fname, p_dir);
@@ -1875,7 +1938,7 @@ void uif_import_all(const char *dir, int arg)
   // all done, close directory and finish
   f_closedir(&dj);
 
-  // show results of mass importy/compare
+  // show results of mass import/compare
   // only show if the value is non-zero to avoid too much clutter in the CLI
 
   cli_printf("  import/compare done, results:");
@@ -1926,7 +1989,7 @@ void uif_import_all(const char *dir, int arg)
 // import_update   import [file] UPDATE q
 // import_compare  import [file] compare q
 
-void import_qrom(const char *fname, int a3) 
+void import_qromm(const char *fname, int a3) 
 {
   uint32_t offs;
   uint8_t buf[0x1000];          // 4K buffer
@@ -2023,21 +2086,30 @@ void import_qrom(const char *fname, int a3)
 
 }
 
-// import a file and program in FLASH
-// a2 and a3 are passed with the following values:
-// a2              a3
-// import_no_arg   import_no_arg            import [file]
-// import_update   import_no_arg            import [file] UPDATE
-// import_compare  import_no_arg            import [file] compare
-// import_all      import_no_arg            import [directory] ALL
-// import_all      import_update            import [directory] ALL UPDATE
-// import_all      import_compare           import [directory] ALL compare
-// import_q        import_no_arg            import [file] q
-// import_q        import_update            import [file] UPDATE q
-// import_q        import_compare           import [file] compare q
+
+/*
+#define import_no_arg           0
+#define import_all              1
+#define import_update           2
+#define import_compare          3
+#define import_qrom             4
+#define import_compare_all      5
+#define import_update_all       6
+*/
+
+/*
+#define IMPORT_HELP_TXT "import functions\r\n\
+        [filename]                   import a single file to FLASH\r\n\
+        [filename]  [qrom]           import a single file in QROM space (FRAM)\r\n\
+        [filename]  [compare]        compare a single file with the one in FLASH or QROM\r\n\
+        [filename]  [UPDATE]         update a single file in FLASH or QROM\r\n\
+        [directory] [ALL]            import all files in a directory to FLASH\r\n\
+        [directory] [compare] [ALL]  compare all files in a directory with FLASH\r\n\
+        [directory] [UPDATE]  [ALL]  update all files in a directory in FLASH\r\n"
+*/
 
 
-void uif_import(const char *fname, int a2, int a3)       
+void uif_import(const char *fname, int func)       
 {
   int i = 0;
 
@@ -2048,29 +2120,29 @@ void uif_import(const char *fname, int a2, int a3)
 
   #ifdef DEBUG
   // show parameters
-    cli_printf("  command: import %s %d %d", fname, a2, a3);
+    cli_printf("  command: import %s %d", fname, func);
   #endif
 
-  if (a2 == import_q) {
-    // QROM/FRAM import
-    import_file(fname, a3, true);   // a3 is import_no_arg, import_update or import_compare
+  if ((func == import_compare_all) || (func == import_update_all) || (func == import_all)) {
+    // compare all files in the directory with FLASH
+    uif_import_all(fname, func);
     return;
   }
 
-  if (a2 == import_all) {
-    // import all files in the directory
-    // a3 can be import_no_arg, import_update or import_compare
-    uif_import_all(fname, a3);
-    return; 
+  if (func == import_qrom) {
+    import_file(fname, func, true);   // import to QROM
+    return;
   }
 
-  // we get here for a single file import
-  // a2 and a3 are passed with the following values:
-  // a2              a3
-  // import_no_arg   import_no_arg            import [file]
-  // import_update   import_no_arg            import [file] UPDATE
-  // import_compare  import_no_arg            import [file] compare
-  import_file(fname, a2, false);   // does all the work for a single file
+  if (func == import_no_arg) {
+    import_file(fname, func, false);   // import to FLASH, no compare or update
+    return;
+  }
+
+
+  // options left are import_compare and import_update for a single file
+  import_file(fname, func, false);   // can be both FLASH and QROM
+  return;
 }
 
 
@@ -3273,7 +3345,7 @@ void uif_list(int option, const char *fname)
           filecounter--;  // count the number of files found
         }
         cli_printf(" ");
-      } else {
+      } else if ((MetaH->FileType != FILETYPE_DELETED) && (MetaH->FileType != FILETYPE_DUMMY)) {
         // normal file types
         sprintf(line, "  %-31s  0x%02X  %8d  0x%08X  0x%08X", 
                 MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile);

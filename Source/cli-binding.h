@@ -291,22 +291,21 @@ extern "C" {
 
 #define IMPORT_HELP_TXT "import functions\r\n\
         [filename]                   import a single file to FLASH\r\n\
-        [filename]  [compare]        compare a single file with the one in FLASH\r\n\
-        [filename]  [UPDATE]         update a single file in FLASH\r\n\
+        [filename]  [qrom]           import a single file in QROM space (FRAM)\r\n\
+        [filename]  [compare]        compare a single file with the one in FLASH or QROM\r\n\
+        [filename]  [UPDATE]         update a single file in FLASH or QROM\r\n\
         [directory] [ALL]            import all files in a directory to FLASH\r\n\
         [directory] [compare] [ALL]  compare all files in a directory with FLASH\r\n\
         [directory] [UPDATE]  [ALL]  update all files in a directory in FLASH\r\n\
-        - import functions for QROM (FRAM):\r\n\
-        [filename]  [qrom]           import a single file in QROM space (FRAM)\r\n\
-        [filename]  [compare] [qrom] compare a single file with the one in QROM space (FRAM)\r\n\
-        [filename]  [UPDATE]  [qrom] update a single file in QROM space (FRAM)\r\n"
+                                     import with the ALL option can be interrupted by pressing a key\r\n"
 
-#define import_no_match         -1
 #define import_no_arg           0
 #define import_all              1
 #define import_update           2
 #define import_compare          3
-#define import_q                4
+#define import_qrom             4
+#define import_compare_all      5
+#define import_update_all       6
 
 #define EXPORT_HELP_TXT "export functions\r\n\
         [filename]                   export the named file to the uSD card\r\n\
@@ -379,7 +378,7 @@ extern "C" {
         CLRAM p       clear the HEPRAM Page p (hex)\r\n\
         INIT          initialize the HEPRAM chain, does NOT erase the HEPRAM\r\n\
                       only for pages that are marked as HEPRAM and not reserved\r\n\
-        INITALL       initialize all HEPRAM, including reserved Pages, will erase all HEPRAM\r\n"
+        INITALL       initialize all HEPRAM, including reserved Pages, does NOT erase the HEPRAM\r\n"
                       
 #define hepram_status   1
 #define hepram_ramtog   2
@@ -512,8 +511,8 @@ extern "C" {
   extern void uif_sdcard_eject();       // eject the SD card as USB drive
 
 // import function, program a file to FLASH or FRAM
-  extern void uif_import(const char *fname, int a2, int a3);              // import a file and program in FLASH
-  extern void uif_delete(const char *fname);                              // delete a file from FLASH/FRAM
+  extern void uif_import(const char *fname, int func);                    // import a file 
+  extern void uif_delete(const char *fname);                              // delete a file
   extern void uif_export(int func, const char *fname,  const char *dir);  // export a file to the uSD card
   extern void uif_cd(int function, const char *dir);                      // change working directory
 

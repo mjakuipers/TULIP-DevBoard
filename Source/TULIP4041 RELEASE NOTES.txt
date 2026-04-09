@@ -2,6 +2,14 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
+VERSION 0.97b BETA
+-   Bug fix release
+-   Fixed the issue of showing deleted files in normal list mode
+-   Fixed the import and update functions for files in FRAM (FRAM)
+-   Added the possibility to interrupt mass import by pressing a key
+-   Used a packed struct for the traceline, saving bytes and freeing up memory
+-
+
 VERSION 0.97 BETA, March 2026
 -   Changed handling of FI in the tracer. Instead of tracing the full FI line (64 bits) the flags
     are now compressed in a single 16-bit word, reducing a traceline to 40 bytes instead of 44

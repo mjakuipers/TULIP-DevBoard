@@ -152,7 +152,7 @@ extern "C" {
 #define TULIP_CLOCK_MID         125000   // clock frequency in kHz for the TULIP4041
 #define TULIP_CLOCK_SLOW         75000   // slow clock frequency in kHz for the TULIP4041
 
-#define IR_CLOCK                32768            // desired IR clock frequency
+#define IR_CLOCK                 32768           // desired IR clock frequency
 #define IROUT_CLOCK             (2 * IR_CLOCK)   // clock frequency for the irout state machine to generate the desired frequency for the IR LED
 
 #define DBG_OUT0                0b0000000000000001
