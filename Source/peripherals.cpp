@@ -25,11 +25,15 @@
 
 #include "peripherals.h"
 
-uint16_t PrintChar;     // character received from printbuffer
-char* PrintLine[200];   // printbuffer to print single lines
+static uint16_t PrintChar;     // character received from printbuffer
+static char* PrintLine[200];   // printbuffer to print single lines
 
-uint16_t ir_code;
-uint32_t ir_frame;
+static uint16_t ir_code;
+static uint32_t ir_frame;
+
+static bool irframe_pending = false;   // true when there is an IR frame ready to be sent, but the PIO is still busy sending the previous frame
+static bool serial_pending = false;    // true when there is a serial character ready to be sent
+static bool char_pending = false;      // a char was read from the printbuffer, but not completely sent yet
 
 queue_t PrintBuffer;            // printbuffer between cores
 const int PrintBufSize = 100;   // size of printbuffer
@@ -77,7 +81,6 @@ extern uint8_t HP41_powermode;
 #define m_eDevice 2
 
 int m_eMode = 0;
-
 
 uint16_t m_wLastFrame;              // last sent frame
 uint16_t m_wLastCmd;                // last CMD frame
@@ -201,7 +204,6 @@ void serialport_init()
 
 void bus_init()
 {
-
     gpio_init(ONBOARD_LED);
 
     gpio_set_dir(ONBOARD_LED, GPIO_OUT);
@@ -319,15 +321,14 @@ uint16_t calculate_frame_payload(uint8_t data)
 }
 
 
-int32_t construct_frame(uint16_t data)
+uint32_t construct_frame(uint16_t data)
 {
     // data contains a 12 bit value:
     //  d c b a 7 6 5 4 3 2 1 0          (dcba= checksum, 76543210 is the data payload)
 
     uint32_t frame = 0b111;                 // start bits           
                                             // frame = 0000.0111
-    for (int i = 0; i < 12 ; i++)
-    {
+    for (int i = 0; i < 12 ; i++) {
         // go through all 12 bits and construct new frame
         // a 0 bit expands to 10
         // a 1 bit expands to 01
@@ -335,9 +336,7 @@ int32_t construct_frame(uint16_t data)
         if ((data & 0x800) == 0x800) {           
             // msb is set
             frame = frame | 0x2;              // OR with 0b10
-        }                  
-        else
-        {
+        } else {
             // msb is not set
             frame = frame | 0x01;             // OR with 0b01
         }
@@ -374,11 +373,6 @@ void PrintBuffer_init()
 
 void Print_task()
 {
-    // first process the printbuffer
-    // need to add something to distinguish between printer types or preferred output (IR or serial)
-    // this routine is mainly for the HP82143 emulation and send the printcodes 
-    // to both the serial port and the IR led
-
     // check for a first connection from the Printer CDC
     if (cdc_connected(ITF_PRINT)) {
         // only if the Print CDC interface is connected
@@ -389,57 +383,64 @@ void Print_task()
         }
     }
 
-    // check for disconnection of Printer
+    // check for disconnection of Printer CDC
     if ((Print_firstconnect) && (!cdc_connected(ITF_PRINT))) {
         // CDC interface is disconnected
         cli_printf("  CDC Port 5 [printer] disconnected");
         Print_firstconnect = false;
     }
 
+
+    // if there is a pending ir character to be sent, try that first before reading the next character from the printbuffer
+    if (irframe_pending) {
+        // there is a pending IR frame to be sent, so try that first
+        if (!ir_busy()) {
+            // the PIO is not busy anymore, so we can send the pending frame
+            // and construct the frame for the IR LED
+            ir_code = calculate_frame_payload((uint8_t)PrintChar);
+            ir_frame = construct_frame(ir_code);
+            send_ir_frame(ir_frame);
+            irframe_pending = false;   // clear the pending flag
+        } 
+    }
+
+    if (serial_pending) {
+        // there is a pending serial character to be sent, so try that first
+        if (cdc_connected(ITF_PRINT)) {
+            // only if connected and serial printing enabled
+            cdc_send_printport(PrintChar);                // send the character to the USB printport with flush
+            serial_pending = false;                       // clear the pending flag
+        } else {
+            // not connected anymore, so clear the pending flag
+            serial_pending = false;                       
+        }
+    }
+
+    if (serial_pending || irframe_pending) {
+        // there is still a pending character to be sent, so we cannot read the next character from the printbuffer yet
+        return;
+    }
+
+    // we get here only if there is no pending IR frame or serial character, so we can read the next character from the printbuffer and process it
+
+
+    // if there is something pending in the printbuffer, read the character 
+    // printbuffer must be processed in case nothing is connected
     if (!queue_is_empty(&PrintBuffer)) {
         queue_remove_blocking(&PrintBuffer, &PrintChar);
 
-        /*  code below for testing throttling of the printer
-        ACA does not lead to a PRINTER ERROR, HP41 just hangs while PBUSY sends the carry
-        PRA does lead to a PRINTER ERROR, probably after an EOL
-        prev_level = level;
-        level = queue_get_level(&PrintBuffer);
-        if (level != prev_level) 
-        {
-            printf("level = %0d, prevlevel = %d\n", level, prev_level);
-        }
-        */
-
-       /* printer monitoring to the console is disabled here
-        if ((PrintChar == 0xE0) || (PrintChar == 0xE8)) {
-            printf("\nPRINT: ");       
+        // check which output is selected
+        if ((globsetting.get(PRT_output_mode) == 1) || (globsetting.get(PRT_output_mode) == 3)) {
+            // serial printing is enabled
+            serial_pending = true;
         }
 
-        if (PrintChar > 0x01F) {
-            printf("%c", PrintChar);
-        }
-            
-        uart_putc_raw(UART_ID, PrintChar);             // Send the character to the serial port
-
-        */
-
-        if (cdc_connected(ITF_PRINT))
-        {
-            // only if connected
-            // but this causes problems with the HP82240 simulator
-            // the beta version of this works fine with the CDC_connected function
-            cdc_send_printport(PrintChar);                 // send the character to the USB printport
+        if ((globsetting.get(PRT_output_mode) == 2) || (globsetting.get(PRT_output_mode) == 3)) {
+            // IR printing is enabled
+            irframe_pending = true;
         }
 
-        // output to a real serial port if required
-        // if ((PrintChar == 0xE0) || (PrintChar == 0xE8)) {
-        //    uart_putc_raw(UART_ID, 13);             
-        // }
-            
-        // send the printcharacter to the IR LED
-        ir_code = calculate_frame_payload(PrintChar);
-        ir_frame = construct_frame(ir_code);
-        send_ir_frame(ir_frame);
+        // if output mode was 0 (no output) the frame is now simply discarded
 
         // line below for debugging the construction of the IR frame
         // printf("IR char = %02X, code = %04X, frame = %08X\n", PrintChar, ir_code, ir_frame);
@@ -1012,79 +1013,5 @@ void HPIL_task()
         // AUTO IDY bit is checked here
         // enable_AUTOIDY can be used to overrule the AUTOIDY bit
         if (enable_AUTOIDY) HPIL_AutoIDYTask();
-    }
-}
-
-void Wand_task()
-{
-    // first process the printbuffer
-    // need to add something to distinguish between printer types or preferred output (IR or serial)
-    // this routine is mainly for the HP82143 emulation and send the printcodes 
-    // to both the serial port and the IR led
-
-    // check for a first connection from the Printer CDC
-    if (cdc_connected(ITF_PRINT)) {
-        // only if the Print CDC interface is connected
-        if (!Print_firstconnect) {
-            // HPIL_firstconnect was false, so this is now a new CDC connection
-            Print_firstconnect = true;
-            cli_printf("  CDC Port 5 [printer] connected");
-        }
-    }
-
-    // check for disconnection of Printer
-    if ((Print_firstconnect) && (!cdc_connected(ITF_PRINT))) {
-        // CDC interface is disconnected
-        cli_printf("  CDC Port 5 [printer] disconnected");
-        Print_firstconnect = false;
-    }
-
-    if (!queue_is_empty(&PrintBuffer)) {
-        queue_remove_blocking(&PrintBuffer, &PrintChar);
-
-        /*  code below for testing throttling of the printer
-        ACA does not lead to a PRINTER ERROR, HP41 just hangs while PBUSY sends the carry
-        PRA does lead to a PRINTER ERROR, probably after an EOL
-        prev_level = level;
-        level = queue_get_level(&PrintBuffer);
-        if (level != prev_level) 
-        {
-            printf("level = %0d, prevlevel = %d\n", level, prev_level);
-        }
-        */
-
-       /* printer monitoring to the console is disabled here
-        if ((PrintChar == 0xE0) || (PrintChar == 0xE8)) {
-            printf("\nPRINT: ");       
-        }
-
-        if (PrintChar > 0x01F) {
-            printf("%c", PrintChar);
-        }
-            
-        uart_putc_raw(UART_ID, PrintChar);             // Send the character to the serial port
-
-        */
-
-        if (cdc_connected(ITF_PRINT))
-        {
-            // only if connected
-            // but this causes problems with the HP82240 simulator
-            // the beta version of this works fine with the CDC_connected function
-            cdc_send_printport(PrintChar);                 // send the character to the USB printport
-        }
-
-        // output to a real serial port if required
-        // if ((PrintChar == 0xE0) || (PrintChar == 0xE8)) {
-        //    uart_putc_raw(UART_ID, 13);             
-        // }
-            
-        // send the printcharacter to the IR LED
-        ir_code = calculate_frame_payload(PrintChar);
-        ir_frame = construct_frame(ir_code);
-        send_ir_frame(ir_frame);
-
-        // line below for debugging the construction of the IR frame
-        // printf("IR char = %02X, code = %04X, frame = %08X\n", PrintChar, ir_code, ir_frame);
     }
 }

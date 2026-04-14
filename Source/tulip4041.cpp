@@ -212,7 +212,8 @@ int main() {
         HPIL_task();                // process the HP-IL task for transmitting and receiving frames
                                     // only if HP-IL is active
 
-        Wand_task();               // process the HP41 wand input emulation
+        // Wand_task();             // process the HP41 wand input emulation
+                                    // not needed
 
         // add a task to check for uSD card removal or insertion ??
         // see workaround on https://github.com/carlk3/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico

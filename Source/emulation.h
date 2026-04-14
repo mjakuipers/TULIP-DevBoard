@@ -84,6 +84,7 @@ void send_ir_frame(uint32_t frame);
 void setflag_FI0();
 void pio_init();                         
 void send_ir_pulse();
+bool ir_busy();
 void debug_out(uint16_t value);
 void  __not_in_flash_func(core1_pio)();  
 void pwo_callback(uint gpio, uint32_t events);

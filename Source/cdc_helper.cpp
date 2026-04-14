@@ -202,11 +202,6 @@ void cdc_send_string(int itf, char* buffer, int len)
 
     wait_for_write(itf, len);                   // wait until len bytes available in the send buffer
     sent = tud_cdc_n_write(itf, buffer, len);
-    if (sent != len)
-    {
-        // something going on
-        printf("\n** len: %d - sent: %d  %.10s\n", len, sent, buffer);
-    }
 }
 
 

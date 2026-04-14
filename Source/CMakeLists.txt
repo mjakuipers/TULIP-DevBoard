@@ -6,7 +6,7 @@ else()
 endif()
 set(sdkVersion 2.2.0)
 set(toolchainVersion 14_2_Rel1)
-set(picotoolVersion 2.2.0)
+set(picotoolVersion 2.2.0-a4)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
@@ -58,8 +58,10 @@ set(SOURCES
                 module.cpp              # embedded modules and functions for ROM management
                 msc_device_disk.c       # functions to implement the uSDCard msc USB device
                 i2c_devices.cpp         # I2C devices (RTC, display)
-                pio_uart.c              # PIO UART implementation is not used
+
 )
+
+#                pio_uart.c              # PIO UART implementation is not used
 
 set(LINK_LIBRARIES
                 pico_stdlib
@@ -101,7 +103,7 @@ add_executable( tulip4041_module        # main application
 )
 target_compile_definitions(tulip4041_module PUBLIC 
                            TULIP_HARDWARE=1                           # define the TULIP_HARDWARE macro
-                           VERSION_STRING="0.97b"
+                           VERSION_STRING="0.98"
 )
 
 pico_set_program_name(tulip4041_module "tulip4041")
@@ -112,7 +114,8 @@ add_subdirectory(lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src)
 
 # Generate PIO header
 pico_generate_pio_header(tulip4041_module ${CMAKE_CURRENT_LIST_DIR}/hp41_pio.pio)
-pico_generate_pio_header(tulip4041_module ${CMAKE_CURRENT_LIST_DIR}/pio_uart.pio)
+
+# pico_generate_pio_header(tulip4041_module ${CMAKE_CURRENT_LIST_DIR}/pio_uart.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
 # not used in the tulip project
@@ -149,7 +152,7 @@ add_executable( tulip4041_devboard      # main application
 )
 target_compile_definitions(tulip4041_devboard PUBLIC 
                            TULIP_HARDWARE=0     # define the TULIP_HARDWARE macro
-                           VERSION_STRING="0.97b"
+                           VERSION_STRING="0.98"
                           ) 
 
 pico_set_program_name(tulip4041_devboard "tulip4041")
@@ -160,7 +163,8 @@ pico_set_program_version(tulip4041_devboard VERSION_STRING)
 
 # Generate PIO header
 pico_generate_pio_header(tulip4041_devboard ${CMAKE_CURRENT_LIST_DIR}/hp41_pio.pio)
-pico_generate_pio_header(tulip4041_devboard ${CMAKE_CURRENT_LIST_DIR}/pio_uart.pio)
+
+# pico_generate_pio_header(tulip4041_devboard ${CMAKE_CURRENT_LIST_DIR}/pio_uart.pio)
 
 # Modify the below lines to enable/disable output over UART/USB
 # not used in the tulip project

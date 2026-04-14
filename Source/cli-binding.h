@@ -133,6 +133,7 @@ extern "C" {
 #define PRINTER_HELP_TXT "printer functions for the HP82143\r\n\
         [no argument] shows the HP82143A status\r\n\
         status        shows the HP82143A status\r\n\
+        output        cycle the printer output between none, serial, IR or both\r\n\
         power         toggle power\r\n\
         trace         enable trace mode\r\n\
         norm          enable norm mode\r\n\
@@ -140,19 +141,21 @@ extern "C" {
         paper         toggle Out Of Paper status\r\n\
         print         push PRINT button\r\n\
         adv           push ADV button\r\n\
-        irtest        test the infrared LED\r\n\
-        irtog         toggle infrared LED\r\n"
+        irtest        test the infrared LED, send a test string to the printer\r\n\
+        irtog         toggle infrared LED, turn the IR LED on or off\r\n\
+                      for testing only, cunsumes extra power!\r\n"
 
         #define printer_status  1
         #define printer_power   2
-        #define printer_trace   3
-        #define printer_norm    4
-        #define printer_man     5
-        #define printer_paper   6
-        #define printer_print   7
-        #define printer_adv     8
-        #define printer_irtest  9
-        #define printer_irtog   10
+        #define printer_output  3        
+        #define printer_trace   4
+        #define printer_norm    5
+        #define printer_man     6
+        #define printer_paper   7
+        #define printer_print   8
+        #define printer_adv     9
+        #define printer_irtest  10
+        #define printer_irtog   11
 
 
 #define TRACER_HELP_TXT "tracer functions\r\n\
@@ -172,8 +175,12 @@ extern "C" {
         hpil          toggle HP-IL tracing to ILSCOPE USB serial port\r\n\
         pilbox        toggle PILBox serial tracing to ILSCOPE USB serial port\r\n\
         ilregs        toggle tracing of HP-IL registers\r\n\
-        save          save tracer settings\r\n"
-/*
+        save          save tracer settings\r\n\
+        mnem          cycle the disassembler mnemonics type between none, JDA (default) and HP\r\n\
+                      no mnemonics will only show the raw trace data without disassembly\r\n"
+
+
+/*      Will be in a seperate trigger/filter command later, but for now include it in the tracer command help text:
         trig              toggle the trigger enable\r\n\
                           blocks all samples until a trigger is found\r\n\
         trig list         list all triggers\r\n\
@@ -207,9 +214,11 @@ extern "C" {
         #define trace_pilbox      9
         #define trace_ilregs     10
         #define trace_save       11
-        #define trace_trig       12
-        #define trace_pass       13
-        #define trace_block      14
+        #define trace_mnem       12
+
+        // #define trace_trig       12
+        // #define trace_pass       13
+        // #define trace_block      14
 
 
         /*  functions for later implemntation:

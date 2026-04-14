@@ -475,6 +475,12 @@ void send_ir_frame(uint32_t frame)
     pio_sm_put_blocking(pio1_pio, irout_sm, frame);  // send the data
 }
 
+bool ir_busy()
+{
+    // return the status of the IR TX FIFO
+    return pio_sm_is_tx_fifo_full(pio1_pio, irout_sm);
+}
+
 
 void send_ir_pulse() {
     // send a single pulse on the IR output for debugging
@@ -510,7 +516,6 @@ uint32_t __not_in_flash_func()exist_usermem(uint32_t address)
     xmem_mods = globsetting.get(xmem_pages);      // get this from global settings
     umem_mods = globsetting.get(umem_pages);      // get this from global settings
 
-
     if ((xmem_mods & xfun_plugged) && (address >= 0x040) && (address <= 0x0BF)) {
         // return the offset in FRAM for this user memory address, this is for the case that there is no XMEM module plugged in, so we use the FRAM for user memory
         return (FRAM_XMEM0_start + (address - 0x040) * 8) ;    
@@ -522,7 +527,6 @@ uint32_t __not_in_flash_func()exist_usermem(uint32_t address)
     }
 
     if ((xmem_mods & xmem2_plugged) && (address > 0x300) && (address < 0x3F0)) {
-
         // return the offset in FRAM for this user memory address, this is for the case that there is no XMEM module plugged in, so we use the FRAM for user memory
         return (FRAM_XMEM2_start + (address - 0x300) * 8) ;  
     }
@@ -634,8 +638,8 @@ void PowerMode_task()
                 CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
                 CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
                 TULIP_CLOCK_FAST * 1000,
-                TULIP_CLOCK_SLOW * 1000
-            );
+                TULIP_CLOCK_SLOW * 1000);
+
             // printf("USB power lost, CPU set to 75 MHz\n");
 
             // adjust the speed or the irout state machine
@@ -669,7 +673,7 @@ void PowerMode_task()
 
     if (HP41_powermode != prev_mode)
     {
-        // there has been a change, send it to the queue
+        // there has been a change
         int64_t us_elapsed;
         int32_t secs_elapsed;
         int32_t ms_elapsed;
@@ -742,13 +746,18 @@ void __not_in_flash_func(core1_pio)()
     uint32_t fi_data1 = 0;
     uint32_t fi_data2 = 0;
 
-    uint16_t ptr_data = 0;                      // pinter data received to be printed
+    uint16_t ptr_data = 0;              // printer data received to be printed
 
     uint32_t rom_addr = 0;
     uint32_t rom_pg = 0;
     uint32_t page_addr = 0;
 
+    bool     data_out_active = false;   // in case data is driven
+    bool     fi_out_active = false;
+    bool     fi_out_active_next = false;  // to track if FI output needs to be active at the next instruction, used for delayed flag output
+
     uint32_t isa_out_data = 0;
+    uint32_t isa_out_d = 0;             
     uint8_t  fram_res[15];              // for reading fram results efficiently
 
     uint8_t traceoverflow = 0;          // to detect TraceBuffer overflow
@@ -815,7 +824,7 @@ void __not_in_flash_func(core1_pio)()
         //      - READ 1..15
         //  - peripheral data to be presented on DATA
 
-        TraceLine.xq_instr = rx_inst_t;    
+        // TraceLine.xq_instr = rx_inst_t;    
         rx_inst_t = 0;
 
         // TraceLine.xq_data1 = fi_out1;
@@ -831,6 +840,7 @@ void __not_in_flash_func(core1_pio)()
             // we could alssend fi_outx always ...
             pio_sm_put(pio1_pio, fiout_sm, fi_out1);  // send the data            
             pio_sm_put(pio1_pio, fiout_sm, fi_out2);  // send the data  
+            fi_out_active = true;
         }
 
         if (rx_inst == inst_READDATA)
@@ -855,6 +865,7 @@ void __not_in_flash_func(core1_pio)()
                 regdata = usermemCache[0];   // get from cache
                 // TraceLine.xq_data1 = regdata;
                 pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);  // send the data
+                data_out_active = true;
                 read_pending = true;
             }          
             else if (globsetting.get(HP82153A_enabled) && (prphselected == PRPH_wand)){
@@ -869,12 +880,11 @@ void __not_in_flash_func(core1_pio)()
                 // TraceLine.xq_data1 = regdata;
                 pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);  // send the data
                 pio_sm_put_blocking(pio1_pio, dataout_sm, 0);  // send the data
+                data_out_active = true;
             }
         } 
       
-        if (globsetting.get(HP82143A_enabled))
-        {
-
+        if (globsetting.get(HP82143A_enabled)){
             // handling of HP82143A (Printer) specific instructions
             switch (rx_inst) {
 
@@ -897,17 +907,17 @@ void __not_in_flash_func(core1_pio)()
                 case SELP9_VALID:               // 0x043,  set carry if status valid, no SYNC bit! 
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst;
-                        sendcarry = globsetting.get(PRT_power);
+                        if (globsetting.get(PRT_power)) {
+                            // valid status only when the printer is ON
+                            sendcarry = SELP9_status_VALID;         // bool SELP9_status_VALID = true; 
+                        }
                         SLCT_PRPH = -1;          // return control back to the NUT                    
                     }
                     break;
                 case SELP9_POWON:               // 0x083, set carry if printer is ON, no SYNC bit!!
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst; 
-                        if (globsetting.get(PRT_power)) {
-                            // valid status only when the printer is ON
-                            sendcarry = SELP9_status_VALID;
-                        }
+                        sendcarry = (globsetting.get(PRT_power) !=0);   // printer is ON if power setting is not 0
                         SLCT_PRPH = -1;          // return control back to the NUT                      
                     }
                     break;                                                                        
@@ -919,6 +929,7 @@ void __not_in_flash_func(core1_pio)()
                         // start preparing to send out to DATA
                         pio_sm_put_blocking(pio1_pio, dataout_sm, 0);                   // bits D00..D32 are always 0
                         pio_sm_put_blocking(pio1_pio, dataout_sm, SELP9_status << 8);   // bits D33..D55 contain status
+                        data_out_active = true;
                         // after reading status the status bits for the PRINT and ADV key are reset
                         // but the status is read multiple times, so keep track of the number of reads
                         if (keycount_print == 0) {
@@ -930,6 +941,7 @@ void __not_in_flash_func(core1_pio)()
                         }                                                       
                     }
                     break;
+                // other printer instrcution are handled later, but these are the ones that require immediate response at T0 time, so they are handled here
             }   // switch
         }
 
@@ -942,7 +954,7 @@ void __not_in_flash_func(core1_pio)()
             // mask for selected peripheral is 0b000111000000 or 0x1C0
 
             // this part needs to be changed, selection of the register is by the SELP instruction, 
-            // NOT by the bits in the READ/WRIT instruction, these are ignored (reaearch by Thomas and Mike)
+            // NOT by the bits in the READ/WRIT instruction, these are ignored (research by Thomas and Mike)
 
             if ((rx_inst & 0xE3F) == 0x824) {
                 // check for SELP0 .. SELPx
@@ -993,6 +1005,7 @@ void __not_in_flash_func(core1_pio)()
                 // TraceLine.xq_data1 = regdata;
                 pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);     // send the data
                 pio_sm_put_blocking(pio1_pio, dataout_sm, 0);           // send the data
+                data_out_active = true;
 
             }
             else if ((SLCT_PRPH >= 0) && (SLCT_PRPH <= 7) && ((rx_inst & 0x003) == 0x001))
@@ -1015,31 +1028,36 @@ void __not_in_flash_func(core1_pio)()
             }
         }
     
-
         // check for CLASS0 READ instruction
         // read data from selected register and present on the DATA line
         // register must be sent out to DATA now!
-        // if ((rx_inst & mask_CLASS0) == mask_READ) 
-        // {
+        if ((rx_inst & mask_CLASS0) == mask_READ) 
+        {
             
-        //     TraceLine.xq_instr = rx_inst;
-        // }
+             // TraceLine.xq_instr = rx_inst;
+        }
 
-        if (sendcarry != 0 ) {
+        // Add the instruction to the TraceLine
+        TraceLine.isa_instruction = rx_inst & 0xFFF;    // only bits 0..9 are the instruction, bit 10 is a copy of bit 9, bit 11 is SYNC status        
+
+        // add the active bank in bits 12 + 13
+        TraceLine.isa_instruction |= (enabled_bank & 0x03) << 12;
+
+        // if the instruction was driven by the TULIP this is indicated in bit 14
+        if (isa_out_data != 0xFFFF) {
+            TraceLine.isa_instruction |= 0x4000;   // bit 14 indicates this is an instruction driven by the TULIP
+        }
+
+        if (sendcarry) {
             // now send the carry, simply dump a '1' bit into the isaout state machine
             // all the rest is handled by the isaout state machine
-            isa_out_data = 0x001;
-            pio_sm_put_blocking(pio1_pio, isaout_sm, isa_out_data);
+            isa_out_d = 0x001;
+            pio_sm_put_blocking(pio1_pio, isaout_sm, isa_out_d);
+            TraceLine.isa_instruction |= 0x8000;        // bit 15 indicates the carry was driven by the TULIP
             sendcarry = false;
-            TraceLine.xq_carry = true;
+            // TraceLine.xq_carry = true;
         } 
-        else {
-            TraceLine.xq_carry = false;
-        }
   
-        // put instruction in TraceLine for the ISA instruction
-        TraceLine.isa_instruction = rx_inst;
-
         pio_sm_put(pio0_pio, debugout_sm, DBG_OUT1);
      
         // ========================================================================
@@ -1160,7 +1178,27 @@ void __not_in_flash_func(core1_pio)()
 
             #endif
 
-            TraceLine.data2 = rx_data2 >> 8;                            // get received data in TraceLine and align
+            if (fi_out_active_next) {
+                TraceLine.fi |= 0x8000;
+                fi_out_active_next = false;
+            }
+
+            if (fi_out_active) {
+                fi_out_active_next = true;   // to indicate that FI output needs to be active for the next instruction
+                fi_out_active = false;
+            }
+
+            TraceLine.data2 |= rx_data2 >> 8;                            // get received data in TraceLine and align
+            
+            // Mask the traceline for the support bits
+            TraceLine.data2 &= 0x80FFFFFF;
+
+            // and get the extra status bits
+            // bit 30: instruction decoded by TULIP
+            // bit 31: driven by TULIP 
+            if (rx_inst_t !=0) {
+                TraceLine.data2 |= 0x40000000;
+            }
 
             // package for the TraceLine is now complete, send it to the TraceBuffer
             // this is non-blocking to prevent going out of SYNC on a full trace bufer
@@ -1169,6 +1207,13 @@ void __not_in_flash_func(core1_pio)()
                 traceoverflow = queue_try_add(&TraceBuffer, &TraceLine);                    // add to internal trace buffer for handling by core0
                 // traceoverflow = 0 (false) if the element was not added, this is an overflow
                 // to be added to the next succesfull trace
+            }
+
+            if (data_out_active) {
+                TraceLine.data2 = 0x80000000;
+                data_out_active = false;
+            } else {
+                TraceLine.data2 = 0;
             }
 
             // Traceline is sent, so clear HP-IL frameout for default value
@@ -1206,6 +1251,7 @@ void __not_in_flash_func(core1_pio)()
                     regdata = usermemCache[1];   // get from cache
                     // TraceLine.xq_data2 = regdata;
                     pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);  // send the data
+                    // data_out_active = true;
                     read_pending = false;
                 }
             }
@@ -1428,7 +1474,7 @@ void __not_in_flash_func(core1_pio)()
 
             // we can now add the Bank information to the Traceline
             enabled_bank = active_bank[rom_pg];          // this is the currently enabled bank for the page
-            TraceLine.bank = enabled_bank;
+            // TraceLine.bank = enabled_bank;
 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT4);
 
@@ -1619,6 +1665,7 @@ void __not_in_flash_func(core1_pio)()
                     rx_inst_t = rx_inst; 
                     ramselected = rx_data1 & 0x03FF;
                     prphselected = 0;           // deselect any peripheral when RAMSLCT appears
+                    TraceLine.prphslct = 0;      // and clear the peripheral selection in the TraceLine for easier tracing
                     fram_offset = exist_usermem(ramselected);   // check if the selected register has a valid address in FRAM
                     
                     if (fram_offset != 0) {
@@ -1646,6 +1693,7 @@ void __not_in_flash_func(core1_pio)()
                 case inst_PRPHSLCT:             // PRPHSLCT, select peripheral from DATA[2..0]
                     rx_inst_t = rx_inst; 
                     prphselected = (rx_data1 & 0x03FF);
+                    TraceLine.prphslct = prphselected;
                     // should do a check if the selected peripheral is ours and active (plugged)
                     // for now leave it, used only for the Wand in the test setup
                     break;
@@ -1670,12 +1718,14 @@ void __not_in_flash_func(core1_pio)()
                     // catch the HP-IL=C(0..7) instructions, copy C[0..1] to the HP-IL register
                     // instructions 0x200..0x3C0, bit pattern: 0b1nnn000000, with SYNC bit set: 0b111nnn000000 0xE00
 
-                    if (SLCT_PRPH == 9) {
+                    // TODO: check for illegal printer instructions ??
+
+                    // if (SLCT_PRPH == 9) {
                         // if the printer was selected and we get here this was an illegal printer instruction
                         // return control to the NUT to handle it and prevent getting stuck in the printer emulation
-                        SLCT_PRPH = -1;   
-                        break;
-                    }
+                    //     SLCT_PRPH = -1;   
+                    //     break;
+                    // }
                     
                     // if (HP82160A_active && ((rx_inst & 0xE3F) == 0xE00))
                     if (globsetting.get(HP82160A_enabled) && ((rx_inst & 0xE3F) == 0xE00))

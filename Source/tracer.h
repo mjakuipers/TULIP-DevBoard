@@ -40,20 +40,49 @@ extern "C" {
 // there are spare bits in DATA, FI, ISA instruction and Bank
 
 // TLine  is for the maximum possible trace line structure with FI and HP-IL
-struct __attribute__((packed))TLine {                                       //      bytes     total   spare bits
-    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4    0
-    uint32_t    data1;              // DATA D31..D00                                4 bytes      8    0
-    uint32_t    data2;              // DATA D55..D32                                4 bytes     12    8
-    uint16_t    isa_address;        // ISA address                                  2 bytes     14    0
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16    4   add decoded by TULIP
-    uint16_t    ramslct;            // selected RAM chip                            2 bytes     18    3   includes ourselected
-    uint16_t    fi;                 // compressed FI                                2 bytes     20    2
-    uint16_t    xq_instr;           // instruction decoded                          2 bytes     22    4
-    uint16_t    frame_in;           // HP-IL frame input                            2 bytes     24    0
-    uint16_t    frame_out;          // HP-IL frame output                           2 bytes     26    0
-    uint8_t     bank;               // current selected bank                        1 byte      27    6
-    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     36    0
-    bool        xq_carry;           // when carry is sent                           1 byte      37    7
+struct __attribute__((packed))TLine {                                       //      bytes     total   bits used spare bits
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4    32        0
+    uint32_t    data1;              // DATA D31..D00                                4 bytes      8    32        0
+    uint32_t    data2;              // DATA D55..D32                                4 bytes     12    24        8
+                                    // bit 30: instruction decoded by TULIP
+                                    // bit 31: driven by TULIP
+    uint16_t    isa_address;        // ISA address                                  2 bytes     14    16        0
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16    12        4   
+                                    // bit 12-13: active bank
+                                    // bit 14: TULIP driving ISA
+                                    // bit 15: TULIP driving carry
+    uint16_t    ramslct;            // selected RAM chip                            2 bytes     18    10        6   
+    uint16_t    fi;                 // compressed FI                                2 bytes     20    14        2
+    uint16_t    prphslct;           // selected peripheral                          2 bytes     22    12        4
+    uint16_t    frame_in;           // HP-IL frame input                            2 bytes     24    16        0
+    uint16_t    frame_out;          // HP-IL frame output                           2 bytes     26    16        0
+    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     35    36        0
+                                    //                                total size is 35 bytes
+}; 
+
+
+// add prphslct, 2 bytes. Actually only 10 bits. Use new status word of 32 bits:
+//  bit 0..9    prphslct, actually only 8 bits?
+//  bit 10..19  ramslct
+//  bit 20..21  current bank
+//  bit 22      TULIP driving DATA, could be in DATA
+//
+
+
+struct __attribute__((packed))TTLine {                                       //      bytes     total   bits used spare bits
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4    32        0
+    uint32_t    data1;              // DATA D31..D00                                4 bytes      8    32        0
+    uint32_t    data2;              // DATA D55..D32                                4 bytes     12    24        8
+    uint32_t    status;             // see bit assignment above                     4 bytes     16    32        0
+
+    uint16_t    isa_address;        // ISA address                                  2 bytes     14    16        0
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16    12        4   
+
+    uint16_t    fi;                 // compressed FI                                2 bytes     20    14        2
+    uint16_t    frame_in;           // HP-IL frame input                            2 bytes     24    16        0
+    uint16_t    frame_out;          // HP-IL frame output                           2 bytes     26    16        0
+    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     35    35        0
+                                    //                               total size is 35 bytes
 }; 
 
 
@@ -97,8 +126,6 @@ struct __attribute__((packed))TLine_basic {
  // uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     36 
  // bool        xq_carry;           // when carry is sent                           1 byte      37
 };
-
-
 
 
 extern const char *mnemonics[];
@@ -171,7 +198,6 @@ class Filter {
         // and return the value
         return fil; // return the filter bits, 0=pass, 1=block, 2=trigger start, 3=trigger end
     }
-
 
 
     // add a new filter

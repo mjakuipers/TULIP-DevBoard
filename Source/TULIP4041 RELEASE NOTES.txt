@@ -2,13 +2,24 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
-VERSION 0.97b BETA
+VERSION 0.98
+-   Added HP mnemonics, can select between no disassembly, JDA or HP mnemonics
+-   Re-arranged Traceline to include status (ISA, DATA, FI driven by TULIP), bank and decoded instruction
+-   Added current selected peripheral to the trace listing and a + to indicate signal driven by TULIP
+-   When sending carry only a C will appear in the tracer
+-   Dropped decoded instruction from the trace listing, added a + in the instruction column if decoded
+-   Re-coded Print_task for better performance and to prevent hold-up when printing to the IR LED
+    This was impacting the CLI and tracer
+-   There was some stray development code 'hidden' in the Wand_task which caused interference when printing
+    This task was not used and is removed, and not called anymore from the main loop
+-   Added option for printer output: none, serial, IR or both
+
+VERSION 0.97b, April 2026
 -   Bug fix release
 -   Fixed the issue of showing deleted files in normal list mode
 -   Fixed the import and update functions for files in FRAM (FRAM)
 -   Added the possibility to interrupt mass import by pressing a key
 -   Used a packed struct for the traceline, saving bytes and freeing up memory
--
 
 VERSION 0.97 BETA, March 2026
 -   Changed handling of FI in the tracer. Instead of tracing the full FI line (64 bits) the flags

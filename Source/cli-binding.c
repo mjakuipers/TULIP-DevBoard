@@ -867,6 +867,36 @@ void onCatCLI(EmbeddedCli *cli, char *args, void *context)
     uif_cat(p, b);   
 }
 
+/*
+
+#define PRINTER_HELP_TXT "printer functions for the HP82143\r\n\
+        [no argument] shows the HP82143A status\r\n\
+        status        shows the HP82143A status\r\n\
+        output        cycle the printer output between none, serial, IR or both\r\n\
+        power         toggle power\r\n\
+        trace         enable trace mode\r\n\
+        norm          enable norm mode\r\n\
+        man           enable man mode\r\n\
+        paper         toggle Out Of Paper status\r\n\
+        print         push PRINT button\r\n\
+        adv           push ADV button\r\n\
+        irtest        test the infrared LED, send a test string to the printer\r\n\
+        irtog         toggle infrared LED, turn the IR LED on or off\r\n\
+                      for testing only, cunsumes extra power!\r\n\"
+
+        #define printer_status  1
+        #define printer_power   2
+        #define printer_output  3        
+        #define printer_trace   4
+        #define printer_norm    5
+        #define printer_man     6
+        #define printer_paper   7
+        #define printer_print   8
+        #define printer_adv     9
+        #define printer_irtest  10
+        #define printer_irtog   11
+
+*/
 
 const char* __in_flash()printer_cmds[] =
 // list of arguments for the HP82143 printer command
@@ -874,6 +904,7 @@ const char* __in_flash()printer_cmds[] =
 {
     "status",           // get status
     "power",            // toggle power
+    "output",           // cycle through the output modes of the printer
     "trace",            // printer mode trace
     "norm",             // printer mode normal
     "man",              // printer mode manual
@@ -1081,6 +1112,7 @@ void onUMEMCLI(EmbeddedCli *cli, char *args, void *context)
         #define trace_pilbox      9
         #define trace_ilregs     10
         #define trace_save       11
+        #define trace_mnem       12
 */
 
 const char* __in_flash()tracer_cmds[] =
@@ -1098,6 +1130,7 @@ const char* __in_flash()tracer_cmds[] =
     "pilbox",           // toggle PILBox serial tracing
     "ilregs",           // toggle tracing of HP-IL registers
     "save",             // save tracer settings
+    "mnem",             // toggle mnemonics type
 };
 
 

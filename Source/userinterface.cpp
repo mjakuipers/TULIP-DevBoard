@@ -71,12 +71,13 @@ const char* __in_flash("flash_constants")glob_set_[] = {
 // control of tracer settings
     "Tracer enabled",                           // 30   tracer enabled
     "Tracing HP-IL Registers",                  // 31   tracing of HP-IL registers enabled
-    "Tracer disassembler on",                   // 32   disassembly enabled
+    "Tracer Mnemonics type",                    // 32   dMnemonics type for disassembly enabled
+                                                //      0 = no disassembly
+                                                //      1 = JDA
+                                                //      2 = HP   (not yet supported)
+                                                //      3 = ...
     "Tracer FI line on",                        // 33   FI tracing enabled
-    "Tracer Mnemonics type",                    // 34   tracer disassembly type (JDA only for now)
-                                                //      0 = JDA
-                                                //      1 = HP   (not yet supported)
-                                                //      2 = ...
+    "",                                         // 34   placeholder
     "Tracing System Pages 0..7",                // 35   tracing of system ROMS pages P0..7
                                                 //      bit pattern in byte refers to page
     "Tracing User ROM P8..F",                   // 36   tracing of user ROM pages 8..F
@@ -155,7 +156,7 @@ const char* __in_flash("flash_constants")glob_set_[] = {
     "Printer Power on",                         // 83   printer power
     "Printer serial output",                    // 84   use serial printer output for output in terminal emulator
 
-    "",                                         // 85
+    "Printer Output Mode",                      // 85
     "",                                         // 86
     "",                                         // 87
     "",                                         // 88
@@ -3231,7 +3232,6 @@ void uif_list(int option, const char *fname)
 
     cli_printf(" ");
 
-    
     // and prepare to print more details from the MOD/ROM content below
     if (MetaH->FileType == FILETYPE_ROM) {
       // ROM file, show details
@@ -5555,47 +5555,30 @@ void uif_delete(const char *fname)
 
 
 // function for the HP82143A printer
-//    1 - status           // get status
-//    2 - power            // toggle power
-//    3 - trace            // printer mode trace
-//    4 - norm             // printer mode normal
-//    5 - man              // printer mode manual
-//    6 - paper            // toggle Out Of Paper status
-//    7 - print            // push PRINT button
-//    8 - adv              // push ADV button
+//        #define printer_status  1
+//        #define printer_power   2
+//        #define printer_trace   3
+//        #define printer_norm    4
+//        #define printer_man     5
+//        #define printer_paper   6
+//        #define printer_print   7
+//        #define printer_adv     8
+//        #define printer_irtest  9
+//        #define printer_irtog   10
+//        #define printer_output  11
 
 void uif_printer(int i) {
 
   uint16_t pr_mode;
+  uint16_t pr_output_mode;
 
-  if (i == printer_irtest) {
-    // test the infrared LED
-    // simply send a string to the IR led, no throttling
-    for (int i = 'A'; i <= 'Z'; i++) {
-      // send the string to the IR led
-      // this is a test, so no throttling
-      PrintIRchar(i);
-    }	
-    PrintIRchar(00);    // send a carriage return
-    PrintIRchar(0xE0);    // send a line feed
-    return;
-  }
-
-  if (i == printer_irtog) {
-    // test the IR LED power consumption by toggling it
-    IR_toggle(); // toggle the IR LED
-    // wait for 10 ms
-    sleep_ms(10); // wait for 10 ms
-    cli_printf("  IR LED (GPIO %d) is %s", P_IR_LED, gpio_get(P_IR_LED) ? "ON" : "OFF");
-    return;
-  }
 
   if (!globsetting.get(HP82143A_enabled)) {
     cli_printf("  HP82143A Printer not plugged, settings will not be active until the printer is plugged");
   }
 
   switch (i) {
-    case 1: // status
+    case printer_status: // status
             cli_printf("  printer power : %s", globsetting.get(PRT_power) ? "ON":"OFF");
             pr_mode = globsetting.get(PRT_mode);
             switch (pr_mode) {
@@ -5604,6 +5587,16 @@ void uif_printer(int i) {
               case 2:  cli_printf("          mode  : TRACE"); break;
               case 3:  cli_printf("          mode  : TRACE*"); break;
               default: cli_printf("          mode  : <invalid>");
+            }
+
+            // get printer output mode from settings
+            pr_output_mode = globsetting.get(PRT_output_mode);
+            switch (pr_output_mode) {
+              case 0:  cli_printf("          output: none"); break;
+              case 1:  cli_printf("          output: serial only"); break;
+              case 2:  cli_printf("          output: infrared only"); break;
+              case 3:  cli_printf("          output: both serial and infrared"); break;
+              default: cli_printf("          output: <invalid>");
             }
 
             cli_printf("          paper : %s", (SELP9_status & prt_OOP_mask) ? "EMPTY":"OK");
@@ -5626,7 +5619,8 @@ void uif_printer(int i) {
             cli_printf("    bt1  %01d - bit  1 - not used, always returns 0", (SELP9_status >> 1) & 0x0001);
             cli_printf("    bt0  %01d - bit  0 - not used, always returns 0", (SELP9_status >> 0) & 0x0001);
             break;
-    case 2: // toggle printer power
+
+    case printer_power: // toggle printer power
             if (globsetting.get(PRT_power)) {
               globsetting.set(PRT_power, 0);
             } else {
@@ -5634,22 +5628,22 @@ void uif_printer(int i) {
             }
             cli_printf("  printer power: %s", globsetting.get(PRT_power) ? "ON":"OFF");
             break;
-    case 3: // set printer to TRACE status, bit 15 set, bit 14 clear
+    case printer_trace: // set printer to TRACE status, bit 15 set, bit 14 clear
             SELP9_status = SELP9_status | prt_SMA_mask & ~prt_SMB_mask;
             globsetting.set(PRT_mode, 2);
             cli_printf("  printer set to TRACE mode");
             break;
-    case 4: // set printer to NORM mode, bit 15 clear, bit 14 set
+    case printer_norm: // set printer to NORM mode, bit 15 clear, bit 14 set
             SELP9_status = (SELP9_status & ~prt_SMA_mask) | prt_SMB_mask;
             globsetting.set(PRT_mode, 1);
             cli_printf("  printer set to NORM mode");
             break;    
-    case 5: // set printer to MAN status, bit 14 and 15 of printer status are 0
+    case printer_man: // set printer to MAN status, bit 14 and 15 of printer status are 0
             SELP9_status = SELP9_status & ~prt_SMA_mask & ~prt_SMB_mask;
             globsetting.set(PRT_mode, 0);
             cli_printf("  printer set to MAN mode");
             break;
-    case 6: // toggle the Out Of Paper status in the printer status word
+    case printer_paper: // toggle the Out Of Paper status in the printer status word
             SELP9_status ^= prt_OOP_mask;   // XOR of Out Of Paper status bit
             if (globsetting.get(PRT_paper)) {
               globsetting.set(PRT_paper, 0);
@@ -5658,7 +5652,7 @@ void uif_printer(int i) {
             }
             cli_printf("  printer Out Of Paper status %s", SELP9_status & prt_OOP_mask ? "on":"off");
             break;
-    case 7: // push the printer PRINT button, short push only, button status is reset after 1 read
+    case printer_print: // push the printer PRINT button, short push only, button status is reset after 1 read
             // this is printer status bit 13
             if (!globsetting.get(HP82143A_enabled)) {
               cli_printf("  HP82143A ROM not plugged, function ignored");
@@ -5669,7 +5663,7 @@ void uif_printer(int i) {
             wakemeup_41();
             cli_printf("  printer PRINT key pushed");
             break;
-    case 8: // push the printer ADV button, short push only, button status is reset after 1 read
+    case printer_adv: // push the printer ADV button, short push only, button status is reset after 1 read
             // this is printer status bit 12
             if (!globsetting.get(HP82143A_enabled)) {
               cli_printf("  HP82143A ROM not plugged, function ignored");
@@ -5680,8 +5674,45 @@ void uif_printer(int i) {
             wakemeup_41();
             cli_printf("  printer ADV key pushed");
             break;            
+      case printer_irtest: // test the infrared LED, this is just a test, so no throttling
+            // simply send a string to the IR led, no throttling
+            for (int i = 'A'; i <= 'Z'; i++) {
+              // send the string to the IR led
+              // this is a test, so no throttling
+              while (ir_busy()) {
+                // wait a bit
+                cli_printfn(".");
+              }
+              PrintIRchar(i);
+            }	
+            PrintIRchar(00);    // send a carriage return
+            PrintIRchar(0xE0);    // send a line feed            
+            cli_printf("  test string sent to IR LED"); 
+            break;
+      case printer_irtog: // test the IR LED power consumption by toggling it
+            IR_toggle(); // toggle the IR LED
+            // wait for 10 ms
+            sleep_ms(10); // wait for 10 ms
+            cli_printf("  IR LED (GPIO %d) is %s", P_IR_LED, gpio_get(P_IR_LED) ? "ON" : "OFF");
+            break;
+      case printer_output: // cycle through the printer output modes: 0=none, 1=serial, 2=infrared, 3=both
+            {
+              uint16_t pr_output_mode = globsetting.get(PRT_output_mode);
+              pr_output_mode = (pr_output_mode + 1) % 4; // cycle through the modes
+              globsetting.set(PRT_output_mode, pr_output_mode);
+              switch (pr_output_mode) {
+                case 0:  cli_printf("  printer output mode set to none"); break;
+                case 1:  cli_printf("  printer output mode set to serial only"); break;
+                case 2:  cli_printf("  printer output mode set to infrared only"); break;
+                case 3:  cli_printf("  printer output mode set to both serial and infrared"); break;
+                default: cli_printf("  printer output mode set to <invalid>"); break;
+              }
+            }
+            // and save the settings in FRAM
+            globsetting.save();
+            break;
 
-    default: 
+      default: 
             // no other actions defined here
             ;
             
@@ -5938,6 +5969,7 @@ void uif_umem(int i) {
         #define trace_pilbox      9
         #define trace_ilregs     10
         #define trace_save       11
+        #define trace_mnem       12
 */
 
         // settings for tracer, enable by default
@@ -5975,6 +6007,7 @@ void uif_tracer(int i, int bufsize) {
             cli_printf("  IL scope traffic        %s", globsetting.get(ilscope_IL_enabled) ? "enabled ":"disabled");
             cli_printf("  PILBox traffic          %s", globsetting.get(ilscope_PIL_enabled) ? "enabled ":"disabled");
             cli_printf("  tracing of IL regs      %s", globsetting.get(tracer_ilregs_on) ? "enabled ":"disabled");
+            cli_printf("  tracer mnemonics        %s", globsetting.get(tracer_dis_type) == 0 ? "none" : (globsetting.get(tracer_dis_type) == 1 ? "JDA" : "HP"));
             break;
     case trace_buffer: // buffer
             // show and/or set the current buffer size
@@ -6051,6 +6084,15 @@ void uif_tracer(int i, int bufsize) {
             globsetting.save();
             cli_printf("  tracer setting saved in FRAM");
             break; 
+    case trace_mnem: // mnem
+            // toggle the display of mnemonics in the trace output
+            // 0 - no disassembly output
+            // 1 - JDA mnemonics (default)
+            // 2 - HP mnemonics
+            globsetting.set(tracer_dis_type, (globsetting.get(tracer_dis_type) + 1) % 3);
+            cli_printf("  tracer mnemonics: %s", globsetting.get(tracer_dis_type) == 0 ? "none" : (globsetting.get(tracer_dis_type) == 1 ? "JDA" : "HP"));
+            // globsetting.save();
+            break;
     default:
             // no other actions defined here
             ;         
@@ -6425,7 +6467,7 @@ void scan_file(const char *fname)
   }
 
   // now we can read the file line by line
-  cli_printf("  starting scanning of file %s, press X to abort ", fname);
+  cli_printf("  starting scanning of file %s, press X (or x) to abort ", fname);
 
 
   // start reading the file. This is must be a text file but that is not checked here
@@ -6507,12 +6549,6 @@ void scan_file(const char *fname)
     }
     cli_printf(""); 
 
-    // wait for a key to be pressed to continue
-    // cli_printf("  scanned one line of %s completed, press any key to continue, press X to exit", fname);
-    // while (!cdc_available(ITF_CONSOLE)) {
-    //   tud_task();  // keep the USB port alive
-    //   sleep_ms(10);
-    // }
     tud_task();  // keep the USB port alive
     char ch = cdc_read_char(ITF_CONSOLE);
     if (ch == 'X' || ch == 'x') {
@@ -6524,9 +6560,7 @@ void scan_file(const char *fname)
   // close the file
   f_close(&fil);
   cli_printf("  file %s closed", fname);
-
 }
-
 
 
 bool process_wand_instruction(const char *instruction)

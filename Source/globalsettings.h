@@ -43,6 +43,8 @@ extern "C" {
 
 // the first block of parameters enable or disable decoding of the perphipher instructions
 // for that specific device. These must be set together with loading the ROM
+// the settings registers are all uint16_t!
+
 #define     HP82143A_enabled     0          // HP82143A printer active and SELP9 decoded
 #define     HP82153A_enabled     1          // HP82153A Wand active
 #define     HP82160A_enabled     2          // HP82160A HP-IL module active
@@ -72,12 +74,16 @@ extern "C" {
 // control of tracer settings
 #define     tracer_enabled      30          // tracer enabled
 #define     tracer_ilregs_on    31          // tracing of HP-IL registers enabled
-#define     tracer_dis_enabled  32          // disassembly enabled
+#define     tracer_dis_type     32          // disassembly enabled
+                                            // 0 = no disassembly
+                                            // 1 = JDA
+                                            // 2 = HP (not yet supported)
+#define     tracer_distype_none  0
+#define     tracer_distype_JDA   1
+#define     tracer_distype_HP    2
+
 #define     tracer_FI_on        33          // FI tracing enabled
-#define     tracer_dis_type     34          // tracer disassembly type (JDA only for now)
-                                            // 0 = JDA
-                                            // 1 = HP   (not yet supported)
-                                            // 2 = ZEN  (not yet supported)
+#define     tracer_placeholder  34          // was mnemonics type
 #define     tracer_sysrom_on    35          // tracing of system ROMS pages 0, 1, 2, 3, 5 enabled
 #define     tracer_userrom_on   36          // tracing of user ROM pages 8..F enabled
 #define     tracer_p4_on        37          // tracing of page 4 enabled
@@ -124,6 +130,11 @@ extern "C" {
 #define     PRT_paper           82          // is paper loaded
 #define     PRT_power           83          // printer power
 #define     PRT_serial          84          // use serial printer output for output in terminal emulator                   
+#define     PRT_output_mode     85          // printer output mode:
+                                            //  0 = no output
+                                            //  1 = serial
+                                            //  2 = infrared
+                                            //  3 = both (serial + infrared)
 
 // control of TULIP4041 device
 #define     CLI_on_USB          90          // CLI goes to USB CDC port, otherwise to serial port
@@ -192,6 +203,9 @@ class GSettings {
         gsettings[tracer_ilroms_on]     = 1;
         gsettings[tracer_mainbuffer]    = 5000;     // default size of main trace buffer
         gsettings[tracer_pretrig]       = 32;       // default size 
+        gsettings[tracer_dis_type]      = 1;        // default to JDA mnemonics
+
+        gsettings[PRT_output_mode]  = 1;        // serial printing only
 
         if (gpio_get(P_PWO) == 0) {
             // when PWO = low we can write to FRAM
