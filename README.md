@@ -16,6 +16,23 @@ The MOD files are now in their own subdirectory with explanation and instruction
 
 My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
 
+When using Windows and many serial ports (especially trcare and ILScope and printer) from the TULIP this may impact performance of the CLI and cause HP-IL frame errors. This
+is due to high loading of the virtual serial ports. I have seen this on Windows only, my Linux Raspberry 5 works fine with all virtual ports in use. Especially connecting
+the serial port for the HP-IL Scope (IL frames and PILBox frames) makes this worse.
+
+VERSION 0.98, April 2026
+-   Added HP mnemonics, can select between no disassembly, JDA or HP mnemonics
+-   Re-arranged Traceline to include status (ISA, DATA, FI driven by TULIP), bank and decoded instruction
+-   Added current selected peripheral to the trace listing and a + to indicate signal driven by TULIP
+-   When sending carry only a C will appear in the tracer
+-   Dropped decoded instruction from the trace listing, added a + in the instruction column if decoded
+-   Re-coded Print_task for better performance and to prevent hold-up when printing to the IR LED
+    This was impacting the CLI and tracer
+-   Fixed issue with printer emulation causing reporting status bit for of PRINTER OFF 
+-   There was some stray development code 'hidden' in the Wand_task which caused interference when printing
+    This task was not used and is removed, and not called anymore from the main loop
+-   Added option for printer output: none, serial, IR or both
+  
 VERSION 0.97b, April 2026
 -   Bug fix release
 -   Fixed the issue of showing deleted files in normal list mode
