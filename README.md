@@ -18,6 +18,7 @@ My favourite community for HP calculators is https://www.hpmuseum.org/forum/inde
 
 I think I have now fixed the issue when using multiple serial ports. There was an issue in the code for the ILScope that messed up things. Please report any 
 issues that you may still encounter. The documentation is not yet up to date.
+The files CHEAT_SHEET.md and USER_MANUAL.md are AI generated documents. I use GitHub CoPilot in combibation with VSCode (with the Pico extension) for coding the TULIP firmware in C/C++.
 
 VERSION 0.98b, April 2026
 -   Restructured the ILScope tracer, now decoupled from the IL traffic with a queue
