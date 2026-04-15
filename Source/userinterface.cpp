@@ -5679,10 +5679,13 @@ void uif_printer(int i) {
             for (int i = 'A'; i <= 'Z'; i++) {
               // send the string to the IR led
               // this is a test, so no throttling
-              while (ir_busy()) {
-                // wait a bit
-                cli_printfn(".");
-              }
+              #ifdef DEBUG
+                cli_printf("  sending character %c to IR LED", i);
+                while (ir_busy()) {
+                  // wait a bit
+                  cli_printfn(".");
+                }
+              #endif
               PrintIRchar(i);
             }	
             PrintIRchar(00);    // send a carriage return

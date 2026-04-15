@@ -194,7 +194,7 @@ int main() {
     
     while (true) {
 
-        // send_ir_pulse();            // send a single pulse on the IR output for debugging, remove this later 
+        // send_ir_pulse();         // send a single pulse on the IR output for debugging, remove this later 
         
         PowerMode_task();           // Verify the HP41 power mode
 
@@ -202,7 +202,7 @@ int main() {
 
         runCLI();                   // process the 'new' embedded CLI
 
-        // serial_loop();              // process the 'old' user interface
+        // serial_loop();           // process the 'old' user interface
                                     // we keep it here for debugging and the PWO monitoring just in case
 
         Trace_task();               // process HP41 Trace/disassembler
@@ -211,6 +211,8 @@ int main() {
 
         HPIL_task();                // process the HP-IL task for transmitting and receiving frames
                                     // only if HP-IL is active
+
+        ILscope_task();             // process the IL Scope task for monitoring HP-IL communication
 
         // Wand_task();             // process the HP41 wand input emulation
                                     // not needed

@@ -38,11 +38,13 @@ static bool char_pending = false;      // a char was read from the printbuffer, 
 queue_t PrintBuffer;            // printbuffer between cores
 const int PrintBufSize = 100;   // size of printbuffer
 
+queue_t ILscopeBuffer;           // buffer for IL Scope, to decouple the HP-IL communication from the printing of the frames
+const int ILscopeBufSize = 100;  // size of ILscope buffer
+
 bool HPIL_firstconnect = false;
 bool ILScope_firstconnect = false;
 bool Print_firstconnect = false;
 bool ilscope_enabled = true;
-
 
 // HP-IL variables
 const int HPIL_BufSize = 10;    // size of printbuffer for both sending and receiving
@@ -70,6 +72,11 @@ bool PIL_tx_pending = false;        // true if the hi byte still has to be sent
 bool PILmode8 = true;               // PILBox transfer mode, true when in 8-bit mode, false when in 7-bit mode
 uint16_t PILBox_mode = TDIS;        // PILBOx mode (TDIS, CON, COFF, COFI)
 uint16_t PILBox_prevmode = 0;       // PILBOx mode to detect a change (TDIS, CON, COFF, COFI)
+
+ILScope_line IL_Line;               // struct for the IL Scope queue, to decouple the HP-IL communication from the printing of the frames
+ILScope_line ILScopeLine;           // struct for the IL Scope queue, to decouple the HP-IL communication from the printing of the frames
+
+bool ILScope_Overflow = false;      // becomes true when the ILScope buffer is full and lines are lost
 
 extern uint8_t HP41_powermode;
 
@@ -470,36 +477,137 @@ void getIL_mnemonic(uint16_t wFrame, char *mnem)
     sprintf(mnem, "%s", IL_mnemonics[i].ILmnemonic);
 }
 
+
+void ILscope_task()
+{
+    // this task is for monitoring the HP-IL communication, it prints the frames to the USB CDC port in a human readable format
+    // it can be enabled/disabled with the ilscope_enabled variable and the settings in the globsetting for IL_scope
+
+    // replaces the routines in the HPIL_task() to decouple the HP-IL communication from the printing of the frames, 
+    // so that the HP-IL communication is not slowed down by the printing to the USB CDC port
+
+    // check the status of the IL SCOPE, and if there is a first connect
+    // also check for an input char to pause the scope
+    if (cdc_connected(ITF_ILSCOPE)) {
+        // only if the Tracer CDC interface is connected
+        if (!ILScope_firstconnect) {
+            // ILScope_firstconnect was false, so this is now a new CDC connection
+            ILScope_firstconnect = true;
+            ILScopePrintLen = 0;
+            cli_printf("  CDC Port 4 [IL Scope] connected");
+            ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen, "IL Scope CDC PORT connected\r\n");
+            cdc_sendbuf(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
+            cdc_flush(ITF_ILSCOPE);
+        } else {
+            if (cdc_read_char(ITF_ILSCOPE) != 0) {
+                ILScopePrintLen = 0;
+                ilscope_enabled = !ilscope_enabled;
+                ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen, "IL Scope is %s\n\r", ilscope_enabled ? "enabled":"paused");
+                cdc_sendbuf(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
+                cdc_flush(ITF_ILSCOPE);
+            }
+        }
+    }
+
+    // check for disconnection of IL Scope
+    if ((ILScope_firstconnect) && (!cdc_connected(ITF_ILSCOPE))) {
+        // CDC interface is disconnected
+        cli_printf("  CDC Port 4 [IL Scope] disconnected");
+        ilscope_enabled = false;    // disable the scope when disconnected
+        ILScope_firstconnect = false;
+    }
+
+    // Struct for the IL Scope queue
+    /*
+    struct __attribute__((packed))ILScope_line {
+    uint32_t    cycle_number;       // cycle number of the frame to match with the mcode tracer cycle number
+    uint16_t    frame;              // HP-IL frame                             2 bytes
+    uint16_t    PILframe;           // PILBox frame (2 serial bytes)           2 bytes
+    uint8_t     frame_type;         // type of the frame
+                                    // bit 0: direction, 0 out, 1 = in (viewed from TULIP)
+                                    // bit 1: frame type, 0 = IL frame, 1 = PILBox frame
+    }; */
+
+
+    // check if there is something in the IL Scope queue, if so print it to the USB CDC port
+    if (!queue_is_empty(&ILscopeBuffer)) {
+        // only do this if something is connected or enabled, otherwise just wasting cycles
+        tud_task();
+        
+        // get the line from the queue
+        queue_try_remove(&ILscopeBuffer, &ILScopeLine);
+
+        if (!cdc_connected(ITF_ILSCOPE)) {
+            // no serial port connected, do nothing
+            return;
+        }
+
+        if (!ilscope_enabled) {
+            // scope is paused, do nothing
+            return;
+        }
+
+        // now check the type of the line, if bit 1 of frame_type is set it is a PILBox line, otherwise it is a normal HP-IL line
+        bool out = (ILScopeLine.frame_type & 0x1) == 0 ? false : true;   // bit 0 indicates direction, 0 out, 1 in (viewed from TULIP)
+        bool pilbox = (ILScopeLine.frame_type & 0x2) == 0 ? false : true; // bit 1 indicates frame type, 0 = IL frame, 1 = PILBox frame
+
+        // check which type of tracing is enabled in the settings, if not enabled do nothing
+        if (pilbox && !globsetting.get(ilscope_PIL_enabled)) return;
+        if (!pilbox && !globsetting.get(ilscope_IL_enabled)) return;
+
+        // now prepare the traceline
+        // first find the mnemonic
+        int i = 0;
+        while (i < numILmnemonics) {   
+            if ((ILScopeLine.frame & IL_mnemonics[i].ILmask) == IL_mnemonics[i].ILcode) break;
+            i++;
+        } 
+
+        if (pilbox) {
+            // build the ILScope string for the PILBox frame
+            ILScopePrintLen = 0;
+            ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"  PILBox %s %04X %s   ", out ? ">":"<", ILScopeLine.frame, IL_mnemonics[i].ILmnemonic);
+            ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"hi: %02X lo: %02X  [%8d]", (ILScopeLine.PILframe >> 8) & 0xFF, ILScopeLine.PILframe & 0xFF, ILScopeLine.cycle_number);
+        } else {
+            // build the ILScope string for the HP-IL frame
+            ILScopePrintLen = 0;
+            ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen," %s %03X %s                           [%8d]",  out ? ">":"<", ILScopeLine.frame, IL_mnemonics[i].ILmnemonic, ILScopeLine.cycle_number);
+
+        }
+
+        // check for a possible overflow of the ILScope buffer, if there was an overflow print a warning message
+        if (ILScope_Overflow) {
+            ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"    possible ILScope overflow, frames may be lost\n\r");
+        } else {
+            ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"\n\r");
+        }
+
+        cdc_send_string(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
+        cdc_flush(ITF_ILSCOPE);
+    }
+}
+
 void HPIL_scope(uint16_t wFrame, bool out, bool traceIDY)
 {
     // HPIL tracer, shoing outgoing and incoming frames
     // output is sent to its own USB CDC port
     //  out         - when true this is outgoing traffic, otherwise it is incoming
-    //  traceIDY    - when true will trace IDY frames
-    uint16_t framemask;
-    int i = 0;
-    int stamp = cycles();
+    // traceIDY is now always enabled
 
-    if (ilscope_enabled && cdc_connected(ITF_ILSCOPE) && globsetting.get(ilscope_IL_enabled)) {
+    // if (ilscope_enabled && globsetting.get(ilscope_IL_enabled)) {
         // only do this if something is connected or enabled, otherwise just wasting cycles
 
-        // first find the mnemonic
-        i = 0;
-        while (i < numILmnemonics) {   
-            if ((wFrame & IL_mnemonics[i].ILmask) == IL_mnemonics[i].ILcode) break;
-            i++;
-        }
+        // prepare the packet for the ILScope queue
+        IL_Line.cycle_number = cycles();
+        IL_Line.frame        = wFrame;
+        IL_Line.PILframe     = 0;   // not a PILBox frame
+        IL_Line.frame_type   = 0;
+        if (out) IL_Line.frame_type |= 0x1;   // set bit 0 for outgoing frames
+                                              // bit 1 is already 0 for HP-IL frames
 
-        // do nothing if it is an IDY frame and the tracing of these is disabled
-        if (((wFrame & 0x700) == 0x600) && !traceIDY) return;   
-    
-        // build the ILScope string
-        ILScopePrintLen = 0;
-        ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen," %s %03X %s                           [%8d]\n\r",  out ? ">":"<", wFrame, IL_mnemonics[i].ILmnemonic, stamp);
-
-        cdc_send_string(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
-        cdc_flush(ITF_ILSCOPE);
-    } 
+        // do a non-blocking add to the queue, if there are overflows find a
+        ILScope_Overflow = !queue_try_add(&ILscopeBuffer, &IL_Line);              
+    // } 
 }
 
 void PILBox_scope(uint16_t wFrame, uint8_t bhi, uint8_t blo, bool out)
@@ -507,30 +615,23 @@ void PILBox_scope(uint16_t wFrame, uint8_t bhi, uint8_t blo, bool out)
     // PILBox tracer, showing outgoing and incoming frames and bytes
     // output is sent to the USB CDC port that is also showing the HP-IL scope
     //  out         - when true this is outgoing traffic, otherwise it is incoming
-    //  traceIDY    - when true will trace IDY frames
 
-    uint16_t framemask;
-    int i = 0;
-    int stamp = cycles();
+    // only job is to prepare the struct and put it in the queue for the IL Scope task
+    // if (ilscope_enabled && globsetting.get(ilscope_PIL_enabled)) {
+        // only do this if enabled, otherwise just wasting cycles
 
-    if (ilscope_enabled && cdc_connected(ITF_ILSCOPE) && globsetting.get(ilscope_PIL_enabled)) {
-        // only do this if something is connected or enabled, otherwise just wasting cycles
+        // prepare the ILscope trace struct
 
-        // first find the mnemonic
-        i = 0;
-        while (i < numILmnemonics) {   
-            if ((wFrame & IL_mnemonics[i].ILmask) == IL_mnemonics[i].ILcode) break;
-            i++;
-        } 
-    
-        // build the ILScope string
-        ILScopePrintLen = 0;
-        ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"  PILBox %s %04X %s   ", out ? ">":"<", wFrame, IL_mnemonics[i].ILmnemonic);
-        ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen,"hi: %02X lo: %02X  [%8d]\n\r", bhi, blo, stamp);
+        IL_Line.cycle_number = cycles();
+        IL_Line.frame        = wFrame;
+        IL_Line.PILframe     = (bhi << 8) | blo;
+        IL_Line.frame_type   = 0;
+        if (out) IL_Line.frame_type |= 0x1;   // set bit 0 for outgoing frames
+        IL_Line.frame_type  |= 0x2;            // set bit 1 for PILBox frames
 
-        cdc_send_string(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
-        cdc_flush(ITF_ILSCOPE);
-    }
+        // do a non-blocking add to the queue
+        ILScope_Overflow = !queue_try_add(&ILscopeBuffer, &IL_Line);  
+    // }
 }
 
 void HPIL_init()
@@ -541,6 +642,19 @@ void HPIL_init()
     // initialize send and receive buffer, HPIL frame is a 16-bit word
     queue_init(&HPIL_SendBuffer, sizeof(uint16_t), HPIL_BufSize);
     queue_init(&HPIL_RecvBuffer, sizeof(uint16_t), HPIL_BufSize);
+
+    // Struct for the IL Scope queue
+    /*
+    struct __attribute__((packed))ILScope_line {
+        uint32_t    cycle_number;       // cycle number of the frame to match with the mcode tracer cycle number
+        uint16_t    frame;              // HP-IL frame input                            2 bytes
+        uint8_t     frame_type;         // type of the frame
+                                        // bit 0: direction, 0 out, 1 = in (viewed from TULIP)
+                                        // bit 1: frame type, 0 = IL frame, 1 = PILBox frame
+    }; */
+
+    // initialize the IL Scope buffer to communicate with the IL Scope task
+    queue_init(&ILscopeBuffer, sizeof(ILScope_line), ILscopeBufSize);
 
     // preset HP-IL registers for HP-IL module hot plugging
     // ASSERT(m_pHpil != NULL);
@@ -569,14 +683,11 @@ void PILBox_sendframe(uint16_t frame)
 
     loopbackFrame = 0xFFFF;
 
-    if (!cdc_connected(ITF_HPIL) || (PILBox_mode == TDIS))
-    {
+    if (!cdc_connected(ITF_HPIL) || (PILBox_mode == TDIS)) {
         // PILBox disabled (TDIS) or no serial connection
         // defaults to loopback
         loopbackFrame = frame;
-    }
-    else
-    {
+    } else {
         /* ignore RFC handling for now
         if ((frame & 0x700) == 0x400)
         {
@@ -606,16 +717,13 @@ void PILBox_sendframe(uint16_t frame)
         // normally we can optimize traffic by not sending the hi byte if it is the same as the previous hi byte
         // with the high speed USB connection this is not an issue anymore
         // to be implemented later
-        if (PILmode8)
-        {
+        if (PILmode8) {
             // 8-bit transfer mode
             PIL_tx_lo = (outframe & 0x007F) | 0x80;             // lower 7 data bits, msb = 1
             PIL_tx_hi = ((outframe >> 6) & 0x1E) | 0x20;        // PILBox hi byte previously sent
             cdc_send_char(ITF_HPIL, PIL_tx_hi);                 // send both chars
             cdc_send_char_flush(ITF_HPIL, PIL_tx_lo);           // flush after the 2nd byte
-        }
-        else
-        {
+        } else {
             // 7-bit transfer mode
             PIL_tx_lo = (outframe & 0x003F) | 0x40;             // lower 6 data bits, msb = 1
             PIL_tx_hi = ((outframe >> 6) & 0x1F) | 0x20;        // higher byte
@@ -694,20 +802,15 @@ uint16_t PILBox_revcframe()
     bool returnframe = false;               // true if a frame needs to be returned
                                             // false if no data available or only part of a frame received
     
-    if (!cdc_connected(ITF_HPIL))
-    {
+    if (!cdc_connected(ITF_HPIL)) {
         // no valid serial link, loopback mode 
         frame = loopbackFrame;
         loopbackFrame = 0xFFFF;             // to indicate no new frame is available
         return frame;                       // and get out
-    }
-    else if (cdc_available(ITF_HPIL) == 0)
-    {
+    } else if (cdc_available(ITF_HPIL) == 0) {
         // no bytes available
         return 0xFFFF;                      // return no data and get out
-    }
-    else
-    {
+    } else {
         // we get here when:
         // - there is a valid serial link
         // - and there is data available in the serial buffer
@@ -716,14 +819,12 @@ uint16_t PILBox_revcframe()
 
         // PILBox emulation received a byte from the PILBox designated serial port
         // pil_recv contains the returned byte
-        if ((pil_recv & 0xE0) == 0x20)
-        {
+        if ((pil_recv & 0xE0) == 0x20) {
             // this is the higher byte of a transfer
             PIL_tx_hi = pil_recv;       // save until the lower byte arrives
             return 0xFFFF;              // and return with no data
         }
-        if ((pil_recv & 0x80) == 0x80)
-        {
+        if ((pil_recv & 0x80) == 0x80) {
             // this is the lower byte of an 8-bit transfer
             PILmode8 = true;                    // set the correct mode to 8 bits
             PIL_rx_lo = pil_recv;               
@@ -731,8 +832,7 @@ uint16_t PILBox_revcframe()
             // this completes the 2-byte transfer, complete the frame
             PIL_rx_frame = (pil_recv & 0x7F) | ((PIL_tx_hi & 0x1E) << 6);
         }
-         if ((pil_recv & 0xC0) == 0x40)
-        {
+        if ((pil_recv & 0xC0) == 0x40) {
             // this is the lower byte of a 7-bit transfer
             PILmode8 = false;            // set the correct mode
             PIL_rx_lo = pil_recv;       
@@ -745,8 +845,7 @@ uint16_t PILBox_revcframe()
         // send to our scope for debugging
         PILBox_scope(PIL_rx_frame, PIL_tx_hi, pil_recv, false);
 
-        switch (PIL_rx_frame)
-        {
+        switch (PIL_rx_frame) {
             case TDIS:                          // TDI: Translator DIsabled
                 PILBox_mode = TDIS;             // set mode to disabled
                                                 // frame is not forwarded to the HP-IL emulation
@@ -803,8 +902,7 @@ uint16_t PILBox_revcframe()
 bool IsFrameInTransfer(uint16_t dwIncr)
 {
   bool bInTransfer = (m_eMode != 0);
-  if (bInTransfer)
-  {
+  if (bInTransfer) {
     // m_dwCpuCycles += dwIncr;
     // if (m_dwCpuCycles >= 10*5780)           // check for timeout
     // {
@@ -852,12 +950,10 @@ void HPIL_AutoIDYTask()
     //   - HP-IL is in Controller mode (CA bit, bit 6 in HP-IL register 0) 
     // loop checks if 10 ms are expired before sending AutoIDY frame 0x6C0
 
-    if (((HPIL_REG[3] & 0x40) != 0) && (HP41_powermode == PowerMode_LightSleep) && ((HPIL_REG[0] & 0x40) != 0))
-    {
+    if (((HPIL_REG[3] & 0x40) != 0) && (HP41_powermode == PowerMode_LightSleep) && ((HPIL_REG[0] & 0x40) != 0)) {
         t_now = get_absolute_time();
         us_elapsed = absolute_time_diff_us(t_IDY_timer, t_now);
-        if (us_elapsed > (10*1000))
-        {
+        if (us_elapsed > (10*1000)) {
             // 10 ms have passed so send a new IDY frame and reset the timer
             t_IDY_timer = t_now;
             HPIL_SendFrame(IDY_C0);   // frame to send is 0x6C0
@@ -871,8 +967,7 @@ void HPIL_SendFrame(uint16_t wFrame)
     // in this case the frame will be sent to the PILBox emulator
     HPIL_scope(wFrame, true, true);
 
-    if (wFrame != RFC)              // not a RFC frame
-    {
+    if (wFrame != RFC) {            // not a RFC frame
         m_wLastFrame = wFrame;      // remember last send frame
                                     // but not really used ??
     }
@@ -890,8 +985,7 @@ void HPIL_RecvFrame(uint16_t wFrame)
 
     // CMD frame and CA (controller active) and adding RFC frame enabled
     // CMD/RFC handshaking is done in the PILBox emulation
-    if (((wFrame & 0x700) == 0x400) && (HPIL_REG[0] & 0x40) != 0)
-    {
+    if (((wFrame & 0x700) == 0x400) && (HPIL_REG[0] & 0x40) != 0) {
         m_wLastCmd = wFrame;                            // remember last CMD frame
         HPIL_SendFrame(RFC);                            // send the RFC frame
         return;
@@ -899,8 +993,7 @@ void HPIL_RecvFrame(uint16_t wFrame)
 
     // CA (controller active) and RFC frame
     // CMD/RFC handshaking done in the PILBox emulation
-    if (((HPIL_REG[0] & 0x40) != 0) && (wFrame == RFC))
-    {
+    if (((HPIL_REG[0] & 0x40) != 0) && (wFrame == RFC)) {
         wFrame = m_wLastCmd;                            // use the last CMD frame as answer
     } 
         
@@ -925,36 +1018,6 @@ void HPIL_task()
 
     // first of all check if HP-IL is enabled and active at all
     // if (!globsetting.get(HP82160A_enabled)) return;
-
-    // check the status of the IL SCOPE, and if there is a first connect
-    // also check for an input char to pause the scope
-    if (cdc_connected(ITF_ILSCOPE)) {
-        // only if the Tracer CDC interface is connected
-        if (!ILScope_firstconnect) {
-            // ILScope_firstconnect was false, so this is now a new CDC connection
-            ILScope_firstconnect = true;
-            ILScopePrintLen = 0;
-            cli_printf("  CDC Port 4 [IL Scope] connected");
-            ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen, "IL Scope CDC PORT connected\r\n");
-            cdc_sendbuf(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
-            cdc_flush(ITF_ILSCOPE);
-        } else {
-            if (cdc_read_char(ITF_ILSCOPE) != 0) {
-                ILScopePrintLen = 0;
-                ilscope_enabled = !ilscope_enabled;
-                ILScopePrintLen += sprintf(ILScopePrint + ILScopePrintLen, "IL Scope is %s\n\r", ilscope_enabled ? "enabled":"paused");
-                cdc_sendbuf(ITF_ILSCOPE, ILScopePrint, ILScopePrintLen);
-                cdc_flush(ITF_ILSCOPE);
-            }
-        }
-    }
-
-    // check for disconnection of IL Scope
-    if ((ILScope_firstconnect) && (!cdc_connected(ITF_ILSCOPE))) {
-        // CDC interface is disconnected
-        cli_printf("  CDC Port 4 [IL Scope] disconnected");
-        ILScope_firstconnect = false;
-    }
 
     // check for a first connection from the HP-IL CDC
     if (cdc_connected(ITF_HPIL)) {

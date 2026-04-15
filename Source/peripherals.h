@@ -54,8 +54,15 @@ extern "C" {
 
 #define NO_PIL 0xFFFF  // indicate no PILBox connected
 
-
-// Array for Wand Paper Keyboard
+// Struct for the IL Scope queue
+struct __attribute__((packed))ILScope_line {
+    uint32_t    cycle_number;       // cycle number of the frame to match with the mcode tracer cycle number
+    uint16_t    frame;              // HP-IL frame                             2 bytes
+    uint16_t    PILframe;           // PILBox frame (2 serial bytes)           2 bytes
+    uint8_t     frame_type;         // type of the frame
+                                    // bit 0: direction, 0 out, 1 = in (viewed from TULIP)
+                                    // bit 1: frame type, 0 = IL frame, 1 = PILBox frame
+};
 
 // function definitions in peripherals.cpp
 void gpio_toggle(uint signal);
@@ -66,6 +73,7 @@ void WandBuffer_init();
 void Print_task();
 void PrintBuffer_init();
 void getIL_mnemonic(uint16_t wFrame, char *mnem);
+void ILscope_task();
 void HPIL_init();
 void HPIL_task();
 void Wand_task();
@@ -73,6 +81,8 @@ void Wand_task();
 extern int m_eMode;          // HP-IL controller/device mode
 extern uint32_t cycles();
 extern uint8_t HP41_powermode;
+
+
 
 // prepare for dynamic buffers for user memory
 

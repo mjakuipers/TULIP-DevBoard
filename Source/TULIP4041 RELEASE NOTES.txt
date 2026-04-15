@@ -2,7 +2,12 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
-VERSION 0.98
+VERSION 0.98b, April 2026
+-   Restructured the ILScope tracer, now decoupled from the IL traffic with a queue
+-   While doing this found an ommision in the code which was probably responsible for issues with the serial ports
+    These should now be resolved
+
+VERSION 0.98, April 2026
 -   Added HP mnemonics, can select between no disassembly, JDA or HP mnemonics
 -   Re-arranged Traceline to include status (ISA, DATA, FI driven by TULIP), bank and decoded instruction
 -   Added current selected peripheral to the trace listing and a + to indicate signal driven by TULIP
@@ -10,6 +15,7 @@ VERSION 0.98
 -   Dropped decoded instruction from the trace listing, added a + in the instruction column if decoded
 -   Re-coded Print_task for better performance and to prevent hold-up when printing to the IR LED
     This was impacting the CLI and tracer
+-   Fixed issue with printer emulation causing reporting status bit for of PRINTER OFF 
 -   There was some stray development code 'hidden' in the Wand_task which caused interference when printing
     This task was not used and is removed, and not called anymore from the main loop
 -   Added option for printer output: none, serial, IR or both
