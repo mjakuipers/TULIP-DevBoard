@@ -11,14 +11,18 @@ Fast command reference for normal daily use.
 
 ## 2) ROM Workflow (Most Common)
 
-Import:
+Import (single file):
 
 - import /roms/myrom.rom
 - import /roms/myrom.rom compare
 - import /roms/myrom.rom UPDATE
 - import /roms/myrom.rom qrom
-- import /roms/myrom.rom compare qrom
-- import /roms/myrom.rom UPDATE qrom
+
+Import (batch from directory):
+
+- import /roms/ ALL
+- import /roms/ compare ALL
+- import /roms/ UPDATE ALL
 
 Plug:
 
@@ -55,6 +59,9 @@ Unplug:
 - list
 - list flash
 - list qrom
+- list ext
+- list all
+- list myrom.rom
 - list myrom.rom dump
 - export myrom.rom
 - export myrom.rom /backup/
@@ -90,9 +97,13 @@ Unplug:
 - tracer trace
 - tracer buffer 5000
 - tracer pretrig 64
+- tracer sysloop
 - tracer sysrom
 - tracer ilrom
 - tracer hpil
+- tracer pilbox
+- tracer ilregs
+- tracer mnem
 - tracer save
 
 Note: changing tracer buffer size may require reboot.
@@ -101,6 +112,7 @@ Note: changing tracer buffer size may require reboot.
 
 - printer status
 - printer power
+- printer output
 - printer norm
 - printer trace
 - printer man
@@ -136,6 +148,7 @@ UMEM:
 
 - umem status
 - umem 4
+- umem quad
 - umem dump
 - umem ERASE
 
@@ -155,20 +168,33 @@ QROM/HEPRAM:
 - hepram release 9
 - hepram CLRAM 8
 - hepram INIT
+- hepram INITALL
 
 ## 11) System Controls
 
 - system status
 - system pio
 - system cdc
+- system cdcident
 - system poweron
 - system calcreset
+- system gpio
+- system owner
 - system configlist
 - system configinit
 - system REBOOT
 - system BOOTSEL
 
-## 12) Troubleshooting Quick Checks
+## 12) RTC (Module Variant Only)
+
+- rtc status
+- rtc get
+- rtc set
+- rtc reset
+- rtc dump
+- rtc display
+
+## 13) Troubleshooting Quick Checks
 
 No CLI response:
 
@@ -191,7 +217,7 @@ SD problems:
 - sdcard status
 - sdcard mount
 
-## 13) Safety Notes
+## 14) Safety Notes
 
 - Do not plug/unplug modules while HP-41 is actively running.
 - Do not run FLASH/FRAM low-level maintenance commands unless you are servicing/debugging.
