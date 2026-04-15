@@ -16,10 +16,14 @@ The MOD files are now in their own subdirectory with explanation and instruction
 
 My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
 
-When using Windows and many serial ports (especially trcare and ILScope and printer) from the TULIP this may impact performance of the CLI and cause HP-IL frame errors. This
-is due to high loading of the virtual serial ports. I have seen this on Windows only, my Linux Raspberry 5 works fine with all virtual ports in use. Especially connecting
-the serial port for the HP-IL Scope (IL frames and PILBox frames) makes this worse.
+I think I have now fixed the issue when using multiple serial ports. There was an issue in the code for the ILScope that messed up things. Please report any 
+issues that you may still encounter
 
+VERSION 0.98b, April 2026
+-   Restructured the ILScope tracer, now decoupled from the IL traffic with a queue
+-   While doing this found an ommision in the code which was probably responsible for issues with the serial ports
+    These should now be resolved
+    
 VERSION 0.98, April 2026
 -   Added HP mnemonics, can select between no disassembly, JDA or HP mnemonics
 -   Re-arranged Traceline to include status (ISA, DATA, FI driven by TULIP), bank and decoded instruction
