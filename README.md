@@ -17,7 +17,7 @@ The MOD files are now in their own subdirectory with explanation and instruction
 My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
 
 I think I have now fixed the issue when using multiple serial ports. There was an issue in the code for the ILScope that messed up things. Please report any 
-issues that you may still encounter
+issues that you may still encounter. The documentation is not yet up to date.
 
 VERSION 0.98b, April 2026
 -   Restructured the ILScope tracer, now decoupled from the IL traffic with a queue
