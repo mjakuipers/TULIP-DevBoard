@@ -2,6 +2,24 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
+VERSION 0.990
+-   Changed IR framing generation to a lookup table to reduce CPU load 
+-   Added debug mode to the system command instead of the #ifdef DEBUG guards (only in userinterface.cpp)
+    to allow easier debugging by users if needed
+-   Modified serial port handling to reduce issues with Windows
+-   Printer mode now cycles trough the option MAN, NORM and TRACE
+-   Serial connection for printer port improved
+-   Implemented HP82143A serial printer emulation mode for pure ASCII and UTF-8
+-   Printer power and OOP status do not block IR output when powered only by the calculator (no USB)
+-   Added the filter command, including save and load
+-   Modified handling of the TraceLine in the core1 loop for more accurate information
+-   Modified handling of the HP-IL flags to output to FI
+-   Modified handling of TraceLine for HP-IL traffic
+-   Removed sysloop, sysrom and ilrom options from the tracer command, this can easily be handled with the filters
+-   Added sysloop option to the filter command
+-   Added a time tag for power mode events to the tracer
+-   ENBANK2 and ENBANK3 mnemonics corrected in the disassembler, these were swapped (but correct in the emulation)
+
 VERSION 0.98b, April 2026
 -   Restructured the ILScope tracer, now decoupled from the IL traffic with a queue
 -   While doing this found an ommision in the code which was probably responsible for issues with the serial ports

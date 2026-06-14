@@ -175,7 +175,7 @@ const char* __in_flash("flash_constants")glob_set_[] = {
     "",                                         // 97
     "",                                         // 98
 
-    "Global settings last item",                // 99   to identify the last item
+    "Debug Level",                              // 99   to identify the last item
     "",                                         // 100  guard
 };
 
@@ -576,7 +576,7 @@ bool enable_programming = false;    // enable FLASH/FRAM programming
 
 char ROMname[16]; // 16 chars will do normally
 char ROMrev[6];
-const char __in_flash()HPchar[] = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ |\"#$%&`()*+{-}/0123456789†,<=>?"; 
+const char __in_flash()HPchar[] = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ |\"#$%&`()*+{-}/0123456789â€ ,<=>?"; 
 
 
 void testglob()
@@ -751,7 +751,7 @@ void uif_status()
     cli_printf("*    __   ___    __");
     cli_printf("*   /  | |   |  /  | /|  Welcome to TULIP4041");   
     cli_printf("*  /___| |   | /___|  |  The ULtimate Intelligent Peripheral for the HP41");
-    cli_printf("*      | |___|     |  |  (C) 2025 Meindert Kuipers, Netherlands");
+    cli_printf("*      | |___|     |  |  (C) 2026 Meindert Kuipers, Netherlands");
     if (TULIP_HARDWARE == T_DEVBOARD) {
       cli_printf("*                        Firmware for the DevBoard version!");
     } else {
@@ -759,9 +759,9 @@ void uif_status()
     }
     cli_printf("*  Firmware: %s -- Compiled %s %s", Version_Number, __DATE__, __TIME__);
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("*  *** DEBUG build, not for production use! ***");
-    #endif
+    }
 
     char ser_string[32] = {0}; // buffer for serial string
     if (otp_read_serial(ser_string)) {
@@ -806,7 +806,7 @@ void uif_status()
     cli_printf("*    Total heap : %7.2lf KBytes", totalheap);
     cli_printf("*    Free heap  : %7.2lf KBytes", freeheap);
     cli_printf("*    Tracebuffer: %7.2lf KBytes, %d samples = %d bytes/traceline", tracebytes, TraceSize, sizeof(TraceLine));
-    cli_printf("*    Tracefilter: %7.2lf KBytes", sizeof(TraceFilter.m_filter) / 1024.0);
+    cli_printf("*    Tracefilter: %7.2lf KBytes", sizeof(TraceFilter.filter) / 1024.0);
     cli_printf("*");    
     cli_printf("*  HP41 status:");
     // show the current power mode based on the HP41_powermode variable
@@ -905,12 +905,12 @@ void uif_reboot()
 
 void uif_bootsel()
 {
-  uint sleepcount = 500;
+  int sleepcount = 500;
 
   cli_printf("  RESETTING THE TULIP4041 to BOOTSEL mode in 2 seconds!! press any key to cancel");
   cli_printf("  will unplug all embedded modules before the REBOOT\n\n");
 
-  while(true) {
+  while(sleepcount > 0) {
     tud_task();                 // to process IO until the watchdog triggers
     sleep_ms(2);
     if (cdc_available(ITF_CONSOLE)) {
@@ -919,31 +919,33 @@ void uif_bootsel()
       return;
     }
     sleepcount--;
-    if (sleepcount == 0) {  
-      // unplug any embedded modules here
-      for (int page = 4; page < 16; page++) {
-        if (TULIP_Pages.isPlugged(page, 1) && TULIP_Pages.isEmbeddedROM(page, 1)) {
-          // page is plugged and embedded, so unplug it and all banks
-          TULIP_Pages.unplug(page, 1);
-          TULIP_Pages.unplug(page, 2);
-          TULIP_Pages.unplug(page, 3);
-          TULIP_Pages.unplug(page, 4);
-          if (page == 6) {
-            // Printer Page
-            globsetting.set(HP82143A_enabled, 0); // disable the Printer ROM in the settings
-          } else if (page == 7) {
-            // HPIL Page
-            globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
-          }
-          globsetting.save();
-          TULIP_Pages.save();
-        }
-      }
+  }
 
-      // reboots the RP2350 when the counter expires, uses the standard LED for activity monitoring
-      reset_usb_boot(1<<PICO_DEFAULT_LED_PIN, 0);      
+  // unplug any embedded modules here
+  for (int page = 4; page < 16; page++) {
+    if (TULIP_Pages.isPlugged(page, 1) && TULIP_Pages.isEmbeddedROM(page, 1)) {
+      // page is plugged and embedded, so unplug it and all banks
+      TULIP_Pages.unplug(page, 1);
+      TULIP_Pages.unplug(page, 2);
+      TULIP_Pages.unplug(page, 3);
+      TULIP_Pages.unplug(page, 4);
+      if (page == 6) {
+        // Printer Page
+        globsetting.set(HP82143A_enabled, 0); // disable the Printer ROM in the settings
+      } else if (page == 7) {
+        // HPIL Page
+        globsetting.set(HP82160A_enabled, 0); // disable the HP82160A ROM in the settings
+      }
+      globsetting.save();
+      TULIP_Pages.save();
     }
   }
+
+  // have another brief delay to allow the unplugging to complete
+  sleep_ms(500);
+  
+  // reboots the RP2350 when the counter expires, uses the standard LED for activity monitoring
+  reset_usb_boot(1<<PICO_DEFAULT_LED_PIN, 0);   
 }
 
 // blink the LED b times, just for testing and fun
@@ -1024,9 +1026,9 @@ void uif_owner(const char *str)
   if (str == NULL) {
     // read the owner string
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
     cli_printf("  reading TULIP4041 owner string from FLASH memory");
-    #endif
+    }
 
     // check if the owner string is already programmed
     if (owner_string[0] < 0x20 || owner_string[0] > 0x7E) {
@@ -1040,9 +1042,9 @@ void uif_owner(const char *str)
       return;
     }
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
     cli_printf("  owner string address: 0x%08X", owner_string);
-    #endif
+    }
 
     // print the owner string
     cli_printf("  owner: \"%s\"", owner_string);
@@ -1159,6 +1161,19 @@ void uif_serial(const char *str)
   }
 }
 
+void uif_debug()
+{
+  // toggle the debug mode, which enables/disables debug messages in the CLI
+  // this is a global variable that is checked in the CLI functions to determine whether to print debug messages or not
+  // the variable is stored in RAM and will be reset to default (0) on reboot, so it does not persist across reboots
+  // this is useful for debugging without having to recompile the firmware with debug messages enabled
+
+  // toggle the globsettings variable for debug mode
+  globsetting.set(debug_level, !globsetting.get(debug_level));
+
+  cli_printf("  debug mode is now %s", globsetting.get(debug_level) ? "ON" : "OFF");
+}
+
 
 // show the status of all GPIO pins
 void uif_gpio_status()
@@ -1242,9 +1257,12 @@ int compare_openfile(FIL* fp, uint32_t offs, bool comp_qrom)
 
   uint filesize = f_size(fp);   // get the filesize
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("  comparing open file size %d bytes with FLASH/QROM file at %08X", filesize, offs);
-  #endif
+  }
+  if (globsetting.get(debug_level)) {
+    cli_printf("  comparing open file size %d bytes with FLASH/QROM file at %08X", filesize, offs);
+  }
 
   // no check is done of the type of file, this is done in the import function
 
@@ -1257,12 +1275,12 @@ int compare_openfile(FIL* fp, uint32_t offs, bool comp_qrom)
     MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
   }
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
   cli_printf("  filename                         type  size      address     next file   uSD filesize");
   cli_printf("  -------------------------------  ----  --------  ----------  ----------  --------");
   cli_printf("  %-31s  0x%02X  %8d  0x%08X  0x%08X  %8d", 
                 MetaH->FileName, MetaH->FileType, MetaH->FileSize, offs, MetaH->NextFile, filesize);
-  #endif
+  }
 
   // verify size infomation
   if (MetaH->FileSize != filesize) {
@@ -1302,9 +1320,9 @@ int compare_openfile(FIL* fp, uint32_t offs, bool comp_qrom)
         if (buf[i] != qr_buf[i])   {
           // bytes are different, so the file is different
           is_different = true;
-          #ifdef DEBUG
+          if (globsetting.get(debug_level)) {
             cli_printf("  bytes at %08X differ: FRAM: %02X - File: %02X", addr + i, qr_buf[i], buf[i]);
-          #endif
+          }
           // no need to check if it is writaebale or not, just get out
           return COMPARE_DIFF_ERASE;
         }  
@@ -1326,9 +1344,9 @@ int compare_openfile(FIL* fp, uint32_t offs, bool comp_qrom)
           if (flash_val != 0) {
           // bits need to change from 0 to 1, which is not allowed in FLASH
             is_writable = false;
-            #ifdef DEBUG
+            if (globsetting.get(debug_level)) {
             cli_printf("  bytes at %08X differ: FLASH: %02X - File: %02X", addr + i, flash_buf[addr + i], buf[i]);
-            #endif
+            }
             return COMPARE_DIFF_ERASE;
           }
         }
@@ -1466,9 +1484,9 @@ int import_file(const char *fname, int option, bool imp_qrom)
   // check if the file already exists in FLASH
   // if it exists maybe the UPDATE or compare option is used
   offs = ff_findfile(fname);
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
       cli_printf("  findfile result FLASH at offset 0x%08X", offs);
-  #endif
+  }
 
   // the file could be a deleted file, this must be checked
   if (offs != NOTFOUND) {
@@ -1476,9 +1494,9 @@ int import_file(const char *fname, int option, bool imp_qrom)
     ModuleMetaHeader_t *MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
     if (MetaH->FileType == FILETYPE_DELETED) {
       // this is a deleted file, so we treat it as not found
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  file found in FLASH at offset 0x%08X, but it is a deleted file, treating as not found", offs);
-      #endif
+      }
       offs = NOTFOUND;
     }
   }
@@ -1486,9 +1504,9 @@ int import_file(const char *fname, int option, bool imp_qrom)
   offs_qr = NOTFOUND;
   if (offs == NOTFOUND) offs_qr = fr_findfile(fname);
   
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
       cli_printf("  findfile result QROM  at offset 0x%08X", offs_qr);
-  #endif
+  }
 
   // now check if the options passed match the file existence and the target of the import
   
@@ -1518,10 +1536,10 @@ int import_file(const char *fname, int option, bool imp_qrom)
       import_fram = true;   
     } 
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  file exists in FLASH or QROM, now checking if UPDATE or compare requested");
       cli_printf("  options: %d - file %s - fram %d", option, fname, imp_qrom);
-    #endif
+    }
 
     // file exists, is this UPDATE or compare?
     if ((option == import_update) || (option == import_compare) || (option == import_compare_all) || (option == import_update_all)) {
@@ -1625,17 +1643,17 @@ int import_file(const char *fname, int option, bool imp_qrom)
       }
 
       // check if the file will fit in FLASH  
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  last free space in FLASH at 0x%08X", offs);
         cli_printf("  now checking for any holes that are large enough for the file");
-      #endif
+      }
 
       offs = ff_findfree(0, filesize); // find the next free space in FLASH
 
       // if offs is NOTFOUND, then there is no free space in FLASH
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  found free space in FLASH at 0x%08X", offs);
-      #endif
+      }
 
       if (offs == NOTFOUND) {
         cli_printf("  no free space in FLASH for this file");
@@ -1758,9 +1776,9 @@ int import_file(const char *fname, int option, bool imp_qrom)
       // find a free slot in FRAM for the file, and program it there
       offs_qr = fr_findfree(0, filesize); // find the next free space in FLASH
 
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  found free space in QROM at 0x%08X", offs_qr);
-      #endif
+      }
 
       if (offs_qr == NOTFOUND) {
         cli_printf("  no free space in QROM for this file");
@@ -1817,9 +1835,9 @@ int import_file(const char *fname, int option, bool imp_qrom)
       header.NextFile = old_header.NextFile;
     }
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  end of file system entry at 0x%08X is 0x%02X", offs_qr, end_of_filesystem);
-    #endif
+    }
 
     // now program the header in FRAM at offs_qr
     fr_write(offs_qr, (uint8_t *)&header, sizeof(header));
@@ -1845,16 +1863,16 @@ int import_file(const char *fname, int option, bool imp_qrom)
     if (end_of_filesystem == FILETYPE_END) {
       uint8_t end_marker = FILETYPE_END;
       fr_write(header.NextFile, &end_marker, 1);  // write the end of file system marker at the next file offset
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  programmed end of file system marker at 0x%08X", header.NextFile);
-      #endif
+      }
     }
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  file programmed in QROM header   : 0x%08X", offs_qr);
       cli_printf("  file programmed in QROM contents : 0x%08X", offs_qr + sizeof(header));
       cli_printf("  next file in QROM at             : 0x%08X", header.NextFile);
-    #endif
+    }
 
     // close the file    
     f_close(&fil);
@@ -1998,10 +2016,10 @@ void import_qromm(const char *fname, int a3)
   int result = 0;
   int rslt = 0;
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     // show parameters  
     cli_printf("  command: import_qrom %s q %d", fname, a3);
-  #endif
+  }
 
   // first sort out the file to be imported
   FIL fil;
@@ -2119,10 +2137,10 @@ void uif_import(const char *fname, int func)
     return;    // only do this when calc is not running
   }
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
   // show parameters
     cli_printf("  command: import %s %d", fname, func);
-  #endif
+  }
 
   if ((func == import_compare_all) || (func == import_update_all) || (func == import_all)) {
     // compare all files in the directory with FLASH
@@ -2332,9 +2350,9 @@ void ShowRomDetailsQ(uint32_t ROMoffset)
   // given an offset in QROM/FRAM to the ROM contents, show the details of the ROM file
   // remember that the address in the FRAM are byte addresses
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("  ShowRomDetailsQ called with ROMoffset 0x%04X", ROMoffset);
-  #endif
+  }
 
   int XROM = swap16(fr_read16(ROMoffset));         // XROM version is at offset 0 in the ROM header
   int NumFunctions = swap16(fr_read16(ROMoffset + 2));   // number of functions is at offset 2 in the ROM header
@@ -2345,9 +2363,9 @@ void ShowRomDetailsQ(uint32_t ROMoffset)
   // get a pointer to the ROM name (first function)
   uint16_t ROMName_offs = ((swap16(fr_read16(ROMoffset + 6)) & 0xFF)) + ((swap16(fr_read16(ROMoffset + 4)) & 0xFF) * 256);
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("    ROMName offset in ROM is 0x%04X", ROMName_offs);
-  #endif
+  }
 
   if (swap16(fr_read16(ROMoffset + 4)) > 0xFF) 
   {
@@ -2401,9 +2419,9 @@ void ShowROMDetails(uint16_t *ROMoffset)
   // get a pointer to the ROM name (first function)
   uint16_t ROMName_offs = ((swap16(myROMImage[3]) & 0xFF)) + ((swap16(myROMImage[2]) & 0xFF) * 256);
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("    ROMName offset in ROM is 0x%04X", ROMName_offs);
-  #endif
+  }
 
   if (swap16(myROMImage[2]) > 0xFF) 
   {
@@ -2718,9 +2736,9 @@ void ShowMODDetailsQ(uint16_t MODoffset)
     // get the offset to this image in QROM/FRAM
     myImageoffset = MODoffset + sizeof(ModuleFileHeader_t) + i * sizeof(ModuleHeader_t) + sizeof(ModulePageHeader_t);
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("    MOD Image offset in QROM/FRAM is 0x%08X", myImageoffset); 
-    #endif
+    }
 
     NumFunctions = getfrombinQ(myImageoffset, 1);
     
@@ -3170,23 +3188,23 @@ void uif_list(int option, const char *fname)
     return;
   }
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("  list option = %d", option);
     cli_printf("  filename argument = \"%s\"", fname);
-  #endif
+  }
 
   // locate the file with the name fname
   if (fname != NULL) {
     // a filename is given so we only show the details of this file
     offs = ff_findfile(fname);
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  file \"%s\" found in FLASH at 0x%08X", fname, offs);
-    #endif
+    }
     if (offs == NOTFOUND) {
       offs = fr_findfile(fname);
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  file \"%s\" found in QROM/FRAM at 0x%08X", fname, offs);
-      #endif
+      }
       file_in_fram = true;
       if (offs == NOTFOUND) {
         // file not found in FLASH or FRAM
@@ -3194,24 +3212,24 @@ void uif_list(int option, const char *fname)
         return;
       }
 
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  option = %d", option);
-      #endif
+      }
     }
 
     if (file_in_fram) {
       // get File header from FRAM
       fr_read(offs, (uint8_t*)&FrMetaH, sizeof(ModuleMetaHeader_t));
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  file \"%s\" found in QROM/FRAM at 0x%08X", fname, offs);
-      #endif
+      }
       MetaH = &FrMetaH;   // point to the struct with the file header details read from FRAM
     } else {
       // File Header is mapped to struct in FLASH, so we can read it directly from FLASH
       MetaH = (ModuleMetaHeader_t*)(FF_SYSTEM_BASE + offs);       // map header to struct
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  file \"%s\" found in FLASH at 0x%08X", fname, offs);
-      #endif
+      }
     }
    
     // show the file details here
@@ -3466,10 +3484,10 @@ int LoadMOD(uint32_t offs, bool isFRAM)
   }
 
   
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("  LoadMOD: called with MetaH      @ 0x%08X", (uint8_t *)MetaH);
     cli_printf("  LoadMOD: ModuleFileHeader  pMFH @ 0x%08X", (uint8_t *)pMFH);
-  #endif
+  }
 
   // get file format and the most important MOD file parameters
   // there is no check on the file size etc
@@ -3477,9 +3495,9 @@ int LoadMOD(uint32_t offs, bool isFRAM)
   // nFileFormat is 1 for MOD1 and 2 for MOD2, 0 for an unsupported type
   const int nFileFormat = MetaH->FileType;
   if (MetaH->FileType != FILETYPE_MOD1) {
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
     cli_printf("  LoadMOD: only MOD1 files supported, this is a %d file", MetaH->FileType);
-    #endif
+    }
     return(LOADMOD_INVALID_FILE);  // not a valid MOD file, cannot do anything with it
   }
 
@@ -3527,10 +3545,10 @@ int LoadMOD(uint32_t offs, bool isFRAM)
   int EvenGroup[8]    = {0,0,0,0,0,0,0,0};      // <0, or =page # if even page(s) go in group
   int OrderedGroup[8] = {0,0,0,0,0,0,0,0};      // <0, or =page # if ordered page(s) go in group
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
   cli_printf("  LoadMOD: FileFormat %s, Title \"%s\", NumPages %d, Hardware %d", 
             pMFH->FileFormat, pMFH->Title, pMFH->NumPages, pMFH->Hardware);
-  #endif
+  }
 
   // load ROM pages with three pass process
   for (int pass = 1; pass <= 3; pass++) {
@@ -3549,9 +3567,9 @@ int LoadMOD(uint32_t offs, bool isFRAM)
         pMFP = (ModuleHeader_t*)((uint8_t *)pMFH + sizeof(ModuleFileHeader_t) + pageIndex * sizeof(ModuleHeader_t));
       }
 
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
       cli_printf("  Pass %d - PageIndex %d - checking page %01X (group %d) @ 0x%08X", pass, pageIndex, pMFP->Page, pMFP->PageGroup, (uint8_t *)pMFP);
-      #endif
+      }
 
       // Skip this (is wrong anyway) - we always use MOD1 format for now
       // if (1 == nFileFormat) {               // MOD1
@@ -3696,10 +3714,10 @@ int LoadMOD(uint32_t offs, bool isFRAM)
         //     pageIndex  : target PageIndex
         //     ImageNo    : Image number in MOD file
         // show debug messages
-        #ifdef DEBUG
+        if (globsetting.get(debug_level)) {
           cli_printf("  About to Plug MOD to Page %d - Bank %d - PageIndex %d - ImageNumber %d", page, pMFP->Bank, pageIndex, ImageNo);
           cli_printf("  FRAM %d, RAM %d, WriteProtect %d, FAT %d", isFRAM, pMFP->RAM, pMFP->WriteProtect, pMFP->FAT);
-        #endif
+        }
 
         if (page <= 3) {
           // not supported, exit
@@ -3784,13 +3802,13 @@ int LoadMOD(uint32_t offs, bool isFRAM)
         // and set the name
         strcpy(TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_name, MetaH->FileName);
 
-        #ifdef DEBUG
+        if (globsetting.get(debug_level)) {
           cli_printf("  Flags: %04X", Bank_Flags);
           cli_printf("  Image: %04X", TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_data);
           cli_printf("  ROM:   %04X", TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_rom);
           cli_printf("  File:  %04X", TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_file);
           cli_printf("  Name:  %s",   TULIP_Pages.Pages[page].m_banks[pMFP->Bank].b_img_name);
-        #endif
+        }
 
 
         /* we do not use the following from V41
@@ -4011,9 +4029,9 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
                 cli_printf("  file \"%s\" not found", fname);
                 return;
               } else {
-                #ifdef DEBUG
+                if (globsetting.get(debug_level)) {
                   cli_printf("  file \"%s\" found in FRAM", fname);
-                #endif
+                }
                 FileInFRAM = true;
               }
             }
@@ -4099,9 +4117,9 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
                 cli_printf("  file \"%s\" not found in FLASH or FRAM", fname);
                 return;
               } else {
-                #ifdef DEBUG
+                if (globsetting.get(debug_level)) {
                   cli_printf("  file \"%s\" found in FRAM", fname);
-                #endif
+                }
                 FileInFRAM = true;
               }
             }
@@ -4295,7 +4313,7 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
   uint16_t addr = Page * 0x1000; // address of the page in FLASH
   Bank = 1; // always bank 1 for now, as we only support one bank
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
   // read the first 16 words of the ROM image
   if (TULIP_Pages.isPlugged(Page, Bank)) {
     // page is plugged, so read the first 16 words
@@ -4313,7 +4331,7 @@ void uif_plug(int func, int Page, int Bank, const char *fname)          // plug 
     // page is not plugged, so show a message
     cli_printf("  Page %d is not plugged", Page);
   }
-  #endif
+  }
   
 }
 
@@ -5184,9 +5202,9 @@ void uif_cat(int p, int b)
 
   char FileNm[32];
 
-  #ifdef DEBUG
-  TULIP_Pages.dumpAll(); // dump the current page settings to the console
-  #endif
+  if (globsetting.get(debug_level)) {
+    TULIP_Pages.dumpAll(); // dump the current page settings to the console
+  }
 
   if (p == 0) {
 
@@ -5554,23 +5572,42 @@ void uif_delete(const char *fname)
 }
 
 
-// function for the HP82143A printer
-//        #define printer_status  1
-//        #define printer_power   2
-//        #define printer_trace   3
-//        #define printer_norm    4
-//        #define printer_man     5
-//        #define printer_paper   6
-//        #define printer_print   7
-//        #define printer_adv     8
-//        #define printer_irtest  9
-//        #define printer_irtog   10
-//        #define printer_output  11
+/* function for the HP82143A printer
+#define PRINTER_HELP_TXT "printer functions for the HP82143\r\n\
+        [no argument] shows the HP82143A status\r\n\
+        status        shows the HP82143A status\r\n\
+        output        cycle the printer output between none, serial, IR or both\r\n\
+        serial        cycle the printer serial mode between HP82143A, ASCII serial and UTF-8 serial printer emulation\r\n\
+        power         toggle power\r\n\
+        mode          cycle the printer mode between normal, trace and manual\r\n\
+        paper         toggle Out Of Paper status\r\n\
+        print         push PRINT button (short press)\r\n\
+        adv           push ADV button (short press)\r\n\
+        irtest        test the infrared LED, send a test string to the printer\r\n\
+        irtog         toggle infrared LED, turn the IR LED on or off\r\n\
+                      for testing only, cunsumes extra power!\r\n"
+
+        #define printer_status  1
+        #define printer_power   2
+        #define printer_output  3
+        #define printer_serial  4
+        #define printer_mode    5
+        #define printer_paper   6
+        #define printer_print   7
+        #define printer_adv     8
+        #define printer_irtest  9
+        #define printer_irtog   10
+*/
 
 void uif_printer(int i) {
 
   uint16_t pr_mode;
   uint16_t pr_output_mode;
+
+  uint16_t PrintChar;          // character received from printbuffer
+  char PrintLine[200];         // printbuffer to print single lines for Serial Printer Emulation
+  int PrintLineLen = 0;        // length of the current line in the printbuffer
+  int PrintBufLineLen = 0;     // length of the current line in the printbuffer
 
 
   if (!globsetting.get(HP82143A_enabled)) {
@@ -5579,29 +5616,36 @@ void uif_printer(int i) {
 
   switch (i) {
     case printer_status: // status
-            cli_printf("  printer power : %s", globsetting.get(PRT_power) ? "ON":"OFF");
+    case 0: cli_printf("  printer power   : %s", globsetting.get(PRT_power) ? "ON":"OFF");
             pr_mode = globsetting.get(PRT_mode);
             switch (pr_mode) {
-              case 0:  cli_printf("          mode  : MAN"); break;
-              case 1:  cli_printf("          mode  : NORM"); break;
-              case 2:  cli_printf("          mode  : TRACE"); break;
-              case 3:  cli_printf("          mode  : TRACE*"); break;
-              default: cli_printf("          mode  : <invalid>");
+              case 0:  cli_printfn("          mode    : MAN"); break;
+              case 1:  cli_printfn("          mode    : NORM"); break;
+              case 2:  cli_printfn("          mode    : TRACE"); break;
+              case 3:  cli_printfn("          mode    : TRACE*"); break;
+              default: cli_printfn("          mode    : <invalid>");
             }
 
             // get printer output mode from settings
             pr_output_mode = globsetting.get(PRT_output_mode);
             switch (pr_output_mode) {
-              case 0:  cli_printf("          output: none"); break;
-              case 1:  cli_printf("          output: serial only"); break;
-              case 2:  cli_printf("          output: infrared only"); break;
-              case 3:  cli_printf("          output: both serial and infrared"); break;
-              default: cli_printf("          output: <invalid>");
+              case 0:  cli_printf("          output  : none"); break;
+              case 1:  cli_printf("          output  : serial only"); break;
+              case 2:  cli_printf("          output  : infrared only"); break;
+              case 3:  cli_printf("          output  : both serial and infrared"); break;
+              default: cli_printf("          output  : <invalid>");
             }
 
-            cli_printf("          paper : %s", (SELP9_status & prt_OOP_mask) ? "EMPTY":"OK");
-            cli_printf("          BUSY  : %s", SELP9_status_BUSY ? "on":"off");
-            cli_printf("  status word   : %04X", SELP9_status);
+            switch (globsetting.get(PRT_emu_mode)) {
+              case 0:  cli_printf("      serial mode : HP82143A"); break;
+              case 1:  cli_printf("      serial mode : Serial Printer ASCII (no Graphics)"); break;
+              case 2:  cli_printf("      serial mode : Serial Printer UTF-8 (no Graphics)"); break;
+              default: cli_printf("      serial mode : <invalid>"); break;
+            }
+
+            cli_printf("          paper   : %s", (SELP9_status & prt_OOP_mask) ? "EMPTY":"OK");
+            cli_printf("          BUSY    : %s", SELP9_status_BUSY ? "on":"off");
+            cli_printf("  status word     : %04X", SELP9_status);
             cli_printf("    SMA  %01d - bit 15 - SMA, TRACE mode when set", (SELP9_status >> 15) & 0x0001);
             cli_printf("    SMB  %01d - bit 14 - SMB, NORM when set, MAN when bit 14 and 15 are clear", (SELP9_status >> 14) & 0x0001);
             cli_printf("    PRT  %01d - bit 13 - PRT, PRINT key down", (SELP9_status >> 13) & 0x0001);
@@ -5627,21 +5671,23 @@ void uif_printer(int i) {
               globsetting.set(PRT_power, 1);
             }
             cli_printf("  printer power: %s", globsetting.get(PRT_power) ? "ON":"OFF");
+            globsetting.save(); // save the settings in FRAM
             break;
-    case printer_trace: // set printer to TRACE status, bit 15 set, bit 14 clear
-            SELP9_status = SELP9_status | prt_SMA_mask & ~prt_SMB_mask;
-            globsetting.set(PRT_mode, 2);
-            cli_printf("  printer set to TRACE mode");
-            break;
-    case printer_norm: // set printer to NORM mode, bit 15 clear, bit 14 set
-            SELP9_status = (SELP9_status & ~prt_SMA_mask) | prt_SMB_mask;
-            globsetting.set(PRT_mode, 1);
-            cli_printf("  printer set to NORM mode");
-            break;    
-    case printer_man: // set printer to MAN status, bit 14 and 15 of printer status are 0
-            SELP9_status = SELP9_status & ~prt_SMA_mask & ~prt_SMB_mask;
-            globsetting.set(PRT_mode, 0);
-            cli_printf("  printer set to MAN mode");
+    case printer_mode: // cycle printer mode between MAN, NORM and TRACE
+            pr_mode = globsetting.get(PRT_mode);
+            pr_mode = (pr_mode + 1) % 3; // cycle through the modes
+            switch (pr_mode) {
+              case 0:   SELP9_status = SELP9_status & ~prt_SMA_mask & ~prt_SMB_mask;
+                        cli_printf("  printer mode set to MANUAL"); break;
+              case 1:   SELP9_status = (SELP9_status & ~prt_SMA_mask) | prt_SMB_mask;
+                        cli_printf("  printer mode set to NORMAL"); break;
+              case 2:   SELP9_status = (SELP9_status & ~prt_SMB_mask) | prt_SMA_mask;
+                        cli_printf("  printer mode set to TRACE"); break;
+              default:  cli_printf("  printer mode set to <invalid>"); break;
+            }
+
+            globsetting.set(PRT_mode, pr_mode);
+            globsetting.save(); // save the settings in FRAM
             break;
     case printer_paper: // toggle the Out Of Paper status in the printer status word
             SELP9_status ^= prt_OOP_mask;   // XOR of Out Of Paper status bit
@@ -5651,6 +5697,7 @@ void uif_printer(int i) {
               globsetting.set(PRT_paper, 1);
             }
             cli_printf("  printer Out Of Paper status %s", SELP9_status & prt_OOP_mask ? "on":"off");
+            globsetting.save(); // save the settings in FRAM
             break;
     case printer_print: // push the printer PRINT button, short push only, button status is reset after 1 read
             // this is printer status bit 13
@@ -5673,24 +5720,84 @@ void uif_printer(int i) {
             keycount_print = 2;
             wakemeup_41();
             cli_printf("  printer ADV key pushed");
-            break;            
+            break;         
+
       case printer_irtest: // test the infrared LED, this is just a test, so no throttling
             // simply send a string to the IR led, no throttling
             for (int i = 'A'; i <= 'Z'; i++) {
               // send the string to the IR led
               // this is a test, so no throttling
-              #ifdef DEBUG
+              if (globsetting.get(debug_level)) {
                 cli_printf("  sending character %c to IR LED", i);
                 while (ir_busy()) {
                   // wait a bit
                   cli_printfn(".");
                 }
-              #endif
+              }
               PrintIRchar(i);
             }	
-            PrintIRchar(00);    // send a carriage return
-            PrintIRchar(0xE0);    // send a line feed            
+            PrintIRchar(0x00);    // send a carriage return
+            PrintIRchar(0xE0);    // send a line feed EOLL
             cli_printf("  test string sent to IR LED"); 
+
+
+            // also tests the serial output for compatobility of ASCII or UTF-8 mapping
+            // send the ASCII character mapping of the HP82143A Printer to the serial port in lines of 16 chars, this is a test, so no throttling
+            cli_printf("  sending ASCII test string to serial port:");
+
+            PrintLineLen = 0;        // reset line length for the test
+
+            for (int i = 0; i < 8; i++) {
+              for (int j = 0; j < 16; j++) {
+                // add the char to the PrintLine Buffer
+                PrintLine[PrintLineLen] = HP82143A_CHAR_MAP_ASCII[(int)i * 16 + j].data[0];
+                PrintLineLen++;
+              }
+              // add CR/LF and null terminator to the line buffer
+              PrintLine[PrintLineLen] = 0x0D; // CR
+              PrintLineLen++;
+              PrintLine[PrintLineLen] = 0x0A; // LF
+              PrintLineLen++;
+              PrintLine[PrintLineLen] = 0x00; // null terminator
+              
+              cli_printf("  %s", PrintLine); // print the line to the console
+
+              // now print to the printer port, but only if the printer is connected 
+              if (cdc_connected_now[ITF_PRINT]) {
+                  cdc_sendbuf(ITF_PRINT, PrintLine, PrintLineLen);
+                  PrintLineLen = 0; // reset line length after sending the line
+              }
+              cdc_flush(ITF_PRINT); // flush the buffer to ensure the line is sent immediately
+            }
+            
+            for (int i = 0; i < 8; i++) {
+              for (int j = 0; j < 16; j++) {
+                // add the char to the PrintLine Buffer
+                // HP82143A character set translated to UTF-8 character set
+                for (int k = 0; k < HP82143A_CHAR_MAP_UTF8[(int)i * 16 + j].length; k++) {
+                        PrintLine[PrintLineLen] = HP82143A_CHAR_MAP_UTF8[(int)i * 16 + j].data[k];
+                        PrintLineLen++;                    
+                }
+
+              }
+              // add CR/LF and null terminator to the line buffer
+              PrintLine[PrintLineLen] = 0x0D; // CR
+              PrintLineLen++;
+              PrintLine[PrintLineLen] = 0x0A; // LF
+              PrintLineLen++;
+              PrintLine[PrintLineLen] = 0x00; // null terminator
+              
+
+              cli_printf("  %s", PrintLine); // print the line to the console
+
+              // now print to the printer port, but only if the printer is connected and the output mode is set to serial or both
+              if (cdc_connected_now[ITF_PRINT]) {
+                  cdc_sendbuf(ITF_PRINT, PrintLine, PrintLineLen);
+                  PrintLineLen = 0; // reset line length after sending the line
+              }            
+            }
+            cdc_flush(ITF_PRINT); // flush the buffer to ensure the line is sent immediately
+             
             break;
       case printer_irtog: // test the IR LED power consumption by toggling it
             IR_toggle(); // toggle the IR LED
@@ -5699,8 +5806,7 @@ void uif_printer(int i) {
             cli_printf("  IR LED (GPIO %d) is %s", P_IR_LED, gpio_get(P_IR_LED) ? "ON" : "OFF");
             break;
       case printer_output: // cycle through the printer output modes: 0=none, 1=serial, 2=infrared, 3=both
-            {
-              uint16_t pr_output_mode = globsetting.get(PRT_output_mode);
+              pr_output_mode = globsetting.get(PRT_output_mode);
               pr_output_mode = (pr_output_mode + 1) % 4; // cycle through the modes
               globsetting.set(PRT_output_mode, pr_output_mode);
               switch (pr_output_mode) {
@@ -5710,11 +5816,26 @@ void uif_printer(int i) {
                 case 3:  cli_printf("  printer output mode set to both serial and infrared"); break;
                 default: cli_printf("  printer output mode set to <invalid>"); break;
               }
-            }
+              // and save the settings in FRAM
+              globsetting.save();
+              break;
+
+      case printer_serial: // cycle through the printer modes
+              pr_mode = globsetting.get(PRT_emu_mode);
+              pr_mode = (pr_mode + 1) % 3; // cycle through the modes
+              globsetting.set(PRT_emu_mode, pr_mode);
+              switch (pr_mode) {
+                case 0:  cli_printf("  printer emulation mode set to HP82143A");
+                         break;
+                case 1:  cli_printf("  printer emulation mode set to ASCII Serial (no graphics)");
+                         break;
+                case 2:  cli_printf("  printer emulation mode set to UTF-8 Serial (no graphics)");
+                         break;
+                default: cli_printf("  printer emulation mode set to <invalid>"); break;
+              }
             // and save the settings in FRAM
             globsetting.save();
             break;
-
       default: 
             // no other actions defined here
             ;
@@ -5948,48 +6069,33 @@ void uif_umem(int i) {
         buffer        shows the trace buffer size\r\n\
         buffer <size> set the tracer buffer size in number of samples\r\n\
                       default is 5000, maximum is about 10.000 samples\r\n\
-                      requires a reboot to take effect!\r\n\
+                      requires a REBOOT to take effect!\r\n\
         pretrig      shows the pre-trigger buffer size and status\r\n\
         pretrig <size> set the pre-trigger buffer size in number of samples\r\n\
                       default is 32, maximum is 256 samples\r\n\
         trace         toggle tracer enable/disable\r\n\
-        sysloop       toggle tracing of system loops (RSTKB, RST05, BLINK01 and debounce)\r\n\
-        sysrom        toggle system rom tracing (Page 0 - 5)\r\n\
-        ilrom         toggle tracing of Page 6+7\r\n\
         hpil          toggle HP-IL tracing to ILSCOPE USB serial port\r\n\
         pilbox        toggle PILBox serial tracing to ILSCOPE USB serial port\r\n\
         ilregs        toggle tracing of HP-IL registers\r\n\
-        save          save tracer settings\r\n"
+        save          save tracer settings in FRAM\r\n\
+        mnem          cycle the disassembler mnemonics type between none, JDA (default) and HP\r\n\
+                      no mnemonics will only show the raw trace data without disassembly\r\n\
+        filter        toggle filter enable/disable\r\n\
+                      when the filter is enabled, only samples that pass the filter will be traced\r\n\
+                      when the filter is disabled, all samples will be traced\r\n\
+                      the filter settings can be configured with the 'filter' command\r\n"
 
         #define trace_status      1
         #define trace_buffer      2
         #define trace_pretrig     3
         #define trace_trace       4
-        #define trace_sysloop     5    
-        #define trace_sysrom      6
-        #define trace_ilrom       7
-        #define trace_hpil        8
-        #define trace_pilbox      9
-        #define trace_ilregs     10
-        #define trace_save       11
-        #define trace_mnem       12
+        #define trace_hpil        5
+        #define trace_pilbox      6
+        #define trace_ilregs      7
+        #define trace_save        8
+        #define trace_mnem        9
+        #define trace_filter     10
 */
-
-        // settings for tracer, enable by default
-        // gsettings[tracer_enabled]       = 1;
-        // gsettings[tracer_ilregs_on]     = 1;
-        // gsettings[tracer_sysrom_on]     = 1;
-        // gsettings[tracer_sysloop_on]    = 1;
-        // gsettings[tracer_ilroms_on]     = 1;
-
-        // HP-IL scope settings
-// #define     ilscope_enabled     50          // HP-IL scope enabled
-// #define     ilscope_PIL_enabled 51          // PILBox tracing enabled
-
-                // block some known system loops
-        //   0x0098 - 0x00A1       RSTKB and RST05
-        //   0x0177 - 0x0178       delay for debounce
-        //   0x089C - 0x089D       BLINK01
 
 void uif_tracer(int i, int bufsize) {
   uint16_t stat;
@@ -6004,9 +6110,8 @@ void uif_tracer(int i, int bufsize) {
             cli_printf("  PreTrig buffer          %5d samples (%d KByte)", globsetting.get(tracer_pretrig), 
                        globsetting.get(tracer_pretrig) * sizeof(TraceLine) / 1024 );
             cli_printf("  HP41 tracer             %s", globsetting.get(tracer_enabled) ? "enabled ":"disabled");
-            cli_printf("  system loop tracing     %s (RSTKB, RST05, BLINK01 and debounce)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
-            cli_printf("  system ROM tracing      %s (Page 0..5)", globsetting.get(tracer_sysrom_on) ? "enabled ":"disabled");
-            cli_printf("  tracing of IL roms      %s (Page 6+7)", globsetting.get(tracer_ilroms_on) ? "enabled ":"disabled");
+            cli_printf("  filters                 %s", (globsetting.get(tracer_filter_on)) ? "enabled":"disabled");
+            cli_printf("  system loop tracing     %s (RSTKB, RST05, BLINK01, debounce, NLT10, NULTST if filters enabled)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
             cli_printf("  IL scope traffic        %s", globsetting.get(ilscope_IL_enabled) ? "enabled ":"disabled");
             cli_printf("  PILBox traffic          %s", globsetting.get(ilscope_PIL_enabled) ? "enabled ":"disabled");
             cli_printf("  tracing of IL regs      %s", globsetting.get(tracer_ilregs_on) ? "enabled ":"disabled");
@@ -6034,15 +6139,18 @@ void uif_tracer(int i, int bufsize) {
     case trace_pretrig: // pre-trigger buffer
             // show and /or set the current pre-trigger buffer size
             if (!uif_pwo_low()) {
-              cli_printf("  PreTrigger Buffer size can only be set when PWO is low");
+              cli_printf("  PreTrigger Buffer can only be set when PWO is low");
               return; // exit the function
             }
+            cli_printf("  Pretrigger buffer function is here as preparation for a next firmware release, it is not functional yet");
+            break;
+            /*
             size = globsetting.get(tracer_pretrig);
-            cli_printf("  PreTrigger Buffer %d samples using %d KBytes", size, size * sizeof(TraceLine));
+            cli_printf("  PreTrigger Buffer %d samples", size);
             if (bufsize > 0) {
               // set the new pre-trigger buffer size
-              if (bufsize < 32 || bufsize > 256) {
-                cli_printf("  PreTrigger Buffer must be between 1 and 256 samples");
+              if (bufsize < 0 || bufsize > 256) {
+                cli_printf("  PreTrigger Buffer must be between 0 and 256 samples");
                 return;
               }
               globsetting.set(tracer_pretrig, bufsize);
@@ -6050,23 +6158,12 @@ void uif_tracer(int i, int bufsize) {
               cli_printf("  PreTrigger Buffer set to %d samples", bufsize);
             }
             break;
+            */
     case trace_trace: // trace
             globsetting.set(tracer_enabled, !globsetting.get(tracer_enabled));
             trace_enabled != tracer_enabled;
             cli_printf("  HP41 tracer         %s", globsetting.get(tracer_enabled) ? "enabled ":"disabled");
             break;            
-    case trace_sysloop: // sysloop
-            globsetting.set(tracer_sysloop_on, !globsetting.get(tracer_sysloop_on));
-            cli_printf("  system loop tracing %s (RSTKB, RST05, BLINK01 and debounce)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
-            break; 
-    case trace_sysrom: // sysrom
-            globsetting.set(tracer_sysrom_on, !globsetting.get(tracer_sysrom_on));
-            cli_printf("  system ROM tracing  %s (Page 0..5)", globsetting.get(tracer_sysrom_on) ? "enabled ":"disabled");
-            break; 
-    case trace_ilrom: // ilrom
-            globsetting.set(tracer_ilroms_on, !globsetting.get(tracer_ilroms_on));
-            cli_printf("  tracing of IL roms  %s (Page 6+7)", globsetting.get(tracer_ilroms_on) ? "enabled ":"disabled");
-            break; 
     case trace_hpil: // hpil scope
             globsetting.set(ilscope_IL_enabled, !globsetting.get(ilscope_IL_enabled));
             cli_printf("  IL scope traffic    %s", globsetting.get(ilscope_IL_enabled) ? "enabled ":"disabled");
@@ -6096,15 +6193,345 @@ void uif_tracer(int i, int bufsize) {
             cli_printf("  tracer mnemonics: %s", globsetting.get(tracer_dis_type) == 0 ? "none" : (globsetting.get(tracer_dis_type) == 1 ? "JDA" : "HP"));
             // globsetting.save();
             break;
+    case trace_filter: // filter enable toggle
+            globsetting.set(tracer_filter_on, !globsetting.get(tracer_filter_on));
+            cli_printf("  tracer filters      %s", globsetting.get(tracer_filter_on) ? "enabled ":"disabled");
+            break;
     default:
             // no other actions defined here
             ;         
   }          
 }        
 
+/*
+#define FILTER_HELP_TXT "filter functions for the mcode tracer\r\n\
+        [no argument]       show the current filter status\r\n\
+        status              show the current filter status\r\n\
+        list                show the current filters\r\n\
+        dump                dump the filter settings for debugging\r\n\
+        save [filename.trf] save the current filter settings to a file on the uSD card\r\n\
+        load [filename.trf] load filter settings from a file on the uSD card\r\n\
+                            the filename can contain an existing subdirectory name\r\n\
+                            existing files WILL be overwritten after asking\r\n\
+        filter              toggle filter enable or disable\r\n\
+        block               show all filter BLOCK entries\r\n\
+        pass                show all filter PASS entries\r\n\
+        block all           block ALL trace samples\r\n\
+        block pX            add a BLOCK filter for Page x (hex)\r\n\
+        block XXXX          add a BLOCK filter for address XXXX (hex)\r\n\
+        block XXXX YYYY     add a BLOCK filter for the range XXXX..YYY (hex)\r\n\
+        pass all            remove all filters and pass all samples\r\n\
+        pass pX             add a PASS filter for Page x (hex)\r\n\
+        pass XXXX YYYY      add a PASS filter for the range XXXX..YYY (hex)\r\n\
+        sysloop             toggle tracing of system loops (RSTKB, RST05, BLINK01, debounce, NLT10, NULTST) in the filter\r\n"
+
+#define filter_status        1
+#define filter_list          2
+#define filter_block_all     3
+#define filter_block_page    4
+#define filter_block_adr     5
+#define filter_pass_all      7
+#define filter_pass_page     8
+#define filter_pass_adr      9
+#define filter_trig_page    10
+#define filter_trig_adr     11
+#define filter_trigend_page 12
+#define filter_trigend_adr  13
+#define filter_dump         14
+#define filter_save         15
+#define filter_load         16
+#define filter_sysloop      17
+
+*/
+
+void uif_filter(int func, uint16_t adr1, uint16_t adr2, const char *fname)
+{
+  int pg;
+  int a_start, a_end;
+  int page, adr;
+  uint8_t block_status;
+  bool list_block, list_pass;
+
+  const char *ext;
+
+  FILINFO fno;
+  FRESULT fr;
+  FILE *file;
+  FIL fil;
+  UINT bytes_written;
+  bool overwrite_allowed;
+  int timeout_ms;
+
+  // show the arguments passed to the function for debugging
+  if (globsetting.get(debug_level)) {
+    cli_printf("  filter function: %d, adr1: %04X, adr2: %04X", func, adr1, adr2);
+  }
+
+  list_block = false;
+  list_pass = false;
+
+  if ((func == filter_pass_adr || (func == filter_block_adr)) && ((adr1 == 0) && (adr2 == 0))) {
+    // list only block or pass filters
+    if (func == filter_pass_adr) {
+      list_pass = true;
+    } else {
+      list_block = true;
+    }
+    func = filter_list;
+  }
+
+  switch (func) {
+    case filter_status: // status
+    case filter_list:   // list, keep these functions the same for now
+            cli_printf("  current filter status:");
+            // go through the filter array and find blocks of identical status per Page, BLOCK or PASS
+
+            for (pg = 0; pg < 16; pg++) {
+              a_start = pg * 0x1000;
+
+              // walk through the Page to find blocks of identical status, if the whole page is BLOCK or PASS, show that
+              // otherwise show shorter blocks as usually a block of several addresses is blocked or passed, but not the whole page, so we need to show the individual blocks
+              a_end = a_start + 0x1000 - 1;
+              block_status = TraceFilter.apply(a_start);
+
+              // show blocks of identical status within the page
+              uint16_t block_start = a_start;
+              uint8_t current_status = block_status;
+              for (adr = a_start; adr <= a_end; adr++) {
+                block_status = TraceFilter.apply((uint16_t)adr);
+                if (block_status != current_status) {
+                  // show the block from block_start to adr-1 with the current_status
+                  // keep USb alive
+                  tud_task();
+                  if (list_block && current_status == FILTER_BLOCK) {
+                    cli_printf("  %04X..%04X: BLOCK", block_start, adr - 1);
+                  } else if (list_pass && current_status == FILTER_PASS) {
+                    cli_printf("  %04X..%04X: PASS", block_start, adr - 1);
+                  } else if (!list_block && !list_pass) { 
+                    cli_printf("  %04X..%04X: %s", block_start, adr - 1, current_status == FILTER_BLOCK ? "BLOCK" : "PASS");
+                  }
+                  block_start = adr;
+                  current_status = block_status;
+                }
+              }
+              // show the last block in the page
+              if (list_block && current_status == FILTER_BLOCK) {
+                cli_printf("  %04X..%04X: BLOCK", block_start, a_end);
+              } else if (list_pass && current_status == FILTER_PASS) {
+                cli_printf("  %04X..%04X: PASS", block_start, a_end);
+              } else if (!list_block && !list_pass) {
+                cli_printf("  %04X..%04X: %s", block_start, a_end, current_status == FILTER_BLOCK ? "BLOCK" : "PASS");
+              }
+            }
+            break;
+    case filter_dump: // dump the filter array, for debugging
+            // Only for Page 0
+            cli_printf("  current filter array:");
+            for (int i = 0; i < 0x100; i=i+4) {
+              // block_status = TraceFilter.filter[i];
+              cli_printf("  %04X - %08X %08X %08X %08X", i * 16, TraceFilter.filter[i], 
+                                                                 TraceFilter.filter[i+1], 
+                                                                 TraceFilter.filter[i+2], 
+                                                                 TraceFilter.filter[i+3]);
+            }
+            break;
+
+    case filter_block_all: // block all
+            // walk through the filter array and set all to BLOCK
+            for (int i = 0; i < BRK_SIZE; i++) {
+              TraceFilter.filter[i] = 0x55555555; // set all to BLOCK (0b0101 etc ...)
+            }
+            cli_printf("  all trace samples BLOCKED");
+            break;
+
+    case filter_block_page: // block page
+            // walk through the filter array and set the specified page to BLOCK
+            // the Page will be in addr1
+            // i is an index in the filter array, each entry is 16 bytes, 
+            // and we have 0x1000 bytes per Page and thus 0x100 entries per Page, so we need to set 0x100 entries to BLOCK for the specified page
+            for (int i = adr1 * 0x100; i < ((adr1 + 1) * 0x100); i++) {
+              TraceFilter.filter[i] = 0x55555555; // set to BLOCK
+            }
+            cli_printf("  trace samples from Page %X BLOCKED", adr1 & 0xF);
+            TraceFilter.save(); // save the filter settings in FRAM
+            break;
+
+    case filter_block_adr: // block address or range
+            // block the range between adr1 and adr2, if adr2 is adr1, block only adr1
+            TraceFilter.add_filter(FILTER_BLOCK, adr1, adr2, 1);
+    
+            if (adr2 == adr1) {
+              cli_printf("  trace samples at address %04X BLOCKED", adr1);
+            } else {
+              cli_printf("  trace samples from address %04X to %04X BLOCKED", adr1, adr2);
+            }
+            TraceFilter.save(); // save the filter settings in FRAM
+            break;
+
+    case filter_pass_all: // pass all
+            // walk through the filter array and set all to PASS
+            for (int i = 0; i < BRK_SIZE; i++) {
+              TraceFilter.filter[i] = 0x00000000; // set all to PASS (0b0000 etc
+            }
+            cli_printf("  all trace samples PASSED");
+            TraceFilter.save(); // save the filter settings in FRAM
+            break;
+
+    case filter_pass_page: // pass page
+            // walk through the filter array and set the specified page to PASS
+            for (int i = adr1 * 0x100; i < ((adr1 + 1) * 0x100); i++) {
+              TraceFilter.filter[i] = 0x00000000; // set to PASS
+            }
+            cli_printf("  trace samples from Page %X PASSED", adr1 & 0xF);
+            TraceFilter.save(); // save the filter settings in FRAM
+            break;
+
+    case filter_pass_adr: // pass address or range
+            // pass the range between adr1 and adr2, if adr2 is adr1, pass only adr1
+            TraceFilter.add_filter(FILTER_PASS, adr1, adr2, 1);
+
+            if (adr2 == adr1) {
+              cli_printf("  trace samples at address %04X PASSED", adr1);
+            } else {
+              cli_printf("  trace samples from address %04X to %04X PASSED", adr1, adr2);
+            }
+            TraceFilter.save(); // save the filter settings in FRAM
+            break;
+
+    case filter_save: { // save filter settings to a file
+            if (fname == nullptr) {
+              cli_printf("  no filename specified for saving filter settings");
+              return;
+            }
+
+            // check if the file extension is .trf, but case insensitive
+            ext = strrchr(fname, '.');
+            if (ext == nullptr || strcasecmp(ext, ".trf") != 0) {
+              cli_printf("  invalid file extension, must be .trf");
+              return;
+            }
+
+            fr = f_stat(fname, &fno);
+            if (fr == FR_OK) {
+              // file exists, ask if it is OK to overwrite
+              cli_printf("  file %s already exists, overwrite? (y/n) [timeout 5s]", fname);
+              overwrite_allowed = false;
+              timeout_ms = 5000;
+              while (timeout_ms > 0) {
+                tud_task();                 // to process IO until the user responds
+                if (cdc_available(ITF_CONSOLE)) {
+                  char c = cdc_read_char(ITF_CONSOLE);
+                  if (c == 'y' || c == 'Y') {
+                    cli_printf("  overwriting file %s", fname);
+                    // delete the file and simply create a new one when saving, this is easier than opening the file for writing and truncating it
+                    f_unlink(fname);
+                    overwrite_allowed = true;
+                    break; // exit the loop and continue with saving
+                  } else {
+                    cli_printf("  not overwriting file %s, save cancelled", fname);
+                    return; // exit the function without saving
+                  }
+                }
+                // Wait in small chunks to keep USB responsive while timing out.
+                sleep_ms(200);
+                timeout_ms -= 200;
+              }
+              if (!overwrite_allowed) {
+                cli_printf("  overwrite timed out after 5 seconds, save cancelled");
+                return;
+              }
+            }
+            
+            // now create the file and write the filter settings to it
+            fr = f_open(&fil, fname, FA_WRITE | FA_CREATE_NEW);
+            if (fr != FR_OK) {
+              cli_printf("  error creating file %s, error code: %d", fname, fr);
+              return;
+            }
+
+            // write the filter settings to the file, we can simply write the filter array as binary data, 
+            // as it is an array of uint32_t and we know the size of the filter array, 
+            // this is easier than writing it as text and parsing it when loading
+
+            // note that we are writing from memory, not from FRAM, this is faster and should be the same anyway
+
+            fr = f_write(&fil, TraceFilter.filter, sizeof(TraceFilter.filter), &bytes_written);
+            if (fr != FR_OK || bytes_written != sizeof(TraceFilter.filter)) {
+              cli_printf("  error writing to file %s, error code: %d", fname, fr);
+              f_close(&fil);
+              return;
+            }
+            f_close(&fil);
+            cli_printf("  filter settings saved to file %s, %d bytes written", fname, bytes_written);
+            break;
+          }
+
+    case filter_load: // load filter settings from a file
+
+            if (fname == nullptr) {
+              cli_printf("  no filename specified for loading filter settings");
+              return;
+            }
+
+            // check if the file extension is .trf, but case insensitive
+            ext = strrchr(fname, '.');
+            if (ext == nullptr || strcasecmp(ext, ".trf") != 0) {
+              cli_printf("  invalid file extension, must be .trf");
+              return;
+            }
+            fr = f_open(&fil, fname, FA_READ);
+            if (fr != FR_OK) {
+              cli_printf("  error opening file %s, error code: %d", fname, fr);
+              return;
+            }
+            // read the filter settings from the file, we can simply read the binary data into the filter array in memory, this is easier than parsing text
+            fr = f_read(&fil, TraceFilter.filter, sizeof(TraceFilter.filter), &bytes_written);
+            if (fr != FR_OK || bytes_written != sizeof(TraceFilter.filter)) {
+              cli_printf("  error reading from file %s, error code: %d", fname, fr);
+              f_close(&fil);
+              return;
+            }
+
+            cli_printf("  filter settings loaded from file %s, %d bytes read", fname, bytes_written);
+
+            f_close(&fil);
+
+            TraceFilter.save(); // save the loaded filter settings in FRAM
+            
+            break;
+
+    case filter_sysloop: // sysloop
+            globsetting.set(tracer_sysloop_on, !globsetting.get(tracer_sysloop_on));
+            if (!globsetting.get(tracer_sysloop_on)) {
+              // block some known system loops
+              //   0x0098 - 0x00A1       RSTKB and RST05
+              //   0x0177 - 0x0178       delay for debounce
+              //   0x089C - 0x089D       BLINK01
+              //   0x0E9A - 0x0E9E       NLT10 wait for key to NULL
+              //   0x0EC9 - 0x0ECE       NULTST NULL timer
+              TraceFilter.add_filter(FILTER_BLOCK, 0x0098, 0x00A1, 1); // block RSTKB and RST05
+              TraceFilter.add_filter(FILTER_BLOCK, 0x0177, 0x0178, 1); // block delay for debounce
+              TraceFilter.add_filter(FILTER_BLOCK, 0x089C, 0x089D, 1); // block BLINK01
+              TraceFilter.add_filter(FILTER_BLOCK, 0x0E9A, 0x0E9E, 1); // block NLT10 wait for key to NULL
+              TraceFilter.add_filter(FILTER_BLOCK, 0x0EC9, 0x0ECE, 1); // block NULTST NULL timer
+            } else {
+              TraceFilter.add_filter(FILTER_PASS, 0x0098, 0x00A1, 1); // unblock RSTKB and RST05
+              TraceFilter.add_filter(FILTER_PASS, 0x0177, 0x0178, 1); // unblock delay for debounce
+              TraceFilter.add_filter(FILTER_PASS, 0x089C, 0x089D, 1); // unblock BLINK01
+              TraceFilter.add_filter(FILTER_PASS, 0x0E9A, 0x0E9E, 1); // unblock NLT10 wait for key to NULL
+              TraceFilter.add_filter(FILTER_PASS, 0x0EC9, 0x0ECE, 1); // unblock NULTST NULL timer
+            }
+            cli_printf("  system loop tracing %s (RSTKB, RST05, BLINK01, debounce, NLT10, NULTST if filters enabled)", globsetting.get(tracer_sysloop_on) ? "enabled ":"disabled");
+            break; 
+
+    default:
+            // no other actions defined here
+            ;
+  }          
+}
+
 
 #define STORAGE_CMD_TOTAL_BYTES 100
-
 
 // functions for the flash command
 //  1        status        shows the flash status
@@ -6219,9 +6646,9 @@ void fr_init_filesystem()
     MetaH.NextFile = FRAM_SETTINGS_FILE;    // always 0x100 for the settings file
     fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_HEADER, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
     fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_HEADER + sizeof(ModuleMetaHeader_t), (uint8_t*)versionstring, 31);
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  FRAM Header created at                   0x%05X", FRAM_HEADER);
-    #endif
+    }
 
     // Global Settings file
     MetaH.FileType = FILETYPE_GLOB;
@@ -6232,9 +6659,9 @@ void fr_init_filesystem()
     // write default global settings
     fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_SETTINGS_CONTENT, (uint8_t*)globsetting.gsettings, sizeof(globsetting.gsettings));
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  Global Configuration file created at     0x%05X", FRAM_SETTINGS_FILE);
-    #endif
+    }
 
     // ROM Map file
     MetaH.FileType = FILETYPE_MMAP;
@@ -6244,21 +6671,21 @@ void fr_init_filesystem()
     fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_ROMMAP_HEADER, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
     // write default rom map
     fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_ROMMAP_CONTENT, (uint8_t*)TULIP_Pages.Pages, sizeof(TULIP_Pages.Pages));
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  Module Map Map file created at           0x%05X", FRAM_ROMMAP_HEADER);
-    #endif
+    }
 
     // Trace Filters file
     MetaH.FileType = FILETYPE_TRAC;
     strcpy(MetaH.FileName, "TULIP_Tracer.TRF");
-    MetaH.FileSize = sizeof(TraceFilter.m_filter) ; // size of trace filters
+    MetaH.FileSize = sizeof(TraceFilter.filter) ; // size of trace filters
     MetaH.NextFile = FRAM_USERMEM_HEADER;           
     fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_TRACER_HEADER, (uint8_t*)&MetaH, sizeof(ModuleMetaHeader_t));
     // write default trace filters
-    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_TRACER_CONTENT, (uint8_t*)TraceFilter.m_filter, sizeof(TraceFilter.m_filter));
-    #ifdef DEBUG
+    fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_TRACER_CONTENT, (uint8_t*)TraceFilter.filter, sizeof(TraceFilter.filter));
+    if (globsetting.get(debug_level)) {
       cli_printf("  Tracer Filters file created at           0x%05X", FRAM_TRACER_HEADER);
-    #endif
+    }
 
     // create the User Memory File
     MetaH.FileType = FILETYPE_UMEM;
@@ -6272,9 +6699,9 @@ void fr_init_filesystem()
     for (uint32_t addr = 0; addr < FRAM_USERMEM_SIZE; addr += sizeof(zerobuf)) {
       fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_USERMEM_CONTENT + addr, (uint8_t*)zerobuf, sizeof(zerobuf));
     }
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  User Memory file created at              0x%05X", FRAM_USERMEM_HEADER);  
-    #endif
+    }
 
     // Create the Extended MEmory File
     MetaH.FileType = FILETYPE_XMEM;
@@ -6286,15 +6713,15 @@ void fr_init_filesystem()
     for (uint32_t addr = 0; addr < FRAM_EXTDMEM_SIZE; addr+= sizeof(zerobuf)) {
       fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_EXTDMEM_CONTENT + addr, (uint8_t*)zerobuf, sizeof(zerobuf));
     } 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  Extended Memory file created at          0x%05X", FRAM_EXTDMEM_HEADER);  
-    #endif
+    }
 
     // Finally we mark the type of the next file as empty
     MetaH.FileType = FILETYPE_FFFF;
     fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_FS_CONTENT_START, (uint8_t*)&MetaH.FileType, sizeof(uint8_t));
 
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  FIXED SYSTEM ADDRESSES in FRAM");
       cli_printf("    FRAM_SETTINGS       0x%05X", FRAM_gsettings_start);
       cli_printf("    FRAM_ROMMAP         0x%05X", FRAM_ROMMAP_CONTENT);
@@ -6305,7 +6732,7 @@ void fr_init_filesystem()
       cli_printf("    FRAM_XMEM0          0x%05X", FRAM_XMEM0_start);
       cli_printf("    FRAM_XMEM1          0x%05X", FRAM_XMEM1_start);
       cli_printf("    FRAM_XMEM2          0x%05X", FRAM_XMEM2_start);
-    #endif
+    }
 
     cli_printf("  FRAM File System initialized"); 
 
@@ -6394,12 +6821,12 @@ void uif_fram(int i, uint32_t addr) {
             cli_printf("  Listing FRAM files:");
             fr_list_files(0);
 
-            #ifdef DEBUG
+            if (globsetting.get(debug_level)) {
               cli_printf("  Struct Sizes:");
               cli_printf("    ModuleMetaHeader_t: %6d bytes", sizeof(ModuleMetaHeader_t));
               cli_printf("    ModuleHeader_t:     %6d bytes", sizeof(ModuleHeader_t));
               cli_printf("    TULIP_Pages:        %6d bytes", sizeof(TULIP_Pages.Pages));
-              cli_printf("    TraceFilter.m_filter: %6d bytes", sizeof(TraceFilter.m_filter));
+              cli_printf("    TraceFilter.filter:   %6d bytes", sizeof(TraceFilter.filter));
               cli_printf("  Fixed addresses in FRAM:");
               cli_printf("    FRAM_SETTINGS       0x%05X", FRAM_gsettings_start);
               cli_printf("    FRAM_ROMMAP         0x%05X", FRAM_ROMMAP_CONTENT);
@@ -6410,7 +6837,7 @@ void uif_fram(int i, uint32_t addr) {
               cli_printf("    FRAM_XMEM0          0x%05X", FRAM_XMEM0_start);
               cli_printf("    FRAM_XMEM1          0x%05X", FRAM_XMEM1_start);
               cli_printf("    FRAM_XMEM2          0x%05X", FRAM_XMEM2_start);
-            #endif
+            }
             break;
 
     default:
@@ -6488,9 +6915,9 @@ void scan_file(const char *fname)
     }
 
     // we now have a valid string
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  read line: %s", str);
-    #endif
+    }
 
     // if the line is empty skip it
     if (strlen((char*)str) < 1) {
@@ -6517,9 +6944,9 @@ void scan_file(const char *fname)
     // check if the string starts with a valid hex character
     if (!isxdigit(str[0])) {
       // not a valid scan line, skip it
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  skipping invalid scan line: %s", str);
-      #endif
+      }
       continue;
     }
 
@@ -6580,9 +7007,9 @@ bool process_wand_instruction(const char *instruction)
   bool digit_decoded = false;
 
   // here we receive single token to be processed as a WAND instruction
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("  processing W command instruction: %s", instruction);
-  #endif
+  }
 
   // first check if the instruction is a string starting with a double quote 
   if (instruction[0] == '\"' ) {
@@ -6743,13 +7170,13 @@ bool process_wand_instruction(const char *instruction)
     alpha_barcode[0] = checksum & 0xFF; // set checksum
     // now we have the complete barcode in alpha_barcode with j bytes
     // send the barcode to the wand buffer
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printfn("  WAND ALPHA barcode to be scanned (%d bytes) ", j);
       for (int k = 0; k < j; k++) {
         cli_printfn(" %02X", alpha_barcode[k]);
       }
       cli_printf(""); 
-    #endif
+    }
 
     for (int k = 0; k < j; k++) {
       barcode = alpha_barcode[k];
@@ -6772,10 +7199,10 @@ bool process_wand_instruction(const char *instruction)
       alpha_barcode[1] = 0x0C; // ALPHA keycode
 
       // send the barcode to the wand buffer
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printfn("  WAND ALPHA single ALPHA key barcode to be scanned ");
         cli_printf(" %02X %02X", alpha_barcode[0], alpha_barcode[1]);
-      #endif
+      }
       // must wait until the previous barcode is processed
       while (gpio_get(P_PWO) == 1) {
         // wand is busy
@@ -6865,9 +7292,9 @@ bool process_wand_instruction(const char *instruction)
                       }                      
         }
 
-        #ifdef DEBUG
+        if (globsetting.get(debug_level)) {
           cli_printf("  WAND ALPHA escaped character to be scanned: index %02X, code %02X %02X", idx, wand_alpha_[idx].hex1, wand_alpha_[idx].hex2);
-        #endif
+        }
 
         alpha_barcode[0] = wand_alpha_[idx].hex1;
         alpha_barcode[1] = wand_alpha_[idx].hex2;
@@ -6877,9 +7304,9 @@ bool process_wand_instruction(const char *instruction)
         break;
       } else {
         // normal character, get the index from the wand_alpha_ array
-        #ifdef DEBUG
+        if (globsetting.get(debug_level)) {
           cli_printf("  WAND ALPHA normal character to be scanned: character %c, code %02X %02X", ch, wand_alpha_[(uint8_t)ch].hex1, wand_alpha_[(uint8_t)ch].hex2);
-        #endif
+        }
 
         // normal character, send as ALPHA keystroke
         // build the barcode for a single ALPHA character
@@ -6897,10 +7324,10 @@ bool process_wand_instruction(const char *instruction)
       }
 
       // send the barcode to the wand buffer
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printfn("  WAND ALPHA single character barcode to be scanned ");
         cli_printf(" %02X %02X", alpha_barcode[0], alpha_barcode[1]);
-      #endif
+      }
 
       // must wait until the previous barcode is processed
       while (gpio_get(P_PWO) == 1) {
@@ -6944,9 +7371,9 @@ bool process_wand_instruction(const char *instruction)
     if (strcmp(instr_uc, wand_cmd_[i].command) == 0) {
       // found the command, execute it
 
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  WAND command found: %s, type %d, barcode %02X %02X", wand_cmd_[i].command, wand_cmd_[i].type, wand_cmd_[i].hex1, wand_cmd_[i].hex2);
-      #endif
+      }
 
       switch (wand_cmd_[i].type) {
         case 0: // type 0 means not supported
@@ -7041,9 +7468,9 @@ bool process_wand_instruction(const char *instruction)
         default:  break;
       }
 
-      #ifdef DEBUG
+      if (globsetting.get(debug_level)) {
         cli_printf("  WAND DIGIT barcode to be scanned: %02X", barcode);  
-      #endif
+      }
 
       if (digit_decoded) {
         // send digit
@@ -7067,9 +7494,9 @@ bool process_wand_instruction(const char *instruction)
         barcode = 0x3C; // CHS code
         CHS_used = false;
 
-        #ifdef DEBUG
+        if (globsetting.get(debug_level)) {
           cli_printf("  WAND CHS barcode to be scanned: %02X", barcode);
-        #endif
+        }
 
         while (gpio_get(P_PWO) == 1) {
           tud_task();  // keep the USB port alive
@@ -7110,9 +7537,9 @@ void uif_w(const char *instruction)
   // only do this when PWO is low
   // if (!uif_pwo_low()) return;
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("  W command invoked: %s", instruction);
-  #endif
+  }
 
   if (!globsetting.get(HP82153A_enabled)) {
     cli_printf("  WAND EMULATION not enabled, plug the WAND ROM and enable WAND emulation");
@@ -7152,9 +7579,9 @@ void uif_w(const char *instruction)
     }
 
     current_instr[i] = '\0'; // null terminate the current instruction
-    #ifdef DEBUG
+    if (globsetting.get(debug_level)) {
       cli_printf("  extracted WAND instruction: %s", current_instr);
-    #endif
+    }
     
     // process the current instruction
     // wait until the wand buffer is empty, cancel on a key press
@@ -7200,9 +7627,9 @@ void uif_wand(int i, const char* fname, char* instruction)
 
   uint16_t barcode; 
 
-  #ifdef DEBUG
+  if (globsetting.get(debug_level)) {
     cli_printf("  WAND command invoked %d", i);
-  #endif
+  }
 
   if (!globsetting.get(HP82153A_enabled)) {
     cli_printf("  WAND EMULATION not enabled, plug the WAND ROM and enable WAND emulation");

@@ -40,24 +40,40 @@ extern "C" {
 // there are spare bits in DATA, FI, ISA instruction and Bank
 
 // TLine  is for the maximum possible trace line structure with FI and HP-IL
-struct __attribute__((packed))TLine {                                       //      bytes     total   bits used spare bits
-    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4    32        0
-    uint32_t    data1;              // DATA D31..D00                                4 bytes      8    32        0
-    uint32_t    data2;              // DATA D55..D32                                4 bytes     12    24        8
+struct __attribute__((packed))TLine {                                       //      bytes     total   bits used  spare bits
+    uint32_t    cycle_number;       // to count the cycles since the last PWO       4 bytes      4      32          0
+    uint32_t    data1;              // DATA D31..D00                                4 bytes      8      32          0
+    uint32_t    data2;              // DATA D55..D32                                4 bytes     12      24+2        6
+                                    // bit 29: HPILRegs contains a time-tag, not actual HPIL register values
                                     // bit 30: instruction decoded by TULIP
-                                    // bit 31: driven by TULIP
-    uint16_t    isa_address;        // ISA address                                  2 bytes     14    16        0
-    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16    12        4   
+                                    // bit 31: DATA driven by TULIP
+    uint16_t    isa_address;        // ISA address                                  2 bytes     14      16          0
+    uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16      12+4        0
                                     // bit 12-13: active bank
-                                    // bit 14: TULIP driving ISA
-                                    // bit 15: TULIP driving carry
-    uint16_t    ramslct;            // selected RAM chip                            2 bytes     18    10        6   
-    uint16_t    fi;                 // compressed FI                                2 bytes     20    14        2
-    uint16_t    prphslct;           // selected peripheral                          2 bytes     22    12        4
-    uint16_t    frame_in;           // HP-IL frame input                            2 bytes     24    16        0
-    uint16_t    frame_out;          // HP-IL frame output                           2 bytes     26    16        0
-    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     35    36        0
-                                    //                                total size is 35 bytes
+                                    // bit 14: TULIP driving ISA (address is in TULIP)
+                                    // bit 15: TULIP driving carry, carry is not actually traced!
+    uint16_t    ramslct;            // selected RAM chip                            2 bytes     18      10          6   
+    uint16_t    fi;                 // compressed FI                                2 bytes     20      14          2
+    uint16_t    prphslct;           // selected peripheral                          2 bytes     22      12          4
+    uint16_t    frame_in;           // HP-IL frame input                            2 bytes     24      16          0
+    uint16_t    frame_out;          // HP-IL frame output                           2 bytes     26      16          0
+    uint8_t     HPILregs[9];        // HP-IL registers                              9 bytes     35      36          0
+
+    // in case the frame is indicated as a time-tage only, the absolute time in usecs is stored in the HPILregs, 64 bits = 8 bytes
+    //   typedef uint64_t absolute_time_t;
+    //   this will be done with a cast
+    //   if there is a time tage, the cycle number will be valid but likely zero
+    //   The RAMSLCT will have  a value showing the type of event related to the time tag:
+    //     0x00 - unknown event
+    //     0x01 - deep sleep  -> light sleep transition
+    //     0x02 - light sleep -> deep sleep transition
+    //     0x03 - deep sleep  -> running transition
+    //     0x04 - light sleep -> running transition
+    //     0x05 - running     -> light sleep transition
+    //     0x06 - running     -> deep sleep transition
+    //     0x10 - external trigger
+    //     0x11 - wake-up by ISA trigger
+    //                                total size is 35 bytes
 }; 
 
 
@@ -127,15 +143,6 @@ struct __attribute__((packed))TLine_basic {
  // bool        xq_carry;           // when carry is sent                           1 byte      37
 };
 
-
-extern const char *mnemonics[];
-
-void TraceBuffer_init();
-void Trace_task();
-
-#define numILmnemonics      49      // number of elements in IL_mnemonics 0.. 48, PILBox commands now included
-
-
 // *******************************************************************
 // new setup for the filters/triggers
 // using the setup from Thomas Fänge
@@ -151,48 +158,129 @@ void Trace_task();
 // Use a dynamic array per Bank of 4K words * 2 bits per word = 1K per Bank
 
 #define     ADDR_MASK   0xFFFF
-#define     BRK_SIZE ((ADDR_MASK+1)/(32/2)) // 2 bits per brkpt
+#define     BRK_SIZE    ((ADDR_MASK+1)/(32/2)) // 2 bits per brkpt
 
 
 // #define BRK_MASK(a,w) ((m_brkpt[a>>4]w >> ((a & 0xF)<<1)) & 0b11)
 // #define BRK_SHFT(a) ((a & 0xF)<<1)
 // #define BRK_WORD(a) (a >> 4)
 
-#define FILTER_PASS_THIS    0b00
-#define FILTER_BLOCK_THIS   0b01
-#define FILTER_TRIG_START   0b10
-#define FILTER_TRIG_END     0b11
+#define FILTER_PASS             0b00
+#define FILTER_BLOCK            0b01
+#define FILTER_TRIG             0b10
+#define FILTER_TRIGEND          0b11
+
+#define PRE_TRIG_BUFSIZE        256     // fixed size of the pre-trigger buffer
+                                        // how much is used is user defined by the global settings in tracer_pretrig
+
+// struct for the filter as stored in RAM and FRAM
+
+struct m_filter_trigger {          
+    uint32_t    filter[BRK_SIZE];         // BRK_SIZE expands to 4096, with 32 bits per word
+                                          // total size is 16 KByte for all breakpoints                                
+    uint16_t    filter_page[16];          // first level filter per Page, enough bits for bank and part of Page, will probably not use
+                                          // exact bit assignment to be defined, but for example bit 0 could be pass/block, bit
+                                          // bit 0    : pass/block entire page
+                                          // bit 1..2 : bank 0..3
+                                          // bit 3    : use bank in filter or not
+                                          // bit 4    : use bank with triggers or not
+                                          // bit 5    : page has a filter in it
+                                          // bit 6    : page has a trigger in it
+                                          // bit 7    : reserved for future use  
+                                          // bit 8..15: reserved for future use
+    uint8_t     filter_active;            // is the filter active or not
+    uint64_t    trigger_data;             // data to compare for triggering, can be used for address or data triggering
+    uint64_t    trigger_data_mask;        // mask for the data to compare for triggering
+    uint16_t    trigger_instr;            // ISA instruction to compare for triggering
+    uint16_t    trigger_instr_mask;       // mask for the ISA instruction to compare
+    uint8_t     trigger_sync;             // SYNC status to compare for triggering, 0 or 1
+    uint8_t     trigger_bank;             // bank to compare for triggering, 0..3
+    uint16_t    trigger_FI;               // FI to compare for triggering, 16 bits compressed FI
+    uint16_t    trigger_FI_mask;          // mask for the FI to compare for triggering
+    uint8_t     trigger_HPILframe;        // HP-IL frame to compare for triggering, 16 bits
+    uint16_t    trigger_HPILframe_mask;   // mask for the HP-IL frame to compare for triggering
+    uint8_t     trigger_HPILin;           // IL frame in or out
+    uint8_t     trigger_carry;            // carry status to compare for triggering, 0 or 1
+    uint8_t     trigger_mode;             // trigger mode
+                                          // value 00: off
+                                          //       01: single trigger, stop after trigger, requires manual re-arm
+                                          //       02: multi trigger, re-trigger after new trigger
+                                          //       03: auto single, re-arm after PWO
+    uint8_t     trigger_runmode;          // run mode after trigger
+                                          // value 00: stop on PWO
+                                          //       01: run until trigger count
+                                          //       02: run until trigger end
+                                          //       03: run until trigger count OR end
+                                          //       04: run until overflow of trace buffer
+    uint8_t    trigger_filter;            // appply filters or not
+    uint8_t    trigger_count;             // count for multi trigger mode, counts number of triggers before the trigger
+    uint16_t   post_trigger_count;        // number of samples to record after the trigger, user defined in global settings, default 0 meaning that the tracer will not stop until a POWOFF or a TRIGEND trigger is hit
+    uint8_t    pre_trigger_count;         // number of pre-trigger samples to store, 0..256
+    uint8_t    reserved[944];             // reserve space to make total struct size exactly 17 KByte (17,408 bytes)
+
+    // total size of this struct is 17 KByte (17,408 bytes)
+};  
+
+extern const char *mnemonics[];
+
+void TraceBuffer_init();
+void Trace_task();
+
+#define numILmnemonics      49      // number of elements in IL_mnemonics 0.. 48, PILBox commands now included
 
 
 class Filter {
 
-    public:
-
-    uint32_t    m_filter[BRK_SIZE];     // BRK_SIZE expands to 4096, with 32 bits per word
-                                        // total size is 16 KByte for all breakpoints
+    public: 
+        // m_filter_trigger filters;       // the filter settings, to be stored in FRAM
+        
+        uint32_t    filter[BRK_SIZE];       // BRK_SIZE expands to 4096, with 32 bits per word
+                                            // total size is 16 KByte for all breakpoints
+        m_filter_trigger filters;           // the filter settings, to be stored in FRAM
 
     Filter() {
         // initialize to default settings
 
         // clear the main filter array
         for (int i = 0; i < BRK_SIZE; i++) {
-            m_filter[i] = 0;
+            filter[i] = 0;
         }
+
+        // initialize all other settings to 0
+        filters.filter_active = 0;
+        filters.trigger_data = 0;
+        filters.trigger_data_mask = 0;
+        filters.trigger_instr = 0;
+        filters.trigger_instr_mask = 0;
+        filters.trigger_sync = 0;
+        filters.trigger_bank = 0;
+        filters.trigger_FI = 0;
+        filters.trigger_FI_mask = 0;
+        filters.trigger_HPILframe = 0;
+        filters.trigger_HPILframe_mask = 0;
+        filters.trigger_HPILin = 0;
+        filters.trigger_carry = 0;
+        filters.trigger_mode = 0;
+        filters.trigger_runmode = 0;
+        filters.trigger_filter = 0;
+
     }
 
 
     // apply the filter, should we pass or block the current address
     // this is called for every sample by the tracer main loop
-    // returns 1 
-
-    uint8_t apply(uint16_t adr) {
-
+    // return values:
+    // 0b00 -- pass
+    // 0b01 -- block
+    // 0b10 -- trigger start
+    // 0b11 -- trigger end
+    inline uint8_t apply(uint16_t adr) {
         // get the word and bit position
         int word = adr >> 4;          // divide by 16
         int bit = (adr & 0xF) << 1;   // multiply by 2
         uint32_t mask = 0b11 << bit;  // create the mask for the 2 bits
         uint32_t fil;
-        fil = m_filter[word] & mask; // get the filter bits for this address
+        fil = filter[word] & mask; // get the filter bits for this address
         // and shift the filter bits out
         fil >>= bit;               // shift the bits to the right
         // and return the value
@@ -202,107 +290,102 @@ class Filter {
 
     // add a new filter
     // parameters:
-    // tp - filter type, 0-block, 1-pass, 2-trig
+    // tp - filter type, 0-block, 1-pass, 2-trig start, 3-trig end
     // start_adr, end_adr: start and end addresses (or count)
     // bank (not used yet)
-    // a new filter is enabled by default
-    // returns the entry number, if -1 then no free entry found
-    
-    int add_filter(uint8_t tp, uint16_t start_adr, uint16_t end_adr, int bank)
+    // returns false if invalid parameters, true if succesfully added
+    bool add_filter(uint8_t tp, uint16_t start_adr, uint16_t end_adr, int bank)
     {
         // first find a free entry in the array
-        int entry = 0; 
+        if (tp > 0b11) {
+            // invalid filter type
+            return false;
+        }
 
+        if (end_adr == 0) {
+            // if end_adr is 0 then only the start address will have the filter applied, so set end_adr to start_adr
+            end_adr = start_adr;
+        }
 
-        return entry;
+        // use the start and end address to set the filter bits in the array
+        for (uint16_t adr = start_adr; adr <= end_adr; adr++) {
+            int word = adr >> 4;          // divide by 16
+            int bit = (adr & 0xF) << 1;   // multiply by 2
+            uint32_t mask = 0b11 << bit;  // create the mask for the 2 bits
+            // clear the bits first
+            filter[word] &= ~mask;
+            // set the new filter type
+            filter[word] |= (tp << bit) & mask;
+        }
+        return true;
     }
-
-    // remove a filter by entry number
-    // returns -1 if not succesful, otehrwise returns the entry number
-    int del_filter(int entry)
-    {
-        int result = -1;
-
-        return entry;
-    }
-
-    // set the status of a filter to active or inactive
-    // returns the new status of the filter
-    uint8_t set_filter(int entry)
-    {
-
-        return 0;
-    }
-
-    // toggle the status of a filter
-    uint8_t toggle_filter(int entry)
-    {
-        return 0;
-    }
-
-
-    uint8_t get_filter(int entry)
-    {
-        return 0;
-    }
-
 
     void clear_filters()
     {
         // clear all filter arrays
-
+        for (int i = 0; i < BRK_SIZE; i++) {
+            filter[i] = 0;
+        }
+        filters.filter_active = 0;
+        filters.trigger_data = 0;
+        filters.trigger_data_mask = 0;
+        filters.trigger_instr = 0;
+        filters.trigger_instr_mask = 0;
+        filters.trigger_sync = 0;
+        filters.trigger_bank = 0;
+        filters.trigger_FI = 0;
+        filters.trigger_FI_mask = 0;
+        filters.trigger_HPILframe = 0;
+        filters.trigger_HPILframe_mask = 0;
+        filters.trigger_HPILin = 0;
+        filters.trigger_carry = 0;
+        filters.trigger_mode = 0;
+        filters.trigger_runmode = 0;
+        filters.trigger_filter = 0;
     }
 
     // set items to the default value and save in fram
-    int set_default() {
+    void set_default() {
         // set all addresses to NULL 
         // initialize all filters, then set defaults values
-
         clear_filters();
-
-        return 0;
-
-
     }
 
 
-    // save all settings in FRAM, can only be done when PWO is low!!
+    // save filters settings in FRAM, can only be done when PWO is low!!
     // is done automatically when HP41 power goes down
     // returns 1 (true) if succesful
-    int save() {
-        if (gpio_get(P_PWO) == 0)
-        {
+    bool save() {
+        if (gpio_get(P_PWO) == 0) {
             // when PWO = low we can write to FRAM
+            // only save the filter array for now
+            fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_TRACER_start, (uint8_t*)filter, sizeof(filter));
             
-            return 1;
-        }
-        else
-        {
+            return true;
+        } else{
             // PWO was high, calculator is running and cannot write to FRAM
-            return 0;
+            return false;
         }
     }
 
     // retrieve settings from FRAM in array for use, can only be done when PWO is low!!
     // is done automatically upon device power up
     // returns 1 (true) if succesful
-    int retrieve() {
-        if (gpio_get(P_PWO) == 0)
-        {
-            // when PWO = low we can write to FRAM
-            // fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_gsettings_start, gsettings, sizeof(gsettings));
-            // when PWO = low we can read from FRAM
-    
-            return 1;
-        }
-        else
-        {
+    bool retrieve() {
+        if (gpio_get(P_PWO) == 0) {
+            // read the filter array from FRAM when PWO is low
+            fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_TRACER_start, (uint8_t*)filter, sizeof(filter));            
+            return true;
+
+        } else {
             // PWO was high, calculator is running and cannot write to FRAM
-            return 0;
+            return false;
         }
     }
 
 } ; // end of class Filter
+
+
 
 #ifdef __cplusplus
 }

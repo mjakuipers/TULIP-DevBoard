@@ -52,6 +52,7 @@ extern "C" {
 extern const char* __in_flash() ITF_str[];
 
 void cdc_sendbuf(int itf, char* buffer, int len);
+bool cdc_sendbuf_available(int itf, char* buffer, int len);
 
 void cdc_send_string(int itf, char* buffer, int len);
 void cdc_send_char(int itf, char c);
@@ -71,6 +72,8 @@ void cdc_read_flush(int itf);
 
 void cdc_printf_console(const char *format, ...);       // prevent using this function
 void cdc_printf_(int itf, const char *format, ...);     // prevent using this function
+
+void cdc_checker();
 
 
 #ifdef __cplusplus

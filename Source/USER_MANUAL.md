@@ -1,6 +1,6 @@
 # TULIP4041 User Manual
 
-Version: 0.97 BETA (software)
+Version: 0.990 (software)
 
 ## 1. Overview
 
@@ -41,6 +41,17 @@ The firmware exposes multiple USB CDC interfaces.
 
 Use the Console port for all commands in this manual.
 
+## 3.1 What Is New In 0.99
+
+- Added `filter` command family for tracer filtering, including save/load to SD card.
+- Tracer filtering can now be toggled directly with `tracer filter`.
+- Added `filter sysloop` for fast include/exclude of common system loops.
+- Printer command set now includes:
+   - `printer mode` (cycles MAN / NORM / TRACE)
+   - `printer serial` (cycles HP82143A / ASCII / UTF-8 serial mapping)
+- HP82143A serial printer output supports both ASCII and UTF-8 symbol mapping.
+- System command supports runtime debug toggling with `system debug`.
+
 ## 4. First-Time Quick Start
 
 1. Connect TULIP4041 and the HP-41 hardware.
@@ -78,30 +89,42 @@ Read this section before normal use.
 - system status: detailed status
 - system pio: PIO state machine status
 - system cdc: CDC link status
+- system cdcident: identify CDC interfaces
 - system poweron: wake operation (when applicable)
 - system calcreset: calculator reset signal action
+- system gpio: show all GPIO states
+- system owner: program or read the device owner string
 - system REBOOT: reboot (with confirmation window)
 - system BOOTSEL: enter UF2 bootloader mode
 - system configlist: list persistent settings
 - system configinit: reset configuration defaults
+- system debug: toggle runtime debug mode
+- system serial: read/program device serial number (Module build only)
 
 ### 6.2 SD Card and Files
 
 - sdcard status
 - sdcard mount
 - sdcard unmount
+- sdcard mounted
 - sdcard connect
 - sdcard eject
 - dir /
 - dir /path/
+- cd
+- cd <dir>
+- cd ..
+- cd /
 
 ### 6.3 ROM Library and Slot Mapping
 
-- list
-- list flash
-- list qrom
-- list <file>
-- list <file> dump
+- list: list all files in FLASH and QROM/FRAM
+- list flash: list only FLASH files
+- list qrom: list only QROM/FRAM files
+- list ext: extended listing with more detail per file
+- list all: include erased files in the listing
+- list <file>: show details of a named file
+- list <file> dump: details plus hexdump
 - cat
 - cat <page>
 - cat <page> <bank>
@@ -125,13 +148,23 @@ Unplugging:
 
 Import/export/delete:
 
-- import <file>
-- import <file> compare
-- import <file> UPDATE
-- import <dir> ALL
-- import <file> qrom
-- export <file>
-- export <file> <dir>
+Single file:
+
+- import <file>: import file to FLASH
+- import <file> compare: compare file with stored version
+- import <file> UPDATE: update stored version from SD card
+- import <file> qrom: import file into QROM/FRAM space
+
+Batch (directory):
+
+- import <dir> ALL: import all files from a directory to FLASH
+- import <dir> compare ALL: compare all files in directory
+- import <dir> UPDATE ALL: update all files from directory
+
+Export/delete:
+
+- export <file>: export file from FLASH/FRAM to SD card root
+- export <file> <dir>: export to named directory on SD card
 - delete <file>
 
 ### 6.4 Reservation Management
@@ -144,6 +177,7 @@ Reserve pages to avoid conflicts with physical hardware or intended layout.
 - reserve printer
 - reserve hpil
 - reserve clear <page>
+- reserve clear all
 
 ### 6.5 Emulation Controls
 
@@ -159,9 +193,9 @@ Reserve pages to avoid conflicts with physical hardware or intended layout.
 - printer
 - printer status
 - printer power
-- printer trace
-- printer norm
-- printer man
+- printer output: cycle output mode (none / serial / IR / both)
+- printer serial: cycle serial mapping mode (HP82143A / ASCII / UTF-8)
+- printer mode: cycle printer mode (MAN / NORM / TRACE)
 - printer paper
 - printer print
 - printer adv
@@ -172,54 +206,88 @@ Reserve pages to avoid conflicts with physical hardware or intended layout.
 
 - tracer
 - tracer status
-- tracer trace
-- tracer buffer
-- tracer buffer <size>
-- tracer pretrig
-- tracer pretrig <size>
-- tracer sysloop
-- tracer sysrom
-- tracer ilrom
-- tracer hpil
-- tracer pilbox
-- tracer ilregs
-- tracer save
+- tracer trace: toggle tracer on/off
+- tracer buffer: show current trace buffer size
+- tracer buffer <size>: set trace buffer size (100–10000 samples)
+- tracer pretrig: show pre-trigger buffer size
+- tracer pretrig <size>: set pre-trigger buffer size (1–256 samples)
+- tracer filter: toggle tracer filter enable/disable
+- tracer hpil: toggle HP-IL tracing to IL Scope port
+- tracer pilbox: toggle PILBox serial tracing to IL Scope port
+- tracer ilregs: toggle tracing of HP-IL registers
+- tracer mnem: cycle disassembly type (none / JDA / HP mnemonics)
+- tracer save: save tracer settings to persistent storage
 
-Note: buffer-size changes may require reboot to take effect.
+Note: buffer-size changes require a reboot to take effect.
 
-### 6.8 Memory Extensions
+### 6.8 Trace Filter
+
+Use `filter` to define which microcode addresses/pages are blocked or passed.
+
+- filter: show current filter status
+- filter status
+- filter list
+- filter dump
+- filter block: show all BLOCK entries
+- filter pass: show all PASS entries
+- filter block all: block all samples
+- filter pass all: pass all samples
+- filter block pX: block page X (hex)
+- filter pass pX: pass page X (hex)
+- filter block <start_hex>: block one address
+- filter pass <start_hex>: pass one address
+- filter block <start_hex> <end_hex>: block address range
+- filter pass <start_hex> <end_hex>: pass address range
+- filter sysloop: toggle system-loop filtering preset
+- filter save <filename.trf>: save filters to SD card
+- filter load <filename.trf>: load filters from SD card
+
+### 6.9 Memory Extensions
 
 XMEM:
 
 - xmem status
-- xmem <0..2>
+- xmem <N> <M>: N = 0..1 (XFunctions), M = 0..2 (XMEM modules)
 - xmem dump
 - xmem ERASE
 
 UMEM:
 
 - umem status
-- umem <0..4>
-- umem dump
+- umem <0..4>: plug 0–4 User Memory modules
+- umem quad: plug a Quad Memory module
+- umem dump: dump User Memory contents
 - umem ERASE
 
 QROM and HEPAX-related control:
 
-- qrom status
-- qrom <page>
-- qrom enable <page>
-- qrom wprot <page>
-- qrom hepram <page>
-- qrom polling <page>
-- qrom CLEAR <page> <bank>
+- qrom status: show QROM status overview
+- qrom enable <page>: toggle read-enable of the named page
+- qrom qrom <page> <bank>: toggle QROM status of file in page/bank
+- qrom wprot <page>: toggle write protection for the named page
+- qrom hepram <page>: toggle HEPAX RAM status for the named page
+- qrom polling <page>: toggle polling-interrupt enable for the named page
+- qrom CLEAR <page> <bank>: clear QROM in named page and bank
 - hepram status
-- hepram ramtog <page>
-- hepram reserve <page>
-- hepram release <page>
-- hepram CLRAM <page>
-- hepram INIT
+- hepram ramtog <page>: toggle write-protect bit for named page
+- hepram reserve <page>: exclude page from the HEPRAM chain
+- hepram release <page>: include page back in the HEPRAM chain
+- hepram CLRAM <page>: clear HEPRAM for named page
+- hepram INIT: initialize HEPRAM chain (erases all non-reserved HEPRAM)
+- hepram INITALL: initialize all HEPRAM including reserved pages
 
-### 6.9 WAND Functions
+### 6.10 RTC (Module Variant Only)
+
+The RTC command is only available on the TULIP Module hardware variant.
+
+- rtc status: show RTC status
+- rtc get: read current date and time from RTC
+- rtc set <datetime>: set RTC date and time
+- rtc reset: reset RTC to defaults
+- rtc dump: dump RTC registers
+- rtc display: test the SSD1315 display
+
+### 6.11 WAND Functions
 
 - wand status
 - wand scan <file>
@@ -286,6 +354,8 @@ Examples:
 
 - Run tracer status.
 - Ensure tracer trace is enabled.
+- Check whether filtering is enabled (`tracer filter` and `filter status`).
+- If needed, allow all samples with `filter pass all`.
 - Confirm host app is connected to the Tracer/IL Scope port.
 
 ### 8.5 SD card issues

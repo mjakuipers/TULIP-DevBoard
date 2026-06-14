@@ -28,6 +28,17 @@ extern "C" {
 
 #include "pico/stdlib.h"
 
+/*
+ * Structure to hold UTF-8 encoded characters
+ * UTF-8 characters can be 1-4 bytes long
+ * Defined here (before tracer.h) to avoid circular include issues:
+ * peripherals.h -> tracer.h -> userinterface.h -> peripherals.h (guarded)
+ */
+typedef struct {
+    uint8_t data[4];   // UTF-8 bytes
+    uint8_t length;    // number of bytes in this character
+} HP82143AChar;
+
 #include "cdc_helper.h"
 #include "emulation.h"
 #include "tracer.h"

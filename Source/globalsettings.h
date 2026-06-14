@@ -97,6 +97,7 @@ extern "C" {
 #define     tracer_mainbuffer   42          // size of main trace buffer queue
 #define     tracer_pretrig      43          // size of pre-trigger trace buffer queue
 #define     tracer_posttrig     44          // post trigger counter, number of samples after the trigger
+#define     tracer_filter_on    45          // filter enabled for tracing, when enabled only samples that pass the filter will be traced
 
 // HP-IL scope settings
 #define     ilscope_IL_enabled  51          // PILBox tracing enabled
@@ -129,7 +130,10 @@ extern "C" {
 #define     PRT_delay           81          // for IR printing
 #define     PRT_paper           82          // is paper loaded
 #define     PRT_power           83          // printer power
-#define     PRT_serial          84          // use serial printer output for output in terminal emulator                   
+#define     PRT_emu_mode        84          // printer emulation mode:
+                                            //  0 = HP82143A emulation
+                                            //  1 = Serial ASCII printer emulation
+                                            //  2 = Serial UTF-8 printer emulation
 #define     PRT_output_mode     85          // printer output mode:
                                             //  0 = no output
                                             //  1 = serial
@@ -190,7 +194,7 @@ class GSettings {
         gsettings[PRT_delay]            = 0;        // no delay for IR (not used yet)
         gsettings[PRT_paper]            = 0;        // no paper loaded in the shipping config
         gsettings[PRT_power]            = 0;        // power off default
-        gsettings[PRT_serial]           = 0;        // no serial translation (not used yet)
+        gsettings[PRT_emu_mode]         = 0;        // HP82143A emulation mode
 
         // settings for Extended Memory
         gsettings[xmem_pages]           = 0;        // no XMEM plugged
@@ -279,9 +283,6 @@ class GSettings {
             // fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_gsettings_start, gsettings, sizeof(gsettings));
             // when PWO = low we can read from FRAM
             fram_read(SPI_PORT_FRAM, PIN_SPI0_CS, FRAM_gsettings_start, (uint8_t*)gsettings, sizeof(gsettings));  
-
-
-
             return 1;
         } else {
             // PWO was high, calculator is running and cannot write to FRAM

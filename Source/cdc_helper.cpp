@@ -39,6 +39,12 @@ const char* __in_flash() ITF_str[] = {  "ITF_CONSOLE",
                                         "ITF_ILSCOPE",
                                         "ITF_PRINT", };
 
+
+bool cdc_connected_now[5]     = {false, false, false, false, false};     // current connection status of the CDC ports
+bool cdc_connected_prev[5]    = {false, false, false, false, false};     // previous connection status of the CDC ports
+bool cdc_connected_changed[5] = {false, false, false, false, false};     // for checking if the connection status changed
+
+
 // flushes the CDC port
 void cdc_flush(int itf)
 {
@@ -75,6 +81,23 @@ void cdc_sendbuf(int itf, char* buffer, int len)
     wait_for_write(itf, len);                   // wait until enough room is in the output queue
     sent = tud_cdc_n_write(itf, buffer, len);   // and send it
 }
+
+// version of sendbuf that sends only if there is space available in the output buffer, otherwise it returns without sending
+// attempts to flush before
+bool cdc_sendbuf_available(int itf, char* buffer, int len)
+{
+    uint32_t avail;
+    tud_task();
+    tud_cdc_n_write_flush(itf);
+    avail = tud_cdc_n_write_available(itf);
+    if (avail >= len) {
+        tud_cdc_n_write(itf, buffer, len);
+        return true;
+    } else {
+        return false;
+    }
+}
+
 
 // printf version for printing into the console
 // and flushes the buffer
@@ -202,6 +225,7 @@ void cdc_send_string(int itf, char* buffer, int len)
 
     wait_for_write(itf, len);                   // wait until len bytes available in the send buffer
     sent = tud_cdc_n_write(itf, buffer, len);
+
 }
 
 
@@ -211,6 +235,17 @@ void usbd_init()
     usbd_serial_init();
 }
 
+void cdc_checker()
+{
+    // function to check the status of the CDC ports and print it to the console
+    // check for changes in the connections
 
-
-
+    for (int i = 0; i < 5; i++) {
+        cdc_connected_prev[i] = cdc_connected_now[i];
+        cdc_connected_now[i] = tud_cdc_n_connected(i);
+        if (cdc_connected_now[i] != cdc_connected_prev[i]) {
+            // connection status changed
+            cdc_connected_changed[i] = true;
+        }
+    }
+}

@@ -41,7 +41,7 @@ CLI_UINT cliBuffer[BYTES_TO_CLI_UINTS(CLI_BUFFER_SIZE)];
 
 EmbeddedCliConfig *config;
 
-bool firstconnect = false;          // to detect the first connect to a CDC host
+// bool firstconnect = false;          // to detect the first connect to a CDC host
                                     // to display a welcome message
 
 // other requirements for the CLI implementatio:
@@ -95,6 +95,13 @@ int cli_printf(const char *format, ...) {
     // Create a buffer to store the formatted string
     char buffer[CLI_PRINT_BUFFER_SIZE];
 
+    tud_task();  // must keep the USB port updated
+
+    if (!cdc_connected_now[ITF_CONSOLE]) {
+        // console not connected, just return without printing
+        return 0;
+    }
+
     // Format the string using snprintf
     va_list args;
     va_start(args, format);
@@ -103,8 +110,9 @@ int cli_printf(const char *format, ...) {
 
     // Check if string fitted in buffer else print error to stderr
     if (length < 0) {
-        fprintf(stderr, "Error formatting the string\r\n");
-        return EOF;
+        // fprintf(stderr, "Error formatting the string\r\n");
+        // there is not a lot of error handling here, just ignore the print if there was an error formatting the string
+        return 0;
     }
 
     // Call embeddedCliPrint with the formatted string
@@ -160,10 +168,8 @@ const char* __in_flash()system_cmds[] =
     "configlist",
     "gpio",
     "owner",     
-    #if (TULIP_HARDWARE == T_MODULE)
+    "debug",
     "serial",       // program/read the TULIP serial number
-    #endif
-    
 };
 
 /*
@@ -179,7 +185,9 @@ const char* __in_flash()system_cmds[] =
         #define help_configlist 10
         #define help_gpio       11
         #define help_owner      12
-        #define help_serial     13
+        #define help_debug      13  
+        #define help_serial     14
+
 
 */
 
@@ -243,13 +251,24 @@ void onSystemCLI(EmbeddedCli *cli, char *args, void *context)
                 uif_configlist();        // re-initialize persistent settings
                 break;            
       case help_serial :                 
-                uif_serial(arg2);        // program/read the TULIP serial number
+                #if TULIP_HARDWARE == T_MODULE
+                    if (arg2 == NULL) {
+                        // no argument given, just show the serial number
+                        uif_serial(NULL);    // show the TULIP serial number
+                    } else {
+                        // not supported for the DevBoard
+                        cli_printf("programming the serial number is not supported on the DevBoard");
+                    }
+                #endif
                 break;
       case help_gpio : 
                 uif_gpio_status();       // show the GPIO status
                 break;
-        case help_owner :
+      case help_owner :
                 uif_owner(arg2);         // program/read the owner of the device
+                break;
+      case help_debug :
+                uif_debug();             // toggle debug level
                 break;
       default:
           cli_printf("system: unkown command %s\n", arg1);    // unknown command
@@ -873,28 +892,26 @@ void onCatCLI(EmbeddedCli *cli, char *args, void *context)
         [no argument] shows the HP82143A status\r\n\
         status        shows the HP82143A status\r\n\
         output        cycle the printer output between none, serial, IR or both\r\n\
+        serial        cycle the printer serial mode between HP82143A, ASCII serial and UTF-8 serial printer emulation\r\n\
         power         toggle power\r\n\
-        trace         enable trace mode\r\n\
-        norm          enable norm mode\r\n\
-        man           enable man mode\r\n\
+        mode          cycle the printer mode between normal, trace and manual\r\n\
         paper         toggle Out Of Paper status\r\n\
-        print         push PRINT button\r\n\
-        adv           push ADV button\r\n\
+        print         push PRINT button (short press)\r\n\
+        adv           push ADV button (short press)\r\n\
         irtest        test the infrared LED, send a test string to the printer\r\n\
         irtog         toggle infrared LED, turn the IR LED on or off\r\n\
-                      for testing only, cunsumes extra power!\r\n\"
+                      for testing only, cunsumes extra power!\r\n"
 
         #define printer_status  1
         #define printer_power   2
-        #define printer_output  3        
-        #define printer_trace   4
-        #define printer_norm    5
-        #define printer_man     6
-        #define printer_paper   7
-        #define printer_print   8
-        #define printer_adv     9
-        #define printer_irtest  10
-        #define printer_irtog   11
+        #define printer_output  3
+        #define printer_serial  4
+        #define printer_mode    5
+        #define printer_paper   6
+        #define printer_print   7
+        #define printer_adv     8
+        #define printer_irtest  9
+        #define printer_irtog   10
 
 */
 
@@ -905,9 +922,8 @@ const char* __in_flash()printer_cmds[] =
     "status",           // get status
     "power",            // toggle power
     "output",           // cycle through the output modes of the printer
-    "trace",            // printer mode trace
-    "norm",             // printer mode normal
-    "man",              // printer mode manual
+    "serial",           // cycle through the printer serial modes
+    "mode",             // cycle through the printer modes
     "paper",            // toggle Out Of Paper status
     "print",            // push PRINT button
     "adv",              // push ADV button
@@ -1093,6 +1109,7 @@ void onUMEMCLI(EmbeddedCli *cli, char *args, void *context)
         pretrig <size> set the pre-trigger buffer size in number of samples\r\n\
                       default is 32, maximum is 256 samples\r\n\
         trace         toggle tracer enable/disable\r\n\
+        filter        toggle filter enable/disable\r\n\
         sysloop       toggle tracing of system loops (RSTKB, RST05, BLINK01 and debounce)\r\n\
         sysrom        toggle system rom tracing (Page 0 - 5)\r\n\
         ilrom         toggle tracing of Page 6+7\r\n\
@@ -1113,6 +1130,7 @@ void onUMEMCLI(EmbeddedCli *cli, char *args, void *context)
         #define trace_ilregs     10
         #define trace_save       11
         #define trace_mnem       12
+        
 */
 
 const char* __in_flash()tracer_cmds[] =
@@ -1123,18 +1141,13 @@ const char* __in_flash()tracer_cmds[] =
     "buffer",           // get/set tracer buffer size
     "pretrig",          // get/set pre-trigger buffer size
     "trace",            // toggle tracer enable/disable
-    "sysloop",          // toggle tracing of system loops
-    "sysrom",           // toggle system rom tracing (Page 0, 1, 2, 3, 5)
-    "ilrom",            // toggle tracing of Page 6 + 7
     "hpil",             // toggle HP-IL tracing
     "pilbox",           // toggle PILBox serial tracing
     "ilregs",           // toggle tracing of HP-IL registers
     "save",             // save tracer settings
     "mnem",             // toggle mnemonics type
+    "filter",           // toggle filter enable/disable
 };
-
-
-
 
 void onTracerCLI(EmbeddedCli *cli, char *args, void *context)
 {
@@ -1208,8 +1221,178 @@ void onTracerCLI(EmbeddedCli *cli, char *args, void *context)
     else {
         cli_printf("invalid argument %s: use: tracer [command], see help", arg1);    // unknown command
     }
-
 }
+
+/*
+#define FILTER_HELP_TXT "filter functions for the mcode tracer\r\n\
+        [no argument]       show the current filter status\r\n\
+        status              show the current filter status\r\n\
+        list                show the current filters\r\n\
+        dump                dump the filter settings for debugging\r\n\
+        save [filename.trf] save the current filter settings to a file on the uSD card\r\n\
+        load [filename.trf] load filter settings from a file on the uSD card\r\n\
+        filter              toggle filter enable or disable\r\n\
+        block               show all filter BLOCK entries\r\n\
+        pass                show all filter PASS entries\r\n\
+        block all           block ALL trace samples\r\n\
+        block pX            add a BLOCK filter for Page x (hex)\r\n\
+        block XXXX          add a BLOCK filter for address XXXX (hex)\r\n\
+        block XXXX YYYY     add a BLOCK filter for the range XXXX..YYY (hex)\r\n\
+        pass all            remove all filters and pass all samples\r\n\
+        pass pX             add a PASS filter for Page x (hex)\r\n\
+        pass XXXX YYYY      add a PASS filter for the range XXXX..YYY (hex)\r\n"
+
+        // to add:       
+        // sysloop           toggle tracing of system loops (RSTKB, RST05, BLINK01 and debounce) in the filter\r\n\"
+
+
+#define filter_status        1
+#define filter_list          2
+#define filter_block_all     3
+#define filter_block_page    4
+#define filter_block_adr     5
+#define filter_pass_all      7
+#define filter_pass_page     8
+#define filter_pass_adr      9
+#define filter_trig_page    10
+#define filter_trig_adr     11
+#define filter_trigend_page 12
+#define filter_trigend_adr  13
+#define filter_dump         14
+#define filter_save         15
+#define filter_load         16
+
+
+*/
+
+void onFilterCLI(EmbeddedCli *cli, char *args, void *context) {
+    const char *arg1 = embeddedCliGetToken(args, 1);
+    const char *arg2 = embeddedCliGetToken(args, 2);
+    const char *arg3 = embeddedCliGetToken(args, 3);
+
+    int param = 0;
+    int adr1 = 0;
+    int adr2 = 0;
+
+    // check for a known token, must be the first argument, the other arguments are used for the block and pass commands
+    uint8_t pos_status  = embeddedCliFindToken(args, "status");
+    uint8_t pos_list    = embeddedCliFindToken(args, "list");
+    uint8_t pos_block   = embeddedCliFindToken(args, "block");
+    uint8_t pos_pass    = embeddedCliFindToken(args, "pass");
+    uint8_t pos_all     = embeddedCliFindToken(args, "all");
+    uint8_t pos_dump    = embeddedCliFindToken(args, "dump");
+    uint8_t pos_save    = embeddedCliFindToken(args, "save");
+    uint8_t pos_load    = embeddedCliFindToken(args, "load");
+    uint8_t pos_sysloop = embeddedCliFindToken(args, "sysloop");
+
+    // find out which of the arguments is used as arg1, this is the command
+    if (pos_status == 1) {
+        uif_filter(filter_status, 0, 0, NULL);   // status command, this is executed directly here
+        return;
+    }
+    if (pos_list == 1) {
+        uif_filter(filter_list, 0, 0, NULL);   // list command, this is executed directly here
+        return;
+    }
+    if ((pos_pass == 1) && (pos_all == 2)) {
+        uif_filter(filter_pass_all, 0, 0, NULL);   // pass command with all argument, this is executed directly here
+        return;
+    }
+    if (arg1 == NULL) {
+        uif_filter(filter_status, 0, 0, NULL);   // no argument given, show the status
+        return;
+    }
+    if ((pos_block == 1) && (pos_all == 2)) {
+        uif_filter(filter_block_all, 0, 0, NULL);   // block command with all argument, this is executed directly here
+        return;
+    }
+
+    if (pos_dump == 1) {
+        uif_filter(filter_dump, 0, 0, NULL);   // dump command, this is executed directly here
+        return;
+    }
+
+    if (pos_save == 1) {
+        uif_filter(filter_save, 0, 0, arg2);   // save command, this is executed directly here
+        return;
+    }
+    if (pos_load == 1) {
+        uif_filter(filter_load, 0, 0, arg2);   // load command, this is executed directly here
+        return;
+    }
+
+    if (pos_sysloop == 1) {
+        uif_filter(filter_sysloop, 0, 0, NULL);   // sysloop command, this is executed directly here
+        return;
+    }
+
+    if ((pos_pass == 1) || (pos_block == 1)) {
+        // work out arguments for block and pass commands, these can be a page or an address or a range
+
+        // if there is no argumment after block or pass we pass 0 and 0, to list all pass or block entries, this is checked in the function
+        if (arg2 == NULL) {
+            if (pos_pass == 1) {
+                param = filter_pass_adr;     // pass command with no argument, this is checked later
+            } else {
+                param = filter_block_adr;    // block command with no argument, this is checked later
+            }
+            uif_filter(param, 0, 0, NULL);       // execute the block or pass command with no arguments
+            return;
+        }
+
+        // check for a valid page number in arg2 preceded by a P or p, this is for the block and pass commands
+        // P can be lower or upper case, but must be followed by a valid hex number for the page (0..F)
+        if (arg2 != NULL) {
+            int p = 0;
+            int res = sscanf(arg2, "P%X", &p);            // if a P with Page number in hex is found then res = 1
+            if (res == 0) {
+                res = sscanf(arg2, "p%X", &p);            // if a p with Page number in hex is found then res = 1
+            }
+
+            if ((res == 1) && (p >= 0) && (p <= 15)) {
+                // valid page number found, pass this to the function
+                if (pos_pass == 1) {
+                    param = filter_pass_page;     // pass command with a page argument, this is checked later
+                } else {
+                    param = filter_block_page;    // block command with a page argument, this is checked later
+                }
+                uif_filter(param, (uint16_t)p, 0, NULL);       // execute the block or pass command with the page number
+                return;
+            }
+
+            // we now have 1 or 2 address arguments, check for a valid hex address in arg2 and arg3, this is for the block and pass commands
+            int res1 = sscanf(arg2, "%X", &adr1);               // if a hex number is found then res1 = 1
+            if ((res1 != 1) || (adr1 > 0xFFFF) || (adr1 < 0)) {
+                cli_printf("invalid address %s: must be a hex number between 0000 and FFFF", arg2);    // invalid address
+                return;
+            }
+
+            int res2 = 0;
+            if (arg3 != NULL) {
+                res2 = sscanf(arg3, "%X", &adr2);            // if a hex number is found then res2 = 1
+                if ((res2 != 1) || (adr2 > 0xFFFF) || (adr2 < 0)) {
+                    cli_printf("invalid address %s: must be a hex number between 0000 and FFFF", arg3);    // invalid address
+                    return;
+                }
+            } else {
+                // no 2nd address, only one adress used
+                adr2 = adr1;
+            }
+
+            // valid hex addresses found, pass these to the function as a range
+            if (pos_pass == 1) {
+                param = filter_pass_adr;     // pass command with an address range argument, this is checked later
+            } else {
+                param = filter_block_adr;    // block command with an address range argument, this is checked later
+            }
+            uif_filter(param, (uint16_t)adr1, (uint16_t)adr2, NULL);   // execute the block or pass command with the address range
+            return;
+        }
+    }
+    // if we are here, then no valid command is found, so get out
+    cli_printf("invalid argument, see help");    // unknown command
+}
+
 
 void onClearCLI(EmbeddedCli *cli, char *args, void *context) {
     cli_printf("\33[2J");           // clears the screen
@@ -2059,23 +2242,20 @@ void writeCharToCLI(EmbeddedCli *embeddedCli, char c)
 
 void runCLI()
 {
-    if ((cli != NULL) && (cdc_connected(ITF_CONSOLE)))
-    {
+    if ((cli != NULL) && cdc_connected_now[ITF_CONSOLE]) {
         // only if the CLI is initialized and CDC interface is connected
         receiveCLIchar();
         embeddedCliProcess(cli);
-        if (!firstconnect)
-        {
-            // firstconnect was false, so this is now a new CDC connection
-            // display the welcome/status message
-            firstconnect = true;
+        if (cdc_connected_changed[ITF_CONSOLE]) {
+            // there was a change in the connection status and we are connected
+            // this is a new connection, so we can display the welcome/status message
+            // firstconnect = true;
+            cdc_connected_changed[ITF_CONSOLE] = false;   // reset the flag
             uif_status();
         }
-    }
-    else
-    // CLI CDC not connected
-    {
-        firstconnect = false;
+    } else{
+        // CLI CDC not connected
+        // firstconnect = false;
     }
 }
 
@@ -2209,6 +2389,15 @@ void initCliBinding() {
             .binding = onTracerCLI
     };
 
+    // Command binding for the filter command
+    CliCommandBinding filter_binding = {
+            .name = "filter",
+            .help = FILTER_HELP_TXT,
+            .tokenizeArgs = true,
+            .context = NULL,
+            .binding = onFilterCLI
+    };
+
     // Command binding for the flash command
     CliCommandBinding flash_binding = {
             .name = "flash",
@@ -2339,38 +2528,39 @@ void initCliBinding() {
 
     // EmbeddedCli *cli = getCliPointer();
     embeddedCliAddBinding(cli, system_binding);
-    embeddedCliAddBinding(cli, sdcard_binding);   
+    embeddedCliAddBinding(cli, sdcard_binding);     // #2   
 
-    embeddedCliAddBinding(cli, rtc_binding);
+    embeddedCliAddBinding(cli, rtc_binding);        // #3
 
     embeddedCliAddBinding(cli, clear_binding);
     embeddedCliAddBinding(cli, led_binding);
     embeddedCliAddBinding(cli, printer_binding);
     embeddedCliAddBinding(cli, tracer_binding);    
+    embeddedCliAddBinding(cli, filter_binding);     // #7
 
-    embeddedCliAddBinding(cli, umem_binding);
+    embeddedCliAddBinding(cli, umem_binding);       
     embeddedCliAddBinding(cli, xmem_binding);    
     embeddedCliAddBinding(cli, flash_binding);    
-    embeddedCliAddBinding(cli, fram_binding);    
+    embeddedCliAddBinding(cli, fram_binding);       // #11
 
     embeddedCliAddBinding(cli, dir_binding);
-    embeddedCliAddBinding(cli, list_binding);
+    embeddedCliAddBinding(cli, list_binding);       // #13
     
     embeddedCliAddBinding(cli, import_binding);
     embeddedCliAddBinding(cli, export_binding);
     embeddedCliAddBinding(cli, delete_binding);  
-    embeddedCliAddBinding(cli, cd_binding);
+    embeddedCliAddBinding(cli, cd_binding);         // #16
 
     embeddedCliAddBinding(cli, plug_binding);
     embeddedCliAddBinding(cli, unplug_binding);
-    embeddedCliAddBinding(cli, reserve_binding);
+    embeddedCliAddBinding(cli, reserve_binding);    // #19
 
     embeddedCliAddBinding(cli, cat_binding);
     embeddedCliAddBinding(cli, emulate_binding);
     embeddedCliAddBinding(cli, qrom_binding);
-    embeddedCliAddBinding(cli, hepram_binding);
+    embeddedCliAddBinding(cli, hepram_binding);     // #23
     
     embeddedCliAddBinding(cli, wand_binding);
-    embeddedCliAddBinding(cli, w_binding);
+    embeddedCliAddBinding(cli, w_binding);          // #25
 
 }

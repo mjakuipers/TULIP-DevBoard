@@ -45,7 +45,8 @@ extern "C" {
         configinit    re-initialize the FRAM persistent settings configuration\r\n\
         configlist    list all configuration settings\r\n\
         gpio          show the GPIO status\r\n\
-        owner         show/program the owner of the device\r\n"
+        owner         show/program the owner of the device\r\n\
+        debug         toggle debug level\r\n" 
 
 #elif TULIP_HARDWARE == T_MODULE
         #define SYSTEM_HELP_TXT "TULIP4041 system status and control\r\n\
@@ -63,9 +64,11 @@ extern "C" {
         configlist    list all configuration settings\r\n\
         gpio          show the GPIO status\r\n\
         owner         show/program the owner of the device\r\n\
+        debug         toggle debug level\r\n\
         serial        show/program the TULIP serial number\r\n\
                       the serial number is programmed in OTP and can be programmed only once\r\n\
                       TULIP module gets its serial number during assembly testing\r\n"
+      
 #endif
 
         #define help_status     1
@@ -80,7 +83,9 @@ extern "C" {
         #define help_configlist 10
         #define help_gpio       11
         #define help_owner      12
-        #define help_serial     13
+        #define help_debug      13  
+        #define help_serial     14
+
 
 #define SDCARD_HELP_TXT "uSD card functions\r\n\
         [no argument] shows the uSD card status and mounts the card\r\n\
@@ -134,28 +139,30 @@ extern "C" {
         [no argument] shows the HP82143A status\r\n\
         status        shows the HP82143A status\r\n\
         output        cycle the printer output between none, serial, IR or both\r\n\
+        serial        cycle the printer serial mode between HP82143A, ASCII serial and UTF-8 serial printer emulation\r\n\
+                      applies only to the virtual serial port, NOT to the IR output\r\n\
+                      IR output is always HP82143A compatible and supports graphics\r\n\
+                      ASCII and UTF-8 serial modes do not support graphics\r\n\
         power         toggle power\r\n\
-        trace         enable trace mode\r\n\
-        norm          enable norm mode\r\n\
-        man           enable man mode\r\n\
+        mode          cycle the printer mode between normal, trace and manual\r\n\
         paper         toggle Out Of Paper status\r\n\
-        print         push PRINT button\r\n\
-        adv           push ADV button\r\n\
+        print         push PRINT button (short press)\r\n\
+        adv           push ADV button (short press)\r\n\
         irtest        test the infrared LED, send a test string to the printer\r\n\
+                      also sends the ASCII and UTF-8 character sets to test the virtual serial port printer\r\n\
         irtog         toggle infrared LED, turn the IR LED on or off\r\n\
-                      for testing only, cunsumes extra power!\r\n"
+                      for testing only, consumes extra power!\r\n"
 
         #define printer_status  1
         #define printer_power   2
-        #define printer_output  3        
-        #define printer_trace   4
-        #define printer_norm    5
-        #define printer_man     6
-        #define printer_paper   7
-        #define printer_print   8
-        #define printer_adv     9
-        #define printer_irtest  10
-        #define printer_irtog   11
+        #define printer_output  3
+        #define printer_serial  4
+        #define printer_mode    5
+        #define printer_paper   6
+        #define printer_print   7
+        #define printer_adv     8
+        #define printer_irtest  9
+        #define printer_irtog   10
 
 
 #define TRACER_HELP_TXT "tracer functions\r\n\
@@ -165,74 +172,93 @@ extern "C" {
         buffer <size> set the tracer buffer size in number of samples\r\n\
                       default is 5000, maximum is about 10.000 samples\r\n\
                       requires a REBOOT to take effect!\r\n\
-        pretrig      shows the pre-trigger buffer size and status\r\n\
-        pretrig <size> set the pre-trigger buffer size in number of samples\r\n\
-                      default is 32, maximum is 256 samples\r\n\
         trace         toggle tracer enable/disable\r\n\
-        sysloop       toggle tracing of system loops (RSTKB, RST05, BLINK01 and debounce)\r\n\
-        sysrom        toggle system rom tracing (Page 0 - 5)\r\n\
-        ilrom         toggle tracing of Page 6 + 7\r\n\
         hpil          toggle HP-IL tracing to ILSCOPE USB serial port\r\n\
         pilbox        toggle PILBox serial tracing to ILSCOPE USB serial port\r\n\
         ilregs        toggle tracing of HP-IL registers\r\n\
-        save          save tracer settings\r\n\
+        save          save tracer settings in FRAM\r\n\
         mnem          cycle the disassembler mnemonics type between none, JDA (default) and HP\r\n\
-                      no mnemonics will only show the raw trace data without disassembly\r\n"
+                      no mnemonics will only show the raw trace data without disassembly\r\n\
+        filter        toggle filter enable/disable\r\n\
+                      when the filter is enabled, only samples that pass the filter will be traced\r\n\
+                      when the filter is disabled, all samples will be traced\r\n\
+                      the filter settings are configured with the filter command\r\n"
 
+                      /*
+        pretrig      shows the pre-trigger buffer size and status\r\n\
+        pretrig <size> set the pre-trigger buffer size in number of samples\r\n\
+                      default is 32, maximum is 256 samples\r\n\
+                      */
 
-/*      Will be in a seperate trigger/filter command later, but for now include it in the tracer command help text:
-        trig              toggle the trigger enable\r\n\
-                          blocks all samples until a trigger is found\r\n\
-        trig list         list all triggers\r\n\
-        trig + s XXXX     add trigger start at address XXXX (hex)\r\n\
-        trig + e XXXX     add trigger end at address XXXX (hex)\r\n\
-        trig - XXXX       remove the trigger at address XXXX (hex)\r\n\
-        trig count NNN    set the post trigger counter to NNN (dec) samples\r\n\
-        filter block      toggle the filter BLOCK enable\r\n\
-        filter pass       toggle the filter PASS enable\r\n\
-        filter list       list all filters\r\n\
-        pass + Px         add a PASS filter for Page x\r\n\
-        pass - Px         remove a PASS filter for Page x\r\n\
-        pass + XXXX YYYY  add a PASS filter for the range XXX..YYYY (hex)\r\n\
-        pass - XXXX YYYY  remove a PASS filter the range XXXX..YYYY (hex)\r\n\
-        pass all          remove all BLOCK and PASS filters and PASS all trace samples\r\n\
-        block + Px        add a BLOCK filter for Page x\r\n\
-        block - Px        remove a BLOCK filter for Page x\r\n\
-        block + XXXX YYYY add a BLOCK filter for the range XXXX..YYY (hex)\r\n\
-        block - XXXX YYYY remove a BLOCK filter for the range XXXX..YYY (hex)\r\n\
-        block all         remove all BLOCK and PASS filters and BLOCK all trace samples\r\n\
-        save              save tracer settings\r\n"
-*/
         #define trace_status      1
         #define trace_buffer      2
         #define trace_pretrig     3
         #define trace_trace       4
-        #define trace_sysloop     5    
-        #define trace_sysrom      6
-        #define trace_ilrom       7
-        #define trace_hpil        8
-        #define trace_pilbox      9
-        #define trace_ilregs     10
-        #define trace_save       11
-        #define trace_mnem       12
-
-        // #define trace_trig       12
-        // #define trace_pass       13
-        // #define trace_block      14
+        #define trace_hpil        5
+        #define trace_pilbox      6
+        #define trace_ilregs      7
+        #define trace_save        8
+        #define trace_mnem        9
+        #define trace_filter     10
 
 
-        /*  functions for later implemntation:
-        block [no arg] show block entries\r\n\
-        block [a1] [a2] block tracing of range between a1 and a2 (hex 0000-FFFF)\r\n\
-        block [n]     toggle tracing of designated block entry, n=0..15\r\n\
-        block [Pn]    block Page n (n= hex 0..F)\r\n\
-        block del [n] delete block entry [n]\r\n\
-        pass [no arg] show pass entries\r\n\
-        pass [a1] [a2] pass only tracing of range between a1 and a2 (hex addresses 0000-FFFF)\r\n\
-        pass [n]      toggle tracing of designated pass entry, n=0..15\r\n\
-        pass [Pn]     pass only tracing of Page n (n=hex 0..F)\r\n\
-        pass del [n]  delete pass entry [n]\r\n\
-        */
+#define FILTER_HELP_TXT "filter functions for the mcode tracer\r\n\
+        [no argument]       show the current filter status\r\n\
+        status              show the current filter status\r\n\
+        list                show the current filters\r\n\
+        dump                dump the filter settings for debugging\r\n\
+        save [filename.trf] save the current filter settings to a file on the uSD card\r\n\
+        load [filename.trf] load filter settings from a file on the uSD card\r\n\
+                            the filename can contain an existing subdirectory name\r\n\
+                            existing files WILL be overwritten after asking\r\n\
+        filter              toggle filter enable or disable\r\n\
+        block               show all filter BLOCK entries\r\n\
+        pass                show all filter PASS entries\r\n\
+        block all           block ALL trace samples\r\n\
+        block pX            add a BLOCK filter for Page x (hex)\r\n\
+        block XXXX          add a BLOCK filter for address XXXX (hex)\r\n\
+        block XXXX YYYY     add a BLOCK filter for the range XXXX..YYY (hex)\r\n\
+        pass all            remove all filters and pass all samples\r\n\
+        pass pX             add a PASS filter for Page x (hex)\r\n\
+        pass XXXX YYYY      add a PASS filter for the range XXXX..YYY (hex)\r\n\
+        sysloop             toggle tracing of system loops (RSTKB, RST05, BLINK01, debounce, NLT10, NULTST) in the filter\r\n"
+
+#define filter_status        1
+#define filter_list          2
+#define filter_block_all     3
+#define filter_block_page    4
+#define filter_block_adr     5
+#define filter_pass_all      7
+#define filter_pass_page     8
+#define filter_pass_adr      9
+#define filter_trig_page    10
+#define filter_trig_adr     11
+#define filter_trigend_page 12
+#define filter_trigend_adr  13
+#define filter_dump         14
+#define filter_save         15
+#define filter_load         16
+#define filter_sysloop      17
+
+
+#define TRIGGER_HELP_TXT "trigger functions for the mcode tracer\r\n\
+        [no argument]     show the current trigger status\r\n\
+        status            show the current trigger status\r\n\
+        list              show the current triggers\r\n\
+        mode              cycle the trigger mode between AUTO, SINGLE, MULTI\r\n\
+        arm               arm the trigger for the SINGLE mode\r\n\
+        post NNNN         set the post trigger counter to NNNN (dec) samples\r\n\
+                          default is 0 meaning that the tracing will not stop until a POWOFF\r\n\
+                          tracing will stop if a TRIGEND trigger is hit\r\n\
+        count NN          trigger on the NNth occurence of a trigger, NN<100\r\n\
+        pretrig NNN       set the pre-trigger count to NNN (dec) samples, NNN <257\r\n\
+        trig pX           add a TRIGGER START for all addresses in Page x (hex)\r\n\
+        trig XXXX         add a TRIGGER START for address XXXX (hex)\r\n\
+        trig XXXX YYYY    add a TRIGGER START for the range XXXX..YYY (hex)\r\n\
+        trigend pX        add a TRIGGER END for any addresses in Page x (hex)\r\n\
+        trigend XXXX      add a TRIGGER END for address XXXX (hex)\r\n\
+        trigend XXXX YYYY add a TRIGGER END for the range XXXX..YYY (hex)\r\n"
+
 
 #define XMEM_HELP_TXT "Extended Memory functions\r\n\
         status        shows the Extended Memory status\r\n\
@@ -507,6 +533,7 @@ extern "C" {
   extern void uif_serial(const char *str);    // show/program the TULIP serial number
   extern void uif_gpio_status();        // show the GPIO status
   extern void uif_owner(const char *str);        // show/program the owner of the device
+  extern void uif_debug();              // toggle debug level
 
 // all dir functions
   extern void uif_dir(const char *dir);                // dir root
@@ -537,6 +564,7 @@ extern "C" {
   extern void uif_umem(int i);                          // functions for User Memory control
 
   extern void uif_tracer(int i, int bufsize);           // functions for the bus tracer
+  extern void uif_filter(int func, uint16_t adr1, uint16_t adr2, const char *fname); // functions for the bus tracer filter and trigger control
 
   extern void uif_flash(int i, uint32_t addr);          // functions for the FLASH test
   extern void uif_fram(int i, uint32_t addr);           // functions for the FRAM test
@@ -554,6 +582,10 @@ extern "C" {
   extern void uif_w(const char *instruction);           // WAND Paper Keyboard functions
 
 // extern void uif_trace_mode(int m);    // trace [mode]
+
+extern bool cdc_connected_now[5];
+extern bool cdc_connected_prev[5];    // previous connection status of the CDC ports
+extern bool cdc_connected_changed[5]; // for checking if the connection status changed
 
 
 

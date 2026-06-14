@@ -81,6 +81,7 @@ void uif_configlist();
 void uif_serial(const char *str);          // show/program the TULIP serial number
 void uif_gpio_status();   // show the GPIO status
 void uif_owner(const char *str);          // show/program the owner of the device
+void uif_debug();               // toggle debug level
 
 void measure_freqs(void);
 
@@ -114,6 +115,7 @@ void uif_xmem(int i);                           // functions for Extended Memory
 void uif_umem(int i);                           // functions for User Memory control
 
 void uif_tracer(int i, int bufsize);            // functions for the bus tracer
+void uif_filter(int func, uint16_t adr1, uint16_t adr2, const char *fname); // functions for the bus tracer filter and trigger control
 
 void uif_rtc(int i, const char *args);          // RTC test functions
 
@@ -149,6 +151,11 @@ extern int keycount_print;
 extern int keycount_adv;
 extern bool default_map;
 extern bool default_map_off;
+
+//extern const char* HP82143_CharMap_ASCII;
+//extern const char* HP82143_CharMap_UTF8;
+extern const HP82143AChar HP82143A_CHAR_MAP_ASCII[128];
+extern const HP82143AChar HP82143A_CHAR_MAP_UTF8[128];
 
 extern void wakemeup_41();
 extern void PrintIRchar(uint8_t c);

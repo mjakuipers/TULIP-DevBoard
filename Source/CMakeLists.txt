@@ -85,8 +85,10 @@ set(INCLUDE_DIRECTORIES
                 lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/ff15/source
                 lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/sd_driver
                 lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include
-                $ENV{PICO_SDK_PATH}/lib/tinyusb/hw
+                $ENV{PICO_SDK_PATH}/lib/tinyusb/hw                
                 $ENV{PICO_SDK_PATH}/lib/tinyusb/src
+                # $ENV{PICO_SDK_PATH}/lib/tinyusb_0.20/hw
+                # $ENV{PICO_SDK_PATH}/lib/tinyusb_0.20/src
 )
 
 
@@ -103,7 +105,7 @@ add_executable( tulip4041_module        # main application
 )
 target_compile_definitions(tulip4041_module PUBLIC 
                            TULIP_HARDWARE=1                           # define the TULIP_HARDWARE macro
-                           VERSION_STRING="0.98b"
+                           VERSION_STRING="0.990"
 )
 
 pico_set_program_name(tulip4041_module "tulip4041")
@@ -152,7 +154,7 @@ add_executable( tulip4041_devboard      # main application
 )
 target_compile_definitions(tulip4041_devboard PUBLIC 
                            TULIP_HARDWARE=0     # define the TULIP_HARDWARE macro
-                           VERSION_STRING="0.98b"
+                           VERSION_STRING="0.990"
                           ) 
 
 pico_set_program_name(tulip4041_devboard "tulip4041")

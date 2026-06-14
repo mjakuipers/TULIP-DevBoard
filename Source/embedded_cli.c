@@ -414,7 +414,7 @@ EmbeddedCliConfig *embeddedCliDefaultConfig(void) {
     defaultConfig.historyBufferSize = 512;
     defaultConfig.cliBuffer = NULL;
     defaultConfig.cliBufferSize = 0;
-    defaultConfig.maxBindingCount = 20;
+    defaultConfig.maxBindingCount = 30;
     defaultConfig.enableAutoComplete = true;
     defaultConfig.invitation = "> ";
     return &defaultConfig;
@@ -425,7 +425,7 @@ uint16_t embeddedCliRequiredSize(EmbeddedCliConfig *config) {
     return (uint16_t) (CLI_UINT_SIZE * (
             BYTES_TO_CLI_UINTS(sizeof(EmbeddedCli)) +
             BYTES_TO_CLI_UINTS(sizeof(EmbeddedCliImpl)) +
-            BYTES_TO_CLI_UINTS(config->rxBufferSize * sizeof(char)) +
+            BYTES_TO_CLI_UINTS(config->rxBufferSize * sizeof(char)) + 
             BYTES_TO_CLI_UINTS(config->cmdBufferSize * sizeof(char)) +
             BYTES_TO_CLI_UINTS(config->historyBufferSize * sizeof(char)) +
             BYTES_TO_CLI_UINTS(bindingCount * sizeof(CliCommandBinding)) +

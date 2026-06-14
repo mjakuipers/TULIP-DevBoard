@@ -115,8 +115,6 @@ int main() {
     tud_init(BOARD_TUD_RHPORT); // initialize the TinyUSB stack
     usbd_serial_init();
 
-
-
     // initialize the debug output
     gpio_put(P_DEBUG, true);
 
@@ -149,7 +147,6 @@ int main() {
 
     sdcard_init();     // initialize the FatFS system and uSD card SPI interface
 
-
     // prepare the HP-IL loop
     HPIL_init();
 
@@ -178,8 +175,7 @@ int main() {
     fram_rommap_init();                             // initialize the FRAM ROM map, only if not already done
 
     multicore_reset_core1();                        // reset core1 to initial state
-
-    
+ 
     multicore_launch_core1(core1_pio);       // launching core1 code, must be done before starting the PIO state machines
 
     // initialize and start the PIO state machines, report the status in the old CLI
@@ -195,10 +191,17 @@ int main() {
     while (true) {
 
         // send_ir_pulse();         // send a single pulse on the IR output for debugging, remove this later 
-        
-        PowerMode_task();           // Verify the HP41 power mode
 
         tud_task();                 // process the USB interfaces required by TinyUSB
+
+        // add a task to check all serial connections and removed from the other tasks
+        // better to centralize this for better debugging and better control
+        // then add a parameter to the tasks using a connection to display the first connect message
+        // use global variables to monitor the CDC status
+
+        cdc_checker();              // check the status of the CDC ports
+        
+        PowerMode_task();           // Verify the HP41 power mode
 
         runCLI();                   // process the 'new' embedded CLI
 

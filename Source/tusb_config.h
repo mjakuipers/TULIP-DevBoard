@@ -69,6 +69,9 @@
 #define CFG_TUD_CDC_RX_BUFSIZE 1024
 #define CFG_TUD_CDC_TX_BUFSIZE 1024
 
+#define CFG_TUD_CDC_EP_BUFSIZE 1024
+
+
 // MSC Buffer size of Device Mass storage
 #define CFG_TUD_MSC_EP_BUFSIZE   512
 

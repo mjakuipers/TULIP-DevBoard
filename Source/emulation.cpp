@@ -129,6 +129,7 @@ uint32_t fram_adr;
 
 uint32_t cycle_counter = 0;         // counts cycles since last PWO
 struct TLine TraceLine;             // the variable with the TraceLine used in capturing cycles in core1
+struct TLine TraceLine_next;        // the variable with the TraceLine used in capturing cycles in core1, for the next cycle
 extern queue_t TraceBuffer;
 
 
@@ -154,11 +155,33 @@ uint8_t HPIL_REG[9];            // HP-IL register stack
                                 // HPIL_REG[8] is the R1W register (write only)
                                 // HPIL_REG[2] is different for read and write!
 
+/*     
+                            bit        7       6       5       4       3       2       1       0  
+
+       0 Status Register    R0         SC      CA      TA      LA      SSQR    RFCR    CLIFCR  MCL         read
+                                                                               SLRDY   CLIFCR              write
+       1 Control/Interrupt  R1R        C13     C12     C11     IFCR    SRQR    FRAV    FRNS    ORAV        read
+       8                    R1W        C03     C02     C01     xxx     xxx     xxx     xxx     FLGENB      write
+
+       2 Data Input/Output  R2         D08     D07     D06     D05     D04     D03     D02     D01         read/write
+       3 Parallel Poll      R3         OSCDIS  AUTOIDY PPIST   PPEN    PPSENSE P3      P2      P1          read/write
+       4 Loop Address       R4                                 ADR4    ADR3    ADR2    ADR1    ADR0        read/write      
+       5 Scratch Register   R5        
+       6 Scratch Register   R6  
+       7 Scratch Register   R7   
+
+
+*/
+
+
+
+
 uint16_t IL_lastframe;          // last frame sent
 uint16_t IL_inframe;            // incoming frame
 uint16_t IL_reg = 0;            // used for selected HP-IL register
 uint16_t nextIL_inst = 0;       // used for detection of IL instructions
 
+uint8_t ctrlReg;  // used for HP-IL FI flags
 
 
 // extern void __not_in_flash_func(fram_read)();
@@ -296,7 +319,6 @@ void pio_init()
     // SELP9_status = SELP9_status | (gsettings(PRT_mode) << 14);         // apply mode bits
     // uint16_t temp = globsetting(PRT_mode);
     SELP9_status = SELP9_status | (globsetting.get(PRT_mode) << 14);         // apply mode bits
-
     SELP9_status = SELP9_status | (globsetting.get(PRT_paper) << 10);        // apply OOP bit
 }
 
@@ -379,6 +401,14 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
         }  
         cycle_counter = 0;
         ramselected = 0;
+
+        // clear FI flags, sometimes a flags gets stuck
+        fi_out1 = 0;
+        fi_out2 = 0;
+
+        // clear the HP-IL output state registers R1R
+        // HPIL_REG[1] = 0;    // R1R to clear the flags and prevent driving FI
+        
     }
 }
 
@@ -549,7 +579,7 @@ uint32_t __not_in_flash_func()exist_usermem(uint32_t address)
 void __not_in_flash_func()HPIL_writereg(uint8_t reg, uint16_t n)
 {
     n &= 0xFF; 
-    TraceLine.frame_out = 0xFFFF;               // default if no frame is sent
+    TraceLine_next.frame_out = 0xFFFF;               // default if no frame is sent
     switch (reg)
     {
         case 0: // status reg.
@@ -581,7 +611,7 @@ void __not_in_flash_func()HPIL_writereg(uint8_t reg, uint16_t n)
             n |= (HPIL_REG[8] & 0xE0) << 3;         // get bits 8-10 from R1W
             HPIL_REG[1] &= 0xF8;                    // FRAV=FRNS=ORAV=0
             IL_lastframe = n;                       // remember the last sent frame
-            TraceLine.frame_out = n;                // HP-IL frame output
+            TraceLine.frame_out = n;                // HP-IL frame output to tracer
             queue_try_add(&HPIL_SendBuffer, &n);    // send frame (to HPIL_task in core0 for handling)
                                                     // non-blocking but is OK here
             break;
@@ -589,10 +619,67 @@ void __not_in_flash_func()HPIL_writereg(uint8_t reg, uint16_t n)
         default:
             // also valid for REG[3], parallel poll register. 
             // case 3 in V41 handles AUTOIDY and creates a thread
-            // in TUP4041 the AUTOIDY bit is checked by the core0 HPIL_task, no further action here
+            // TODO: in TUP4041 the AUTOIDY bit is checked by the core0 HPIL_task, no further action here
             HPIL_REG[reg] = n;
     }
 }          
+
+
+// prepare the fi_out variables from the HP-IL flags
+void __not_in_flash_func()HPIL_sendflags()
+{
+    // at this time we can update the HP-IL flags
+    // simply set the FI flags according to the HP-IL register
+    // HP-IL uses the following flags:
+    //  FI_06   0x07000000      // FI_IFCR, checked with ?IFCR, Interface Clear Received (on fi_out1)
+    //  FI_07   0x70000000      // FI_SRQR, checked with ?SRQR, Service Request Received (on fi_out1)
+    //  FI_08   0x00000007      // FI_FRAV, checked with ?FRAV, Frame Available  (on fi_out2)
+    //  FI_09   0x00000070      // FI_FRNS, checked with ?FRNS, Frame Received Not as Sent (on fi_out2)
+    //  FI_10   0x00000700      // FI_ORAV, checked with ?ORAV, Output Register Available (on fi_out2)
+
+    if (HPIL_REG[8] & 0x01) {  // if FLGENB set in R1W
+        ctrlReg = HPIL_REG[1];           // flags are in R1R
+
+        // HPIL Register 1 (write) bit 0 is the flag output enable
+        // when it is 1 the flags are enabled
+        if (ctrlReg & 0x01) {
+            fi_out2 |= FI_10;        // ORAV
+        } else {
+            fi_out2 &= FI_10_off;
+        }
+
+        if (ctrlReg & 0x02) {
+            fi_out2 |= FI_09;        // FRNS
+        } else {              
+            fi_out2 &= FI_09_off;
+        }
+                
+        if (ctrlReg & 0x04) {
+            fi_out2 |= FI_08;        // FRAV
+        } else {             
+            fi_out2 &= FI_08_off;
+        }
+                
+        if (ctrlReg & 0x08) {
+            fi_out1 |= FI_07;        // SRQR
+        } else {
+            fi_out1 &= FI_07_off;
+        }
+                
+        if (ctrlReg & 0x10) {
+            fi_out1 |= FI_06;        // IFCR
+        } else {
+            fi_out1 &= FI_06_off;
+        }
+    } else {
+        // HP-IL flags are disabled, so clear the relevant flags
+        fi_out1 &= FI_06_off;
+        fi_out1 &= FI_07_off;
+        fi_out2 &= FI_08_off;
+        fi_out2 &= FI_09_off;
+        fi_out2 &= FI_10_off;
+    }
+}
 
 
 // check the HP41 Power Mode
@@ -601,6 +688,8 @@ void PowerMode_task()
     // monitor PWO and SYNC to keep the HP41 power mode up to date
     uint8_t prev_mode = 0;
     float clk_div;
+    struct TLine TraceLineTimeTag;      
+    uint8_t PMode = 0;
 
     // check if there was a VBUS state change and modify the speed accordingly
     if (gpio_get(PICO_VBUS_PIN)) {
@@ -646,33 +735,65 @@ void PowerMode_task()
             pio_sm_set_enabled(pio1_pio, irout_sm, false);   // disable the state machine before changing the program
             clk_div = (float)clock_get_hz(clk_sys) / (float)IROUT_CLOCK;
             hp41_pio_irout_program_init(pio1_pio, irout_sm, irout_offset, 0, P_IR_LED, 0, clk_div);    // uses only sideset, clock divider added for correct frequency
-
         }
     }
+
+    //     0x00 - unknown event
+    //     0x01 - deep sleep  -> light sleep transition
+    //     0x02 - light sleep -> deep sleep transition
+    //     0x03 - deep sleep  -> running transition
+    //     0x04 - light sleep -> running transition
+    //     0x05 - running     -> light sleep transition
+    //     0x06 - running     -> deep sleep transition
+    //     0x10 - external trigger
+    //     0x11 - wake-up by ISA trigger
+    //                                total size is 35 bytes
+
 
     prev_mode = HP41_powermode;
-    if (gpio_get(P_PWO))
-    {
+    if (gpio_get(P_PWO)) {
         // PWO is high, HP41 is running
         HP41_powermode = PowerMode_Running;    // HP41 is running
-    }
-    else
-    {
+        if (prev_mode == PowerMode_LightSleep) {
+            PMode = 0x04; // light sleep -> running transition
+        } else if (prev_mode == PowerMode_DeepSleep) {
+            PMode = 0x03; // deep sleep -> running transition
+        } else if (prev_mode == PowerMode_Running) {
+            PMode = 0x00; // no change
+        } else {
+            PMode = 0x00; // unknown event
+        }
+    } else {
         // PWO is low, HP41 is sleeping (DEEP or LIGHT sleep)
-        if (gpio_get(P_SYNC))
-        {
+        if (gpio_get(P_SYNC)) {
             // SYNC is high, PWO is low
             HP41_powermode = PowerMode_LightSleep;
-        }
-        else
-        {
+            if (prev_mode == PowerMode_Running) {
+                PMode = 0x05; // running -> light sleep transition
+            } else if (prev_mode == PowerMode_LightSleep) {
+                PMode = 0x00; // no change
+            } else if (prev_mode == PowerMode_DeepSleep) {
+                PMode = 0x01; // deep sleep -> light sleep transition, which should not be possible
+            } else {
+                PMode = 0x00; // unknown event
+            }
+
+        } else{
             // SYNC is low, PWO is low
             HP41_powermode = PowerMode_DeepSleep;
+            if (prev_mode == PowerMode_Running) {
+                PMode = 0x06; // running -> deep sleep transition
+            } else if (prev_mode == PowerMode_LightSleep) {
+                PMode = 0x02; // light sleep -> deep sleep transition
+            } else if (prev_mode == PowerMode_DeepSleep) {
+                PMode = 0x00; // no change
+            } else {
+                PMode = 0x00; // unknown event
+            }
         }
     }
 
-    if (HP41_powermode != prev_mode)
-    {
+    if (HP41_powermode != prev_mode) {
         // there has been a change
         int64_t us_elapsed;
         int32_t secs_elapsed;
@@ -687,18 +808,40 @@ void PowerMode_task()
         PowerLine.t_end = t_end;
         PowerLine.t_start = t_start;
 
-        // for handling in the tracer task 
-        // ignore if the buffer is full
-        // queue_try_add(&PowerBuffer, &PowerLine);   
 
-        t_start = t_end;                                     // reset start time for next measurement    
+        us_elapsed = absolute_time_diff_us(t_start, t_end);         // get elapsed time in microseconds
+
+        t_start = t_end;                                     // reset start time for next measurement             
+
+        // put the elapsed time in the HP-IL register set
+        // The time is a 64-bit value, store this in HP-IL registers 0..7, these are each 8 bits
+        // simply put the value in that storage area, and the tracer task will read it and put it in the correct format for the time tag
+
+        memcpy(&TraceLineTimeTag.HPILregs[0], &us_elapsed, sizeof(int64_t));  
+        // TraceLineTimeTag.HPILregs[8] = 0;
+
+        // set bit 29 of data2 to indicate that this is a time tag, and put the power mode in the lower 4 bits of data2
+        TraceLineTimeTag.data2 = (1 << 29);
+
+        TraceLineTimeTag.ramslct = PMode;
+        TraceLineTimeTag.cycle_number = cycle_counter;
+
+        // now add to the TraceBuffer, non blocking of course
+        queue_try_add(&TraceBuffer, &TraceLineTimeTag);
+
 
         // if PWO is now low the calculator has stopped running
         // this means that we need to cleanup some dirty stuff
-        if ((HP41_powermode != PowerMode_Running) && Banks_dirty) {
+        if ((HP41_powermode != PowerMode_Running)) {
+            // save the global settings to FRAM
+            // globsetting.save();              // save global settings to FRAM
+
             // if the banks are dirty we need to save the ROM map to FRAM
-            Banks_dirty = false;            // reset dirty flag
-            TULIP_Pages.save();             // save the ROM map to FRAM            
+            if (Banks_dirty) {
+                // save the ROM map to FRAM
+                TULIP_Pages.save();
+                Banks_dirty = false;            // reset dirty flag
+            }          
         }
     }
 }
@@ -771,10 +914,8 @@ void __not_in_flash_func(core1_pio)()
     int var = 0;
     int n = 0;
 
-    uint8_t ctrlReg;  // used for HP-IL FI flags
-
     bool sendcarry = false;         // set to true if carry at D0_TIME must be sent
-    TraceLine.frame_out = 0;
+    TraceLine.frame_out = 0xFFFF;   // default if no frame is sent
 
 
     // core1 code must be running before starting the SYNC/ISA State Machine
@@ -807,12 +948,7 @@ void __not_in_flash_func(core1_pio)()
         pio_sm_put(pio0_pio, debugout_sm, DBG_OUT0);
 
         TraceLine.cycle_number = cycle_counter;
-        cycle_counter++;
-
-        // TraceLine.xq_instr = 0;
-        // TraceLine.xq_data = 0;
-
-        // gpio_pulse(P_DEBUG, 2);                                  // for debugging                                      
+        cycle_counter++;                             
 
         // for peripheral emulation this is the place where the instruction must be decoded and handled
         // fast enough to be ready to send a carry at T0_TIME or data starting at T0_TIME
@@ -824,27 +960,7 @@ void __not_in_flash_func(core1_pio)()
         //      - READ 1..15
         //  - peripheral data to be presented on DATA
 
-        // TraceLine.xq_instr = rx_inst_t;    
-        rx_inst_t = 0;
-
-        // TraceLine.xq_data1 = fi_out1;
-        // TraceLine.xq_data2 = fi_out2;
-
-        if ((fi_out1 != 0 ) || (fi_out2 != 0))
-        {
-            // if one of fi_out is not zero we have a flag to be output
-            // in case we have to drive FI for any flags present
-            // we only drive the FI_OE signal, this is an active high signal
-            // The FI_out is tied to GND, and FI itself is normally pulled high by the system
-            // of fi_outx is all zero's, nothing needs to be sent
-            // we could alssend fi_outx always ...
-            pio_sm_put(pio1_pio, fiout_sm, fi_out1);  // send the data            
-            pio_sm_put(pio1_pio, fiout_sm, fi_out2);  // send the data  
-            fi_out_active = true;
-        }
-
-        if (rx_inst == inst_READDATA)
-        {
+        if (rx_inst == inst_READDATA) {
             // respond to READDATA instruction, return the register pointed to by ramselected
             // or the peripheral register in case of a valid PRPH selected register
             // must handle here
@@ -857,7 +973,6 @@ void __not_in_flash_func(core1_pio)()
             // TODO: READDATA and WRITDATA change the RAMSLCT pointer!
             // TODO: implement READ and WRIT properly
                 
-            // TraceLine.xq_instr = rx_inst;    
             rx_inst_t = rx_inst;            
             if (ourselected > 0) {
                 // regdata = usermemLo[ourselected - 0x200];
@@ -877,7 +992,6 @@ void __not_in_flash_func(core1_pio)()
                 // queue_try_remove(&WandBuffer, &WandCached);
                 regdata = WandCached;
                 WandCached = 0xFFFF;       // mark cache as consumed
-                // TraceLine.xq_data1 = regdata;
                 pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);  // send the data
                 pio_sm_put_blocking(pio1_pio, dataout_sm, 0);  // send the data
                 data_out_active = true;
@@ -896,7 +1010,8 @@ void __not_in_flash_func(core1_pio)()
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst; 
                         // we report the printer as busy when the printbuffer is full and the printer is ON
-                        if (globsetting.get(PRT_power)) {
+                        // when only on calculator power we also report printerON to support IR output
+                        if (globsetting.get(PRT_power) || (gpio_get(PICO_VBUS_PIN) == 0)) {
                             SELP9_status_BUSY = queue_is_full(&PrintBuffer);
                             // SELP9_status_BUSY = false;      // never BUSY
                             sendcarry = SELP9_status_BUSY;
@@ -907,7 +1022,8 @@ void __not_in_flash_func(core1_pio)()
                 case SELP9_VALID:               // 0x043,  set carry if status valid, no SYNC bit! 
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst;
-                        if (globsetting.get(PRT_power)) {
+                        // when only on calculator power we also report printerON to support IR output
+                        if (globsetting.get(PRT_power) || (gpio_get(PICO_VBUS_PIN) == 0)) {
                             // valid status only when the printer is ON
                             sendcarry = SELP9_status_VALID;         // bool SELP9_status_VALID = true; 
                         }
@@ -917,14 +1033,24 @@ void __not_in_flash_func(core1_pio)()
                 case SELP9_POWON:               // 0x083, set carry if printer is ON, no SYNC bit!!
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst; 
-                        sendcarry = (globsetting.get(PRT_power) !=0);   // printer is ON if power setting is not 0
-                        SLCT_PRPH = -1;          // return control back to the NUT                      
+                        if (globsetting.get(PRT_power) || (gpio_get(PICO_VBUS_PIN) == 0)) {
+                            // printer is ON when power setting is not 0
+                            sendcarry = true;   // printer is ON if power setting is not 0
+                        }
+                        SLCT_PRPH = -1;         // return control back to the NUT                      
                     }
                     break;                                                                        
                 case SELP9_RDPTRN:              // 0x03A, transfer printer status word to C[10..13], no SYNC bit!
                     if (SLCT_PRPH == 9) { 
                         rx_inst_t = rx_inst; 
                         rx_data1 = SELP9_status;
+
+                        // when only on calculator power we report Printer ON and Paper available as status to support IR output
+                        if (!gpio_get(PICO_VBUS_PIN)) {
+                            // bit 11 is PRT_OOP, clear this bit
+                            SELP9_status = SELP9_status & (~prt_OOP_mask);
+                        }
+
                         // transfer printer status word to C[10..13], peripheral remains selected
                         // start preparing to send out to DATA
                         pio_sm_put_blocking(pio1_pio, dataout_sm, 0);                   // bits D00..D32 are always 0
@@ -941,7 +1067,7 @@ void __not_in_flash_func(core1_pio)()
                         }                                                       
                     }
                     break;
-                // other printer instrcution are handled later, but these are the ones that require immediate response at T0 time, so they are handled here
+                // other printer instructions are handled later, but these are the ones that require immediate response at T0 time, so they are handled here
             }   // switch
         }
 
@@ -985,40 +1111,31 @@ void __not_in_flash_func(core1_pio)()
                 //  - update R1W with C01..C03 from R1R
                 rx_inst_t = rx_inst; 
                 // IL_reg = (rx_inst & 0x1C0) >> 6;            // this can be commented out ??
-                if (IL_reg == 2)
-                {
+                if (IL_reg == 2) {
                     // Register 2, data input/output
                     n = HPIL_REG[1] & 0x06;               // FRAV & FRNS
                     HPIL_REG[1] &= 0xF9;                  // FRAV=FRNS=0
-                    if (n)      // FRAV or FRNS is set
-                    {
+                    if (n) {     // FRAV or FRNS is set            
                         // FRAV or FRNS is set, so we have a valid frame received
                         HPIL_REG[8] &= ~0xE0;               // clear CO3-CO1
                         HPIL_REG[8] |= HPIL_REG[1] & 0xE0;  // copy CO3-CO1 from R1R to R1W
                     }
-                    // update_flags();                      // flags are updated elsewhere
                 }
 
                 // now return register value to C[0..1]
                 regdata = HPIL_REG[IL_reg];
 
-                // TraceLine.xq_data1 = regdata;
                 pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);     // send the data
                 pio_sm_put_blocking(pio1_pio, dataout_sm, 0);           // send the data
                 data_out_active = true;
-
-            }
-            else if ((SLCT_PRPH >= 0) && (SLCT_PRPH <= 7) && ((rx_inst & 0x003) == 0x001))
-            {
+            } else if ((SLCT_PRPH >= 0) && (SLCT_PRPH <= 7) && ((rx_inst & 0x003) == 0x001)) {
                 // check for HPIL_Cx = (literal), 0bcccccccc01, c = value to be placed in register
                 // only after SELP0..7, SYNC not set
                 // deselects peripheral
                 rx_inst_t = rx_inst; 
                 HPIL_writereg(SLCT_PRPH, (rx_inst & 0x3FC) >> 2);
                 SLCT_PRPH = -1;
-            }
-            else if ((SLCT_PRPH >= 0) && (SLCT_PRPH <= 7) && ((rx_inst & 0x003) == 0x003))
-            {
+            } else if ((SLCT_PRPH >= 0) && (SLCT_PRPH <= 7) && ((rx_inst & 0x003) == 0x003)) {
                 // 
                 rx_inst_t = rx_inst; 
                 // this is the 3rd instruction of a 3-instruction sequence
@@ -1026,16 +1143,34 @@ void __not_in_flash_func(core1_pio)()
                 // no further checks, accept all instructions ending with 2 1's
                 SLCT_PRPH = -1;
             }
+
+            HPIL_sendflags();       // update the FI flags according to the HP-IL register values            
         }
-    
-        // check for CLASS0 READ instruction
+
+        // now check if any of the flags need to be driven
+        fi_out_active = false;    // reset FI output active flag, will be set again below if needed
+
+        if ((fi_out1 != 0) || (fi_out2 != 0)){
+            // if one of fi_out is not zero we have a flag to be output
+            // in case we have to drive FI for any flags present
+            // we only drive the FI_OE signal, this is an active high signal
+            // The FI_out is tied to GND, and FI itself is normally pulled high by the system
+            pio_sm_put(pio1_pio, fiout_sm, fi_out1);  // send the data            
+            pio_sm_put(pio1_pio, fiout_sm, fi_out2);  // send the data  
+            fi_out_active = true;
+        }
+
+        // check for CLASS0 READ instruction, but this is not supported yet
         // read data from selected register and present on the DATA line
         // register must be sent out to DATA now!
-        if ((rx_inst & mask_CLASS0) == mask_READ) 
-        {
-            
+        // if ((rx_inst & mask_CLASS0) == mask_READ) {
              // TraceLine.xq_instr = rx_inst;
-        }
+        // }
+
+        // uint16_t    isa_instruction;    // ISA instruction with SYNC status             2 bytes     16    12        4   
+                                           // bit 12-13: active bank
+                                           // bit 14: TULIP driving ISA
+                                           // bit 15: TULIP driving carry
 
         // Add the instruction to the TraceLine
         TraceLine.isa_instruction = rx_inst & 0xFFF;    // only bits 0..9 are the instruction, bit 10 is a copy of bit 9, bit 11 is SYNC status        
@@ -1043,7 +1178,7 @@ void __not_in_flash_func(core1_pio)()
         // add the active bank in bits 12 + 13
         TraceLine.isa_instruction |= (enabled_bank & 0x03) << 12;
 
-        // if the instruction was driven by the TULIP this is indicated in bit 14
+        // if the instruction was driven by the TULIP this is indicated in bit 14 (and shown in the address in the tracer window)
         if (isa_out_data != 0xFFFF) {
             TraceLine.isa_instruction |= 0x4000;   // bit 14 indicates this is an instruction driven by the TULIP
         }
@@ -1053,9 +1188,9 @@ void __not_in_flash_func(core1_pio)()
             // all the rest is handled by the isaout state machine
             isa_out_d = 0x001;
             pio_sm_put_blocking(pio1_pio, isaout_sm, isa_out_d);
-            TraceLine.isa_instruction |= 0x8000;        // bit 15 indicates the carry was driven by the TULIP
+            TraceLine_next.isa_instruction = 0x8000;        // bit 15 indicates the carry was driven by the TULIP, but for the NEXT trace cycle
             sendcarry = false;
-            // TraceLine.xq_carry = true;
+
         } 
   
         pio_sm_put(pio0_pio, debugout_sm, DBG_OUT1);
@@ -1087,23 +1222,7 @@ void __not_in_flash_func(core1_pio)()
 
         // at this point we have two options: PWO goes low (power down) or we receive new data
 
-        if ((HPIL_REG[8] & 0x01) == 0x01)   // if FLGENB set in R1W
-        {
-            ctrlReg = HPIL_REG[1];          // flags are in R1R
-            // HPIL Register 1 (write) bit 0 is the flag output enable
-            // when it is 1 the flags are enabled
-            if ((ctrlReg & 0x01) == 0x01) 
-            {
-                fi_out2 = fi_out2 | FI_10;        // ORAV
-            }
-            else
-            {
-                fi_out2 = fi_out2 & FI_10_off;
-            }
-        }
-
-        while (gpio_get(P_PWO) && (pio_sm_get_rx_fifo_level(pio0_pio, datain_sm) == 0))
-        {
+        while (gpio_get(P_PWO) && (pio_sm_get_rx_fifo_level(pio0_pio, datain_sm) == 0)) {
                 // do nothing, just wait until PWO goes low or data arrives in the FIFO!
         }
 
@@ -1112,19 +1231,23 @@ void __not_in_flash_func(core1_pio)()
         // for debugging       
         pio_sm_put(pio0_pio, debugout_sm, DBG_OUT2);
 
-        if (gpio_get(P_PWO))
-        { 
+        if (gpio_get(P_PWO)){ 
             // PWO is high, so we can read DATA at T0
             rx_data2 = pio_sm_get_blocking(pio0_pio, datain_sm);        //  blocking read from datain state machine
 
             // when we get here there is also data in the FI input state machine
             // read both words, but at the first start there may be only one word in the RX FIFO
 
-            fi_data_compressed = 0;
+            // when tracing the FI line there are two options:
+            // 1) Hardware is the DevBoard, data comes from the FI input SM. If one of the FI bits is driven by TULIp
+            //    this is indicated by the fi_out_active flag from this cycle that is about to be stored in teh TreceLine queue
+            // 2) Hardware is the Module, data comes from the fi_out1 and fi_out2 variables,
+            //    these are driven by the TULIP if non zero in the current cycle but after T0
+
+            fi_data_compressed = 0;  // for the traceline
 
             #if (TULIP_HARDWARE == T_DEVBOARD) 
                 if (pio_sm_get_rx_fifo_level(pio0, fiin_sm) > 0) {
-
                     fi_word = ~pio_sm_get_blocking(pio0_pio, fiin_sm);
                     fi_data_compressed = 0;
                     fi_data_compressed |= ((fi_word >>  2) & 0x1) << 0;   // FI0 in bit 2
@@ -1137,8 +1260,7 @@ void __not_in_flash_func(core1_pio)()
                     fi_data_compressed |= ((fi_word >> 30) & 0x1) << 7;   // FI7 in bit 30
                 }
 
-                if (pio_sm_get_rx_fifo_level(pio0, fiin_sm) > 0){
-
+                if (pio_sm_get_rx_fifo_level(pio0, fiin_sm) > 0) {
                     fi_word = ~pio_sm_get_blocking(pio0_pio, fiin_sm);   
                     fi_data_compressed |= ((fi_word >> 10) & 0x1) <<  8;   // FI8 in bit 2
                     fi_data_compressed |= ((fi_word >> 14) & 0x1) <<  9;   // FI9 in bit 6
@@ -1147,7 +1269,22 @@ void __not_in_flash_func(core1_pio)()
                     fi_data_compressed |= ((fi_word >> 26) & 0x1) << 12;   // FI12 in bit 18
                     fi_data_compressed |= ((fi_word >> 30) & 0x1) << 13;   // FI13 in bit 22
                 }
+
+                // the data was just read from the fiin SM
                 TraceLine.fi = fi_data_compressed;
+
+                // now check if there was anything driven by the TULIP to flag this for the tracer
+                // this would apply to the previous cycle!
+
+                if (fi_out_active_next) {
+                    TraceLine.fi |= 0x8000;
+                    fi_out_active_next = false;
+                }
+
+                if (fi_out_active) {
+                    fi_out_active_next = true;   // to indicate that FI output needs to be active for the next instruction
+                    fi_out_active = false;
+                }
 
             #elif (TULIP_HARDWARE == T_MODULE)
                 // TraceLine.fi1 = fi_out1;
@@ -1167,65 +1304,42 @@ void __not_in_flash_func(core1_pio)()
                 fi_data_compressed |= (fi_word >> 30 & 0x01) <<  7;       // FI7 in bit 30
 
                 fi_word = fi_out2;
-                fi_data_compressed |= (fi_word >> 2 & 0x01) <<  8;       // FI8 in bit 10
+                fi_data_compressed |= (fi_word >>  2 & 0x01) <<  8;       // FI8 in bit 10
                 fi_data_compressed |= (fi_word >>  6 & 0x01) <<  9;       // FI9 in bit 14
                 fi_data_compressed |= (fi_word >> 10 & 0x01) << 10;       // FI10 in bit 18      
                 fi_data_compressed |= (fi_word >> 14 & 0x01) << 11;       // FI11 in bit 22
                 fi_data_compressed |= (fi_word >> 18 & 0x01) << 12;       // FI12 in bit 26
                 fi_data_compressed |= (fi_word >> 22 & 0x01) << 13;       // FI13 in bit 30
 
-                TraceLine.fi = fi_data_compressed;
+                TraceLine_next.fi = fi_data_compressed;
+
+                if (fi_out_active) {
+                    // fi_out was driven in the current cycle
+                    // flag the next trace as having FI driven by TULIP
+                    TraceLine_next.fi |= 0x8000;    
+                }
 
             #endif
 
-            if (fi_out_active_next) {
-                TraceLine.fi |= 0x8000;
-                fi_out_active_next = false;
-            }
-
-            if (fi_out_active) {
-                fi_out_active_next = true;   // to indicate that FI output needs to be active for the next instruction
-                fi_out_active = false;
-            }
-
             TraceLine.data2 |= rx_data2 >> 8;                            // get received data in TraceLine and align
             
-            // Mask the traceline for the support bits
-            TraceLine.data2 &= 0x80FFFFFF;
-
-            // and get the extra status bits
-            // bit 30: instruction decoded by TULIP
-            // bit 31: driven by TULIP 
-            if (rx_inst_t !=0) {
-                TraceLine.data2 |= 0x40000000;
-            }
-
-            // package for the TraceLine is now complete, send it to the TraceBuffer
-            // this is non-blocking to prevent going out of SYNC on a full trace bufer
-            if ((trace_enabled) || (trace_outside == (rom_addr > 0x6000)))
-            {
-                traceoverflow = queue_try_add(&TraceBuffer, &TraceLine);                    // add to internal trace buffer for handling by core0
-                // traceoverflow = 0 (false) if the element was not added, this is an overflow
-                // to be added to the next succesfull trace
-            }
-
             if (data_out_active) {
-                TraceLine.data2 = 0x80000000;
+                TraceLine_next.data2 = 0x80000000;
                 data_out_active = false;
             } else {
-                TraceLine.data2 = 0;
+                TraceLine_next.data2 = 0;
             }
 
-            // Traceline is sent, so clear HP-IL frameout for default value
-            TraceLine.frame_out = 0xFFFF;               // default if no frame is sent
+            // clear HP-IL frameout for default value
+            TraceLine_next.frame_out = 0xFFFF;               // default if no frame is sent
+            // TraceLine.frame_out = 0xFFFF;                   // default if no frame is sent
 
             // DATA is now fully complete after T0
             // ready to check on instructions needing the data from the PREVIOUS cycle
             // this would be a WRITDATA (or any of the other WRIT variations)
             // this would be triggered by a delayed WRITE here
 
-            if (write_pending == true) 
-            {
+            if (write_pending == true) {
                 // there was a pending write, captured data is now bits D32..55
                 // to be stored in selected register
                 // the lower bits have already been saved
@@ -1241,8 +1355,7 @@ void __not_in_flash_func(core1_pio)()
             // now that any pending writes have been done, a possible pending read can be handled
             // this is needed in case a READ immediately follows a WRITE
 
-            if (read_pending == true) 
-            {
+            if (read_pending == true) {
                 // handle a pending READ of the higher data register bits D32..D55
                 // TODO: check alignment
                 if (ourselected > 0) {
@@ -1272,26 +1385,20 @@ void __not_in_flash_func(core1_pio)()
                 // fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset, (uint8_t*)&usermemCacheLo, 4);
                 // fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset + 4, (uint8_t*)&usermemCacheHi, 4);
                 fram_write(SPI_PORT_FRAM, PIN_SPI0_CS, fram_offset, (uint8_t*)&usermemCache, 8);
-
             }
 
-            if (globsetting.get(HP82153A_enabled))
-            {
-                if (queue_is_empty(&WandBuffer) && (WandCached == 0xFFFF))
-                {
+            if (globsetting.get(HP82153A_enabled)) {
+                if (queue_is_empty(&WandBuffer) && (WandCached == 0xFFFF)) {
                     fi_out1 = fi_out1 & FI_00_off;
                     fi_out1 = fi_out1 & FI_02_off;
-                }
-                else
-                {
+                } else {
                     // cached Wand data is valid or data in the queue
                     // now that data is available, set the flags
                     // Wand sets flags 0 and 2 when it has data
                     // Flag 0 is set when it wants attention
                     fi_out1 = fi_out1 | FI_00 | FI_02;
 
-                    if (WandCached == 0xFFFF)
-                    {
+                    if (WandCached == 0xFFFF) {
                         // our cache is available, so read from the buffer
                         // otherwise cache may be filled but not read yet
                         queue_try_remove(&WandBuffer, &WandCached);
@@ -1301,38 +1408,40 @@ void __not_in_flash_func(core1_pio)()
 
             // check for incoming data from HP-IL
             // if (HP82160A_active && !queue_is_empty(&HPIL_RecvBuffer))
-            if (globsetting.get(HP82160A_enabled) && !queue_is_empty(&HPIL_RecvBuffer))
-            {
+            TraceLine_next.frame_in = 0xFFFF;          // default if no frame is received
+            TraceLine.frame_in = 0xFFFF;               // default if no frame is received
+            if (globsetting.get(HP82160A_enabled) && !queue_is_empty(&HPIL_RecvBuffer)) {
                 // HP-IL is active and there is data in the HP-IL receive queue
                 // this means that a valid frame has arrived
                 // process the frames according to V41 (Christoph Giesselink)
-                // RFC frames are handled by core0
+                // TODO: RFC frames are handled by core0
 
                 // read the frame from the queue
                 queue_remove_blocking(&HPIL_RecvBuffer, &IL_inframe);
                 TraceLine.frame_in = IL_inframe;
 
                 // adjust flags according to received frame and state:
-                if ((IL_inframe & 0x400) == 0)              // DOE : 0xx
-                {
-                    if (HPIL_REG[0] & 0x10)                 // LA, Listener Active
-                    {
+                if ((IL_inframe & 0x400) == 0) {             
+                    // DOE : 0xx
+                    if (HPIL_REG[0] & 0x10) {                
+                        // LA, Listener Active
                         HPIL_REG[1] |= 5;                   // FRAV=ORAV=1
                     }
-                    else if (HPIL_REG[0] & 0x20)            // TA, Talker Active
-                    {
+                    else if (HPIL_REG[0] & 0x20) {           
+                        // TA, Talker Active
                         if ((IL_lastframe & 0xff) != (IL_inframe & 0xff))
                             // incoming and outgoing do not match
                             // set FRNS
                             HPIL_REG[1] |= 3;               // FRNS=ORAV=1
                         else
                             HPIL_REG[1] |= 1;               // ORAV=1
-                    }
-                    else
-                    {
+                    } else {
                         // SendFrame(IL_inframe);           // case LA=TA=0, retransmit DOE frames!
-                                                            // send frame (to HPIL_task in cor0 for handling)
+                                                            // send frame (to HPIL_task in core0 for handling)
                         queue_try_add(&HPIL_SendBuffer, &IL_inframe);    
+
+                        // DONE: the frame should be added to the TraceLine since we send it out, but this is not yet implemented
+                        TraceLine.frame_out = IL_inframe;                        
                     }
                     if ((IL_inframe & 0x100) != 0)
                         HPIL_REG[1] |= 8;                   // SRQR=1
@@ -1340,8 +1449,7 @@ void __not_in_flash_func(core1_pio)()
                         HPIL_REG[1] &= ~8;                  // SRQR=0
                 }
 
-                else if ((IL_inframe & 0x200) != 0)         // IDY : 11x
-                {
+                else if ((IL_inframe & 0x200) != 0) {       // IDY : 11x
                     if ((HPIL_REG[0] & 0x30) == 0x30)       // TA=LA=1 (scope mode)
                         HPIL_REG[1] |= 5;                   // FRAV=ORAV=1
                     else
@@ -1352,8 +1460,7 @@ void __not_in_flash_func(core1_pio)()
                         HPIL_REG[1] &= ~8;                  // SRQR=0
                 }
 
-                else if ((IL_inframe & 0x100) == 0)         // CMD : 100
-                {
+                else if ((IL_inframe & 0x100) == 0) {       // CMD : 100
                     if ((HPIL_REG[0] & 0x30) == 0x30)       // TA=LA=1 (scope mode)
                         HPIL_REG[1] |= 5;                   // FRAV=ORAV=1
                     else if (IL_lastframe == IL_inframe)
@@ -1364,14 +1471,12 @@ void __not_in_flash_func(core1_pio)()
                         HPIL_REG[1] |= 16;                  // IFCR=1
                 }
 
-                else                                        // RDY : 101
-                {
+                else {                                      // RDY : 101
                     if ((HPIL_REG[0] & 0x30) == 0x30)       // TA=LA=1 (scope mode)
                         HPIL_REG[1] |= 5;                   // FRAV=ORAV=1
                     else if ((IL_inframe & 0xc0) == 0x40)   // ARG
                         HPIL_REG[1] |= 5;                   // FRAV=ORAV=1
-                    else
-                    {
+                    else {
                         if (IL_lastframe == IL_inframe)
                             HPIL_REG[1] |= 1;               // ORAV=1
                         else
@@ -1379,19 +1484,16 @@ void __not_in_flash_func(core1_pio)()
                     }
                 }
 
-                if ((HPIL_REG[1] & 6) != 0)                 // if FRNS or FRAV, returned frame in R1R & R2R
-                {
-                    HPIL_REG[2] = (uint8_t)IL_inframe;        // returned frame
+                if ((HPIL_REG[1] & 6) != 0) {               // if FRNS or FRAV, returned frame in R1R & R2R
+                    HPIL_REG[2] = (uint8_t)IL_inframe;      // returned frame
                     HPIL_REG[1] &= 0x1f;
                     HPIL_REG[1] |= (IL_inframe & 0x700) >> 3; // save received bits 8-10 to R1R
                 }
-                // flags are updated later in the cycle
-                // AUTO IDY check is done in core0
+                // FI flags are updated later
+                // TODO: AUTO IDY check is done in core0
             }
             // end of incoming HP-IL handling
-
-
-
+                        
 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT3);
 
@@ -1400,9 +1502,9 @@ void __not_in_flash_func(core1_pio)()
             // PWO is high, HP41 still running, get ISA ADDRESS
 
             rx_addr = pio_sm_get_blocking(pio0_pio, sync_sm);           // 2nd read from SYNC/ISA state machine is ADDRESS
-            rom_addr = rx_addr >> 16;                 
-                              // to get the current address
-            TraceLine.isa_address = rom_addr;
+            rom_addr = rx_addr >> 16;                                   // to get the current address
+            TraceLine_next.isa_address = rom_addr;
+
             // at this point we have a valid address which is left justified in rx_addr and right justified in rom_addr
             // this can be used to check for a ROM hit, read data and present it on the ISA output
 
@@ -1425,8 +1527,7 @@ void __not_in_flash_func(core1_pio)()
             // ENBANK4      0x1C0   0b0001.1100.0000.0000
 
             
-            switch (rx_inst)
-            {
+            switch (rx_inst) {
                 case inst_ENBANK1:     
                     banktoswitch = 1;
                     break;
@@ -1447,7 +1548,7 @@ void __not_in_flash_func(core1_pio)()
             if (banktoswitch != 0) {
                 rx_inst_t = rx_inst;
                 // only if there is an ENBANKx instruction
-                if (rom_pg == 3){
+                if (rom_pg == 3) {
                     // HP41CX, ENBANK in Page 3 actually switched Page 5 active bank
                     active_bank[5] = banktoswitch;
                 }
@@ -1474,7 +1575,6 @@ void __not_in_flash_func(core1_pio)()
 
             // we can now add the Bank information to the Traceline
             enabled_bank = active_bank[rom_pg];          // this is the currently enabled bank for the page
-            // TraceLine.bank = enabled_bank;
 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT4);
 
@@ -1502,10 +1602,10 @@ void __not_in_flash_func(core1_pio)()
                 }
             }
 
-            if (isa_out_data != 0xFFFF)
-            // not an empty page so return valid data
-            // otherwise nothing will be returned
-            {
+            if (isa_out_data != 0xFFFF) {
+                // not an empty page so return valid data
+                // otherwise nothing will be returned
+
                 // we must force the state machine to jump to the offset of the isa instruction out
                 // normally it is stalled waiting for data right before sending the carry out at D0_TIME
                 // this is for faster handling of the carry as we have only 2 clock cycles for that
@@ -1528,7 +1628,7 @@ void __not_in_flash_func(core1_pio)()
             // next up is capture the first part of DATA, D31..D0
 
             rx_data1 = pio_sm_get_blocking(pio0_pio, datain_sm);                 // blocking read from datain state machine   
-            TraceLine.data1 = rx_data1;
+            TraceLine_next.data1 = rx_data1;
         
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT6);
 
@@ -1666,6 +1766,7 @@ void __not_in_flash_func(core1_pio)()
                     ramselected = rx_data1 & 0x03FF;
                     prphselected = 0;           // deselect any peripheral when RAMSLCT appears
                     TraceLine.prphslct = 0;      // and clear the peripheral selection in the TraceLine for easier tracing
+                    TraceLine_next.prphslct = 0;      // and clear the peripheral selection in the TraceLine for easier tracing
                     fram_offset = exist_usermem(ramselected);   // check if the selected register has a valid address in FRAM
                     
                     if (fram_offset != 0) {
@@ -1684,18 +1785,22 @@ void __not_in_flash_func(core1_pio)()
                         ourselected = 0;
                     }
 
-                    if (ourselected)
+                    if (ourselected) {
                       TraceLine.ramslct = ramselected | 0x8000;    // mark in the TraceLine that this is our register, for easier tracing
-                    else
+                      TraceLine_next.ramslct = ramselected | 0x8000;    // mark in the TraceLine that this is our register, for easier tracing
+                    } else {
                       TraceLine.ramslct = ramselected;
+                      TraceLine_next.ramslct = ramselected;
+                    }
                     break;
 
                 case inst_PRPHSLCT:             // PRPHSLCT, select peripheral from DATA[2..0]
                     rx_inst_t = rx_inst; 
                     prphselected = (rx_data1 & 0x03FF);
                     TraceLine.prphslct = prphselected;
+                    TraceLine_next.prphslct = prphselected;
                     // should do a check if the selected peripheral is ours and active (plugged)
-                    // for now leave it, used only for the Wand in the test setup
+                    // for now leave it, used only for the Wand
                     break;
 
                 case inst_WRITDATA:             // WRITDATA, must wait for DATA to be complete and then store
@@ -1728,112 +1833,69 @@ void __not_in_flash_func(core1_pio)()
                     // }
                     
                     // if (HP82160A_active && ((rx_inst & 0xE3F) == 0xE00))
-                    if (globsetting.get(HP82160A_enabled) && ((rx_inst & 0xE3F) == 0xE00))
-                    // instruction to write C[0..1] to the selected IL register
-                    {
+                    if (globsetting.get(HP82160A_enabled) && ((rx_inst & 0xE3F) == 0xE00)) {
+                        // instruction to write C[0..1] to the selected IL register
+                        // HPIL=C(0..7) instructions, bit pattern: 0b1nnn000000, with SYNC bit set: 0b111nnn000000 0xE00
                         rx_inst_t = rx_inst; 
                         IL_reg = (rx_inst & 0x1C0) >> 6;            // mask register and bring in position
                         HPIL_writereg(IL_reg, rx_data1 & 0xFF);     // takes care of sending if needed
                     }
                     break;
+            } // switch (rx_inst) for handling instructions with DATA
+
+            // ALL possible instructions are now handled so we know if teh current instruction was handled by the TULIP
+            // complete the traceline with the info if the instruction was handled by the TULIP or not, for easier tracing
+
+            // Mask the traceline for the support bits
+            TraceLine.data2 &= 0x80FFFFFF;
+
+            // and get the extra status bits
+            // bit 30: instruction decoded by TULIP
+            // bit 31: driven by TULIP 
+            if (rx_inst_t !=0) {
+                TraceLine.data2 |= 0x40000000;
+                rx_inst_t = 0;
             }
 
-            for (i = 0; i < 9; i++)
-            {
+            // package for the TraceLine is now complete, send it to the TraceBuffer
+            // this is non-blocking to prevent going out of SYNC on a full trace bufer
+            if (trace_enabled) {
+                traceoverflow = queue_try_add(&TraceBuffer, &TraceLine);                    // add to internal trace buffer for handling by core0
+                // traceoverflow = 0 (false) if the element was not added, this is an overflow
+                // to be added to the next succesfull trace
+            }
+
+            // copy the contents of TraceLine_next to TraceLine for the next cycle, and clear the next line
+            TraceLine = TraceLine_next;
+            TraceLine_next.frame_out = 0xFFFF;               // default if no frame is sent
+
+            
+            for (i = 0; i < 9; i++){
                 TraceLine.HPILregs[i] = HPIL_REG[i];
             }
            
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT7);
 
-            // at this time we can update the HP-IL flags
-            // simply set the FI flags according to the HP-IL register
-            // HP-IL uses the following flags:
-            //  FI_06   0x07000000      // FI_IFCR, checked with ?IFCR, Interface Clear Received (on fi_out1)
-            //  FI_07   0x70000000      // FI_SRQR, checked with ?SRQR, Service Request Received (on fi_out1)
-            //  FI_08   0x00000007      // FI_FRAV, checked with ?FRAV, Frame Available  (on fi_out2)
-            //  FI_09   0x00000070      // FI_FRNS, checked with ?FRNS, Frame Received Not as Sent (on fi_out2)
-            //  FI_10   0x00000700      // FI_ORAV, checked with ?ORAV, Output Register Available (on fi_out2)
+            // end of handling instructions when PWO is high, HP41 is still running
 
-            if ((HPIL_REG[8] & 0x01) == 0x01)   // if FLGENB set in R1W
-            {
-                ctrlReg = HPIL_REG[1];          // flags are in R1R
-                // HPIL Register 1 (write) bit 0 is the flag output enable
-                // when it is 1 the flags are enabled
-                if ((ctrlReg & 0x01) == 0x01) 
-                {
-                    fi_out2 = fi_out2 | FI_10;        // ORAV
-                }
-                else
-                {
-                    fi_out2 = fi_out2 & FI_10_off;
-                }
-
-                if ((ctrlReg & 0x02) == 0x02)
-                {
-                    fi_out2 = fi_out2 | FI_09;        // FRNS
-                } 
-                else
-                {
-                    fi_out2 = fi_out2 & FI_09_off;
-                }
-                
-                if ((ctrlReg & 0x04) == 0x04)
-                {
-                    fi_out2 = fi_out2 | FI_08;        // FRAV
-                } 
-                else
-                {
-                    fi_out2 = fi_out2 & FI_08_off;
-                }
-                
-                if ((ctrlReg & 0x08) == 0x08)
-                {
-                    fi_out1 = fi_out1 | FI_07;        // SRQR
-                } 
-                else
-                {
-                    fi_out1 = fi_out1 & FI_07_off;
-                }
-                
-                if ((ctrlReg & 0x10) == 0x10)
-                {
-                    fi_out1 = fi_out1 | FI_06;        // IFCR
-                } 
-                else
-                {
-                    fi_out1 = fi_out1 & FI_06_off;
-                }
-            }
-            else
-            {
-                // HP-IL flags are disabled, so clear the relevant flags
-                fi_out1 = fi_out1 & FI_06_off;
-                fi_out1 = fi_out1 & FI_07_off;
-                fi_out2 = fi_out2 & FI_08_off;
-                fi_out2 = fi_out2 & FI_09_off;
-                fi_out2 = fi_out2 & FI_10_off;
-            }
-
-        } 
-        else {
+        } else {
             // PWO is low, so HP41 is now in deep or light sleep
             // try to empty the buffer but do not block
 
             // also empty datain FIFO, best to reset state machine to also empty ISR
             
-            if (!pio_sm_is_rx_fifo_empty(pio0_pio, sync_sm))
-            {           
+            if (!pio_sm_is_rx_fifo_empty(pio0_pio, sync_sm)) {           
                 // read data if RX FIFO is not empty
                 rx_addr = pio_sm_get_blocking(pio0_pio, sync_sm);
-            }
-            else
-            {
+            } else {
                 rx_addr = 0;
             }
+
             // in any case, update the Trace buffer with whatever we have
             queue_try_add(&TraceBuffer, &TraceLine);                    // add to internal trace buffer for handling by core0   
 
             pio_sm_put(pio0_pio, debugout_sm, DBG_OUT7);
         }        
-    }
-}                       // end of the core1 loop
+
+    }   // end of core 1 while (1) loop
+}                      

@@ -104,29 +104,30 @@ extern "C" {
 #define FRAM_HEADER             0x00000                                             
 
 #define FRAM_SETTINGS_FILE      0x00100
-#define FRAM_SETTINGS_CONTENT   (FRAM_SETTINGS_FILE + sizeof(ModuleMetaHeader_t))         // start of settings contents
-#define FRAM_SETTINGS_CONTENT_SIZE 0x202                                                // size of global settings
+#define FRAM_SETTINGS_CONTENT   (FRAM_SETTINGS_FILE + sizeof(ModuleMetaHeader_t))           // start of settings contents
+#define FRAM_SETTINGS_CONTENT_SIZE 0x202                                                    // size of global settings
 
-#define FRAM_ROMMAP_HEADER      (FRAM_SETTINGS_CONTENT + FRAM_SETTINGS_CONTENT_SIZE)      // start of ROM map header
-#define FRAM_ROMMAP_CONTENT     (FRAM_ROMMAP_HEADER + sizeof(ModuleMetaHeader_t))         // start of ROM map contents
+#define FRAM_ROMMAP_HEADER      (FRAM_SETTINGS_CONTENT + FRAM_SETTINGS_CONTENT_SIZE)        // start of ROM map header
+#define FRAM_ROMMAP_CONTENT     (FRAM_ROMMAP_HEADER + sizeof(ModuleMetaHeader_t))           // start of ROM map contents
 
 
 
-#define FRAM_TRACER_HEADER      (FRAM_ROMMAP_CONTENT + sizeof(TULIP_Pages.Pages))         // start of tracer settings header
-// #define FRAM_TRACER_HEADER      FRAM_ROMMAP_CONTENT + 0x200         // start of tracer settings header
-#define FRAM_TRACER_CONTENT     (FRAM_TRACER_HEADER + sizeof(ModuleMetaHeader_t))         // start of tracer settings contents
+#define FRAM_TRACER_HEADER      (FRAM_ROMMAP_CONTENT + sizeof(TULIP_Pages.Pages))           // start of tracer settings header
+// #define FRAM_TRACER_HEADER      FRAM_ROMMAP_CONTENT + 0x200                              // start of tracer settings header
+#define FRAM_TRACER_CONTENT     (FRAM_TRACER_HEADER + sizeof(ModuleMetaHeader_t))           // start of tracer settings contents
 
-#define FRAM_USERMEM_HEADER     (FRAM_TRACER_CONTENT + sizeof(TraceFilter.m_filter))      // start of user memory module header
-// #define FRAM_USERMEM_HEADER     FRAM_TRACER_CONTENT + 0x200     // start of user memory module header
+#define FRAM_USERMEM_HEADER     (FRAM_TRACER_CONTENT + sizeof(TraceFilter.filter))          // start of user memory module header
+// #define FRAM_USERMEM_HEADER     FRAM_TRACER_CONTENT + 0x200                              // start of user memory module header
+                                                                                            // expands to 16 KByte for the filter array
 
-#define FRAM_USERMEM_CONTENT    (FRAM_USERMEM_HEADER + sizeof(ModuleMetaHeader_t))        // start of user memory module header
+#define FRAM_USERMEM_CONTENT    (FRAM_USERMEM_HEADER + sizeof(ModuleMetaHeader_t))          // start of user memory module header
 
-#define FRAM_EXTDMEM_HEADER     (FRAM_USERMEM_CONTENT + FRAM_USERMEM_SIZE)                 // start of extended memory module header
-#define FRAM_EXTDMEM_CONTENT    (FRAM_EXTDMEM_HEADER + sizeof(ModuleMetaHeader_t))           // start of extended memory module content
+#define FRAM_EXTDMEM_HEADER     (FRAM_USERMEM_CONTENT + FRAM_USERMEM_SIZE)                  // start of extended memory module header
+#define FRAM_EXTDMEM_CONTENT    (FRAM_EXTDMEM_HEADER + sizeof(ModuleMetaHeader_t))          // start of extended memory module content
 
-#define FRAM_gsettings_start    FRAM_SETTINGS_CONTENT                                   // start of settings contents
-#define FRAM_ROMMAP_START       FRAM_ROMMAP_CONTENT                                     // start of ROM map contents    
-#define FRAM_TRACER_START       FRAM_TRACER_CONTENT                                     // start of tracer settings
+#define FRAM_gsettings_start    FRAM_SETTINGS_CONTENT                                       // start of settings contents
+#define FRAM_ROMMAP_START       FRAM_ROMMAP_CONTENT                                         // start of ROM map contents    
+#define FRAM_TRACER_START       FRAM_TRACER_CONTENT                                         // start of tracer settings
 
 // Extended Memory Module fixed addresses in FRAM
 #define FRAM_XMEM0_START        FRAM_EXTDMEM_CONTENT                        // start address of XFUN memory module in FRAM, mapped to 0x040 - 0x0BF in the HP41 system
