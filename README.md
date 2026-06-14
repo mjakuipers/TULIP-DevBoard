@@ -5,7 +5,7 @@ README for the TULIP4041 DevBoard and Module.
 
 
 
-To order, contact me directly with your email address to receive an order form.
+TULIP units are sold out, please contact me directly with your email addres to be added to the waiting list for a next batch.
 
 The firmware binaries are now in the Firmware directory, updated to 0.97b. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module
@@ -16,9 +16,25 @@ The MOD files are now in their own subdirectory with explanation and instruction
 
 My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
 
-I think I have now fixed the issue when using multiple serial ports. There was an issue in the code for the ILScope that messed up things. Please report any 
-issues that you may still encounter. The documentation is not yet up to date.
 The files CHEAT_SHEET.md and USER_MANUAL.md are AI generated documents. I use GitHub CoPilot in combibation with VSCode (with the Pico extension) for coding the TULIP firmware in C/C++.
+
+VERSION 0.990
+-   Changed IR framing generation to a lookup table to reduce CPU load 
+-   Added debug mode to the system command instead of the #ifdef DEBUG guards (only in userinterface.cpp)
+    to allow easier debugging by users if needed
+-   Modified serial port handling to reduce issues with Windows
+-   Printer mode now cycles trough the option MAN, NORM and TRACE
+-   Serial connection for printer port improved
+-   Implemented HP82143A serial printer emulation mode for pure ASCII and UTF-8
+-   Printer power and OOP status do not block IR output when powered only by the calculator (no USB)
+-   Added the filter command, including save and load
+-   Modified handling of the TraceLine in the core1 loop for more accurate information
+-   Modified handling of the HP-IL flags to output to FI
+-   Modified handling of TraceLine for HP-IL traffic
+-   Removed sysloop, sysrom and ilrom options from the tracer command, this can easily be handled with the filters
+-   Added sysloop option to the filter command
+-   Added a time tag for power mode events to the tracer
+-   ENBANK2 and ENBANK3 mnemonics corrected in the disassembler, these were swapped (but correct in the emulation)
 
 VERSION 0.98b, April 2026
 -   Restructured the ILScope tracer, now decoupled from the IL traffic with a queue
