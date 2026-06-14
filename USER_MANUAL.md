@@ -1,6 +1,6 @@
 # TULIP4041 User Manual
 
-Version: 0.98b (software)
+Version: 0.990 (software)
 
 ## 1. Overview
 
@@ -40,6 +40,17 @@ The firmware exposes multiple USB CDC interfaces.
 - Printer: printer text stream
 
 Use the Console port for all commands in this manual.
+
+## 3.1 What Is New In 0.99
+
+- Added `filter` command family for tracer filtering, including save/load to SD card.
+- Tracer filtering can now be toggled directly with `tracer filter`.
+- Added `filter sysloop` for fast include/exclude of common system loops.
+- Printer command set now includes:
+   - `printer mode` (cycles MAN / NORM / TRACE)
+   - `printer serial` (cycles HP82143A / ASCII / UTF-8 serial mapping)
+- HP82143A serial printer output supports both ASCII and UTF-8 symbol mapping.
+- System command supports runtime debug toggling with `system debug`.
 
 ## 4. First-Time Quick Start
 
@@ -87,16 +98,23 @@ Read this section before normal use.
 - system BOOTSEL: enter UF2 bootloader mode
 - system configlist: list persistent settings
 - system configinit: reset configuration defaults
+- system debug: toggle runtime debug mode
+- system serial: read/program device serial number (Module build only)
 
 ### 6.2 SD Card and Files
 
 - sdcard status
 - sdcard mount
 - sdcard unmount
+- sdcard mounted
 - sdcard connect
 - sdcard eject
 - dir /
 - dir /path/
+- cd
+- cd <dir>
+- cd ..
+- cd /
 
 ### 6.3 ROM Library and Slot Mapping
 
@@ -159,6 +177,7 @@ Reserve pages to avoid conflicts with physical hardware or intended layout.
 - reserve printer
 - reserve hpil
 - reserve clear <page>
+- reserve clear all
 
 ### 6.5 Emulation Controls
 
@@ -175,9 +194,8 @@ Reserve pages to avoid conflicts with physical hardware or intended layout.
 - printer status
 - printer power
 - printer output: cycle output mode (none / serial / IR / both)
-- printer trace
-- printer norm
-- printer man
+- printer serial: cycle serial mapping mode (HP82143A / ASCII / UTF-8)
+- printer mode: cycle printer mode (MAN / NORM / TRACE)
 - printer paper
 - printer print
 - printer adv
@@ -193,9 +211,7 @@ Reserve pages to avoid conflicts with physical hardware or intended layout.
 - tracer buffer <size>: set trace buffer size (100–10000 samples)
 - tracer pretrig: show pre-trigger buffer size
 - tracer pretrig <size>: set pre-trigger buffer size (1–256 samples)
-- tracer sysloop: toggle tracing of system loops (RSTKB, RST05, BLINK01, debounce)
-- tracer sysrom: toggle tracing of system ROM pages 0–5
-- tracer ilrom: toggle tracing of pages 6 and 7
+- tracer filter: toggle tracer filter enable/disable
 - tracer hpil: toggle HP-IL tracing to IL Scope port
 - tracer pilbox: toggle PILBox serial tracing to IL Scope port
 - tracer ilregs: toggle tracing of HP-IL registers
@@ -204,12 +220,34 @@ Reserve pages to avoid conflicts with physical hardware or intended layout.
 
 Note: buffer-size changes require a reboot to take effect.
 
-### 6.8 Memory Extensions
+### 6.8 Trace Filter
+
+Use `filter` to define which microcode addresses/pages are blocked or passed.
+
+- filter: show current filter status
+- filter status
+- filter list
+- filter dump
+- filter block: show all BLOCK entries
+- filter pass: show all PASS entries
+- filter block all: block all samples
+- filter pass all: pass all samples
+- filter block pX: block page X (hex)
+- filter pass pX: pass page X (hex)
+- filter block <start_hex>: block one address
+- filter pass <start_hex>: pass one address
+- filter block <start_hex> <end_hex>: block address range
+- filter pass <start_hex> <end_hex>: pass address range
+- filter sysloop: toggle system-loop filtering preset
+- filter save <filename.trf>: save filters to SD card
+- filter load <filename.trf>: load filters from SD card
+
+### 6.9 Memory Extensions
 
 XMEM:
 
 - xmem status
-- xmem <0..2>
+- xmem <N> <M>: N = 0..1 (XFunctions), M = 0..2 (XMEM modules)
 - xmem dump
 - xmem ERASE
 
@@ -238,7 +276,7 @@ QROM and HEPAX-related control:
 - hepram INIT: initialize HEPRAM chain (erases all non-reserved HEPRAM)
 - hepram INITALL: initialize all HEPRAM including reserved pages
 
-### 6.9 RTC (Module Variant Only)
+### 6.10 RTC (Module Variant Only)
 
 The RTC command is only available on the TULIP Module hardware variant.
 
@@ -249,7 +287,7 @@ The RTC command is only available on the TULIP Module hardware variant.
 - rtc dump: dump RTC registers
 - rtc display: test the SSD1315 display
 
-### 6.10 WAND Functions
+### 6.11 WAND Functions
 
 - wand status
 - wand scan <file>
@@ -316,6 +354,8 @@ Examples:
 
 - Run tracer status.
 - Ensure tracer trace is enabled.
+- Check whether filtering is enabled (`tracer filter` and `filter status`).
+- If needed, allow all samples with `filter pass all`.
 - Confirm host app is connected to the Tracer/IL Scope port.
 
 ### 8.5 SD card issues

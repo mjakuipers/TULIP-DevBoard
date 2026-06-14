@@ -1,5 +1,7 @@
 # TULIP4041 Cheat Sheet
 
+Version: 0.990 (software)
+
 Fast command reference for normal daily use.
 
 ## 1) Start Here
@@ -46,8 +48,10 @@ Unplug:
 
 ## 3) Storage and Files
 
+- sdcard status
 - sdcard mount
 - sdcard unmount
+- sdcard mounted
 - sdcard connect
 - sdcard eject
 - dir /
@@ -97,14 +101,26 @@ Unplug:
 - tracer trace
 - tracer buffer 5000
 - tracer pretrig 64
-- tracer sysloop
-- tracer sysrom
-- tracer ilrom
+- tracer filter
 - tracer hpil
 - tracer pilbox
 - tracer ilregs
 - tracer mnem
 - tracer save
+
+Filter quick use:
+
+- filter status
+- filter list
+- filter block all
+- filter pass all
+- filter block p0
+- filter pass p0
+- filter block 0098 00A1
+- filter pass 0098 00A1
+- filter sysloop
+- filter save mytrace.trf
+- filter load mytrace.trf
 
 Note: changing tracer buffer size may require reboot.
 
@@ -113,9 +129,8 @@ Note: changing tracer buffer size may require reboot.
 - printer status
 - printer power
 - printer output
-- printer norm
-- printer trace
-- printer man
+- printer serial
+- printer mode
 - printer print
 - printer adv
 - printer paper
@@ -180,6 +195,8 @@ QROM/HEPRAM:
 - system calcreset
 - system gpio
 - system owner
+- system debug
+- system serial
 - system configlist
 - system configinit
 - system REBOOT
@@ -211,6 +228,8 @@ Tracer empty:
 
 - tracer status
 - tracer trace
+- filter status
+- filter pass all
 
 SD problems:
 
