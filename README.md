@@ -7,7 +7,7 @@ README for the TULIP4041 DevBoard and Module.
 
 TULIP units are sold out, please contact me directly with your email addres to be added to the waiting list for a next batch.
 
-The firmware binaries are now in the Firmware directory, updated to 0.97b. The firmware files are:
+The firmware binaries are now in the Firmware directory, updated to 0.990. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module
    - tulip4041_devboard.uf2    For the TULIP DevBoard
 DO NOT mix up the firmware files, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues
