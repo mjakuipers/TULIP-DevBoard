@@ -10,15 +10,16 @@ TULIP units are sold out, please contact me directly with your email addres to b
 The firmware binaries are now in the Firmware directory, updated to 0.990. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module
    - tulip4041_devboard.uf2    For the TULIP DevBoard
+
 DO NOT mix up the firmware files, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues
 
 The MOD files are now in their own subdirectory with explanation and instructions for using HEPAX RAM.
 
 My favourite community for HP calculators is https://www.hpmuseum.org/forum/index.php, there are some TULIP related threads.
 
-The files CHEAT_SHEET.md and USER_MANUAL.md are AI generated documents. I use GitHub CoPilot in combibation with VSCode (with the Pico extension) for coding the TULIP firmware in C/C++.
+The files CHEAT_SHEET.md and USER_MANUAL.md are AI generated documents. I use VSCode with the Pico extension in combinations with GitHub CoPilot for coding the TULIP firmware in C/C++.
 
-VERSION 0.990
+**VERSION 0.990 Release Notes** Previous firmware release notes are at the end of this page
 -   Changed IR framing generation to a lookup table to reduce CPU load 
 -   Added debug mode to the system command instead of the #ifdef DEBUG guards (only in userinterface.cpp)
     to allow easier debugging by users if needed
@@ -35,6 +36,83 @@ VERSION 0.990
 -   Added sysloop option to the filter command
 -   Added a time tag for power mode events to the tracer
 -   ENBANK2 and ENBANK3 mnemonics corrected in the disassembler, these were swapped (but correct in the emulation)
+
+**Remember to unplug your embedded ROMs (HP-IL, ILPrinter) when doing a firmware upgrade (this is automatic from Firmware V0.95, but only when doing a system BOOTSEL, nut by hardware enforced BOOTSEL mode)**
+
+**USE THE CORRECT .UF2 FIRMWARE FILE FOR THE DEVBOARD OR MODULE!**
+
+**Please check the Issues section for any known limitations or bugs**
+
+**WARNING for Wand users:**
+When experimenting with the Wand please be aware that sending strings with characters < 0x10 can lead to
+a crash of the calculator that can be recoverd from only by completely removing power (and batteries) and 
+the TULIP. The firmware replaces these characters with a space. With the wand send command it is still 
+possible to construct these strings and send this.
+
+**TULIP4041 Quick Start**
+
+The instructions below will guide you through the steps to get up and running with the new firmware TULIP4041 quickly.
+
+0.  Please read the documentation. If you have time read it all, if not then start with Chapter 10 and then 11. Follow the instructions in Chapter 12 for the firmware update process
+1.	Format a micro SD card (minimum 2 GByte) with the exFAT (recommended) or FAT file system
+2.	Create a repository in a subdirectory on the card of ROM and MOD files that you wish to use in your TULIP (can also be done after step 3). Let’s call this myROMrepo
+3.	Plug the microSD card in your TULIP and connect it with your host PC, verify if the card is visible as a removable drive in your host computer
+4.	Connect a Terminal Emulator with the TULIP Command Line Interface. Try the newly discovered serial ports until you see the TULIP welcome message. Use the sdcard connect command in the CLI to connect with the host if the USB drive was not visible. When using the FAT file system the detection by the host can take some time, even up to several minutes when a large capacity SC card is used.
+5.	Update to the latest firmware (see the instructions in the documentation) if needed
+6.	Type the command dir myromrepo (do not care about the case of the subdirectory name) and verify if all your files are visible
+7.	Type the ***list*** command to check which ROMs are already in FLASH. If this is the first time the TULIP is used it will contain the ROM files used for production testing. Go to step 12 in case the list is garbled or if no files are visible at all. If the system is newly initialized it will show only the “TULIP4041 FLASH HEADER” file of type 41.
+8.	Type the command import myromrepo ALL (ALL must be uppercase!). This will copy your ROM repository to FLASH memory which is needed for the ROMs to be pluggable. 
+9.	Use list again to verify if all your roms are imported
+10.	Connect the TULIP with your calculator. While doing that check which ports are physically occupied. You can now use the plug command. Say that you have imported the set of PPC roms, PPCL.rom and PPCU.rom. Assuming that you have Port 4 free (this is Page E and F) you can type (the case of the ROM name and the Page do not matter)
+
+    TULIP> plug PPCL.rom E
+
+    TULIP> plug PPCU.rom F 
+
+12.	Use cat in the TULIP CLI to confirm that the ROMs are plugged and enter CAT 2 on the HP41 to confirm that the PPC ROM is now plugged in the calculator. The configuration is saved in FRAM and will be available again after a power cycle
+13.	In case the file system is corrupted or not yet initialized you need to fully initialize the FLASH File System with the following steps:
+
+    TULIP> flash NUKEALL
+
+    TULIP> flash INIT
+
+    and/or
+ 
+    TULIP> fram NUKEALL
+
+    TULIP> fram INIT
+
+And go back to step 7
+
+Any issues? Best is to report these in the issue tracker here on GitHub.
+
+Here are links to some videos I made:
+- Soldering the HP41 connector: https://www.youtube.com/watch?v=pW8rN5y5UB0
+- Production testing: https://www.youtube.com/watch?v=3AXWcQL1dGo
+- Harvest a connector from an HP41 module: https://www.youtube.com/watch?v=I3a0NojwHeg
+- Preview of the pre-production units, firmware and housing: https://www.youtube.com/watch?v=8PRu2yhQjck
+- Overview of the pre-production units: https://www.youtube.com/watch?v=zgKlAMlz9vY
+- Demonstration of the Wand emulation: https://youtu.be/-Lm2CUnrXPQ
+- Assembly and soldering of the new battery board: https://youtu.be/wtu5E9yf-MI
+
+Robert Prosperi gave a talk about the TULIP on the 2025 HHC confernce in Orlando, with a Q+A session where I particpated online: https://www.youtube.com/watch?v=4R3ebXHAJd4, here is the presentation PDF: https://hhuc.us/2025/Presentations/TULIP4041%20-%20The%20Next%20Chapter.pdf
+
+If you wish to use the infrared printer output, you can use theRedEye IR Receiver here: https://github.com/mjakuipers/HP-RedEye-Receiver, base on Martin Hepperle's project https://www.mh-aerotools.de/hp/red-eye/index.htm. The IR output does not (yet) work with real HP82240 printer.
+
+The housing design is now also available here: https://github.com/blackjetrock/hp41c-tulip-module-case. Thanks Andrew for the design!
+
+![IMG_20240925_110722543](https://github.com/user-attachments/assets/33102d0d-1736-4b8a-81de-e93384321606)
+
+[TUP-Devboard Schematics V1.1.pdf](https://github.com/user-attachments/files/16324529/TUP-Devboard.Schematics.V1.1.pdf)
+
+[TUP-Module Adapter Schematics V1.0.pdf](https://github.com/user-attachments/files/16324675/TUP-Module.Adapter.Schematics.V1.0.pdf)
+
+
+User Karel designed a tray for the mainboard and a module-like housing for the connectorboard. Thanks Karel for sharing! Details and download here: https://www.printables.com/model/1053554-tulip4041-devboard-case
+
+All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
+
+**Previous Firmware release notes**
 
 VERSION 0.98b, April 2026
 -   Restructured the ILScope tracer, now decoupled from the IL traffic with a queue
@@ -108,7 +186,7 @@ VERSION 0.96 BETA, December 2025
 VERSION 0.95 BETA 3, November 2025
 -   Added Page 4 bankswitching to support Library4 in HP41C/CV/MAXX machines
     Is somewhat experimental, please report issues
--   Reset into BOOTSELmode now unplugs all embedded modules
+-   Reset into BOOTSEL mode now unplugs all embedded modules
 -   Changed reading uSD card number of sectors, now with ioctl call to fix issue with exFAT on MacOS
 -   Fixed issue with enabling hpil emulation upon reboot/powercycle causing a real HP-IL module to malfunction
 -   Fixed unplug ALL command which did not clear reservations
@@ -137,93 +215,7 @@ VERSION 0.91 BETA 2, July 2025, Functional changes:
 -   Support for Bank Switching and loading .ROM files in individual Banks
 -   Support for ZEPROM Sticky Bank Switching (use the CLI emulate command to enable)
 -   Flexible sizing of Trace Buffer (change requires restart)
--   A ROM can now be plugged with a Page nmber. This works only for Bank 1 and the first available Page is used
+-   A ROM can now be plugged without a Page nmber. This works only for Bank 1 and the first available Page is used
 -   The reserve command is added to reserve a Page for a physical Module, plugging without a Page number respects this reservation
 
-**Remember to unplug your embedded ROMs (HP-IL, ILPrinter) when doing a firmware upgrade (this is automatic from Firmware V0.95)**
 
-**ONLY USE THE .UF2 VERSION FOR THE DEVBOARD!**
-
-Some users with a Mac as their host computer have reported issues with the uSD card. It works fine on the TULIP itself, but refuse to connect to the host PC as a drive while in the TULIP. The solution is to format the to the ExFAT format using the official SD CArd Formatting software available at https://www.sdcard.org/downloads/formatter/
-
-**WARNING for Wand users:**
-When experimenting with the Wand please be aware that sending strings with characters < 0x10 can lead to
-a crash of the calculator that can be recoverd from only by completely removing power (and batteries) and 
-the TULIP. The firmware replaces these characters with a space. With the wand send command it is still 
-possible to construct these strings and send this.
-
-**TULIP4041 Quick Start**
-
-The instructions below will guide you through the steps to get up and running with the new firmware TULIP4041 quickly.
-
-0.  Please read the documentation. If you have time read it all, if not then start with Chapter 10 and then 11. Follow the instructions in Chapter 12 for the firmware update process
-1.	Format a micro SD card (minimum 2 GByte) with the exFAT (recommended) or FAT file system
-2.	Create a repository in a subdirectory on the card of ROM and MOD files that you wish to use in your TULIP (can also be done after step 3). Let’s call this myROMrepo
-3.	Plug the microSD card in your TULIP and connect it with your host PC, verify if the card is visible as a removable drive in your host computer
-4.	Connect a Terminal Emulator with the TULIP Command Line Interface. Try the newly discovered serial ports until you see the TULIP welcome message. Use the sdcard connect command in the CLI to connect with the host if the USB drive was not visible. When using the FAT file system the detection by the host can take some time, even up to several minutes when a large capacity SC card is used.
-5.	Update to the latest firmware (see the instructions in the documentation) if needed
-6.	Type the command dir myromrepo (do not care about the case of the subdirectory name) and verify if all your files are visible
-7.	Type the ***list*** command to check which ROMs are already in FLASH. If this is the first time the TULIP is used it will contain the ROM files used for production testing. Go to step 12 in case the list is garbled or if no files are visible at all. If the system is newly initialized it will show only the “TULIP4041 FLASH HEADER” file of type 41.
-8.	Type the command import myromrepo ALL (ALL must be uppercase!). This will copy your ROM repository to FLASH memory which is needed for the ROMs to be pluggable. 
-9.	Use list again to verify if all your roms are imported
-10.	Connect the TULIP with your calculator. While doing that check which ports are physically occupied. You can now use the plug command. Say that you have imported the set of PPC roms, PPCL.rom and PPCU.rom. Assuming that you have Port 4 free (this is Page E and F) you can type (the case of the ROM name and the Page do not matter)
-
-    TULIP> plug PPCL.rom E
-
-    TULIP> plug PPCU.rom F 
-
-12.	Use cat in the TULIP CLI to confirm that the ROMs are plugged and enter CAT 2 on the HP41 to confirm that the PPC ROM is now plugged in the calculator. The configuration is saved in FRAM and will be available again after a power cycle
-13.	In case the file system is corrupted or not yet initialized you need to fully initialize the FLASH File System with the following steps:
-
-
-    TULIP> flash NUKEALL
-
-    TULIP> flash INIT
-
-    and/or
- 
-    TULIP> fram NUKEALL
-
-    TULIP> fram INIT
-
-And go back to step 7
-
-Any issues? Best is to report these in the issue tracker here on GitHub.
-
-Here are links to some videos I made:
-- Soldering the HP41 connector: https://www.youtube.com/watch?v=pW8rN5y5UB0
-- Production testing: https://www.youtube.com/watch?v=3AXWcQL1dGo
-- Harvest a connector from an HP41 module: https://www.youtube.com/watch?v=I3a0NojwHeg
-- Preview of the pre-production units, firmware and housing: https://www.youtube.com/watch?v=8PRu2yhQjck
-- Overview of the pre-production units: https://www.youtube.com/watch?v=zgKlAMlz9vY
-- Demonstration of the Wand emulation: https://youtu.be/-Lm2CUnrXPQ
-- Assembly and soldering of the new battery board: https://youtu.be/wtu5E9yf-MI
-
-Robert Prosperi gave a talk about the TULIP on the 2025 HHC confernce in Orlando, with a Q+A session where I particpated online: https://www.youtube.com/watch?v=4R3ebXHAJd4, here is the presentation PDF: https://hhuc.us/2025/Presentations/TULIP4041%20-%20The%20Next%20Chapter.pdf
-
-If you wish to use the infrared printer output, you can use theRedEye IR Receiver here: https://github.com/mjakuipers/HP-RedEye-Receiver, base on Martin Hepperle's project https://www.mh-aerotools.de/hp/red-eye/index.htm 
-
-The housing design is now also available here: https://github.com/blackjetrock/hp41c-tulip-module-case. Thanks Andrew for the design!
-
-![IMG_20240925_110722543](https://github.com/user-attachments/assets/33102d0d-1736-4b8a-81de-e93384321606)
-
-[TUP-Devboard Schematics V1.1.pdf](https://github.com/user-attachments/files/16324529/TUP-Devboard.Schematics.V1.1.pdf)
-
-[TUP-Module Adapter Schematics V1.0.pdf](https://github.com/user-attachments/files/16324675/TUP-Module.Adapter.Schematics.V1.0.pdf)
-
-Version history
-
-- jul 21 2024   - initial version, schematics updated, not yet verified in hardware!
-- sep 25 2024   - DevBoard PCB's are verified and ready to ship
-                - Will change to the RP2350 and Pico2 after evaluating the Pico2
-                - BOM file updated with the RP2350 Pico2
-                - Documentation uploaded: TULIP description, usage, assembly and testing of DevBoard
-- sep 26 2024   - The directory TULIP4041-RP2040-Final contains the archived 2040 sources and the latest binary (.uf2)
-- sep 26 2024   - The direcory TULIP-P2 contains the sources and build for the RP2350 version
-- oct 27 2024   - refreshed sources and firmware to version 00.01.05
-- jun 27 2025   - update to version 0.9 BETA 1. See release notes for details
-- jul 26 2025   - update to version 0.91 BETA 2. See release notes for details
-
-All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
-
-User Karel designed a tray for the mainboard and a module-like housing for the connectorboard. Thanks Karel for sharing! Details and download here: https://www.printables.com/model/1053554-tulip4041-devboard-case
