@@ -5,13 +5,13 @@ README for the TULIP4041 DevBoard and Module.
 
 
 
-A new batch of TULIP units is available, please contact me for an order form. The new batch of V1.1 hardware has a few minor changes that will be documented. It will runs the same firmware as the V1.0 hardware.
+A new batch of TULIP units is available, please contact me for an order form. The new batch of V1.1 hardware has a few minor changes that will be documented. It will run the same firmware as the V1.0 hardware.
 
 The firmware binaries are now in the Firmware directory, updated to 0.990. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module V1.0 and V1.1
    - tulip4041_devboard.uf2    For the TULIP DevBoard
 
-DO NOT mix up the firmware files, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues
+DO NOT mix up the firmware files for the Module or Devboard, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues
 
 The MOD files are now in their own subdirectory with explanation and instructions for using HEPAX RAM.
 
