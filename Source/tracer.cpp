@@ -2094,8 +2094,6 @@ struct TLine_FI TraceSample_FI;             // Trace Buffer definition, no HP-IL
 struct TLine_basic Tracesample_basic;       // basic Tracebuffer
 struct PLine PowerSample;                   // Power event buffer definition
 
-uint32_t ISAsample;
-uint64_t DATAsample;
 uint32_t DATAsample1;
 uint32_t DATAsample2;
 uint32_t xq1 = 0;
@@ -2128,7 +2126,6 @@ char overflow = '.';
 char prev_overflow = ' ';
 bool sample_skipped = false;
 
-uint32_t data0;
 uint32_t data1;
 
 uint32_t data_x;        // DATA exponent, 2 digits
@@ -2139,8 +2136,6 @@ uint32_t data_s;        // DATA sign, D52..D55
 
 int64_t tt_elapsed;
 float t_secs_elapsed;
-float t_ms_elapsed;
-float t_us_elapsed;
 int calc_speed;
 
 int16_t activeSELP = -1;    // for disassembling peripheral instructions
@@ -2165,10 +2160,6 @@ int TracePrintLen = 0;
 int dis_len;
 
 volatile int level;
-volatile int prev_level;
-
-int ALD_range_lo;
-int ALD_range_hi;
 bool ALD_block = false;
 int test = 0;
 bool blocking = false;

@@ -252,13 +252,10 @@ void onSystemCLI(EmbeddedCli *cli, char *args, void *context)
                 break;            
       case help_serial :                 
                 #if TULIP_HARDWARE == T_MODULE
-                    if (arg2 == NULL) {
-                        // no argument given, just show the serial number
-                        uif_serial(NULL);    // show the TULIP serial number
-                    } else {
-                        // not supported for the DevBoard
-                        cli_printf("programming the serial number is not supported on the DevBoard");
-                    }
+                    uif_serial(arg2);    // show the TULIP serial number
+                #else
+                    // not supported for the DevBoard
+                    cli_printf("programming the serial number is not supported on the DevBoard");
                 #endif
                 break;
       case help_gpio : 

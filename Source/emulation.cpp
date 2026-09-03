@@ -72,7 +72,15 @@ bool default_map = false;                   // default is disabled, enable in UI
 bool default_map_off = false;               // all ROMs off when true;
 
 bool USB_powered = false;                   // true when USB power is present
+
+
+// HP41 PowerMode contains the state of the following:
+//   bit 0: PWO line
+//   bit 1: SYNC line
 uint8_t HP41_powermode = 0;
+
+
+
 char  TPrint[200];
 int   TPrintLen = 0;
 
@@ -125,7 +133,6 @@ int fram_offset;                            // offset into the FRAM
 const uint16_t *flash_contents = (const uint16_t *) (XIP_BASE + ROM_BASE_OFFSET);
 
 uint16_t fram_buf[0x10];
-uint32_t fram_adr;
 
 uint32_t cycle_counter = 0;         // counts cycles since last PWO
 struct TLine TraceLine;             // the variable with the TraceLine used in capturing cycles in core1
@@ -142,7 +149,7 @@ extern CModules TULIP_Pages;
 extern int m_eMode;
 
 
-absolute_time_t t_start, t_end, t_elapsed;
+absolute_time_t t_start, t_end;
 
 // HP-IL variables
 
@@ -172,8 +179,6 @@ uint8_t HPIL_REG[9];            // HP-IL register stack
 
 
 */
-
-
 
 
 uint16_t IL_lastframe;          // last frame sent
@@ -362,11 +367,48 @@ void __not_in_flash_func()pwo_callback(uint gpio, uint32_t events) {
         // FI output
         fi_out1 = 0;                       // for flag output driver
         fi_out2 = 0;
+
+        // at the falling edge of PWO we can lower the clock even more if there is no USB power
+        // just testing for now
+        /*
+        if (gpio_get(PICO_VBUS_PIN) == 0) { 
+            clock_configure(
+                    clk_sys,
+                    CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                    CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                    TULIP_CLOCK_FAST * 1000,
+                    TULIP_CLOCK_SLOW * 1000);
+        }
+                    */
     } 
     else {
         // upon rising edge of PWO
         // PWO is now high so HP41 is running
         // reset state machine, next SYNC is imminent
+
+        // first get the clock back to speed
+
+        /*
+        if (gpio_get(PICO_VBUS_PIN) == 0) {
+            // if there is no USB power then we can set the clock to the slow speed of 75 MHz
+            clock_configure(
+                clk_sys,
+                CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                TULIP_CLOCK_FAST * 1000,
+                TULIP_CLOCK_SLOW * 1000);
+        } else {
+            // if there is USB power then we can set the clock to the high speed of 150 MHz
+            clock_configure(
+                clk_sys,
+                CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                TULIP_CLOCK_FAST * 1000,
+                TULIP_CLOCK_FAST * 1000);
+        }
+        */
+
+        
         gpio_put(ONBOARD_LED, 1);           // turn LED on
 
         // enforce a jump to the start of the SYNC state machine
@@ -682,61 +724,73 @@ void __not_in_flash_func()HPIL_sendflags()
 }
 
 
-// check the HP41 Power Mode
+// check the HP41 and USB Power Mode, constantly called from the main loop
+// all power mode transitions are monitored here and this is the only place where the CPU clock is changed
+
+// The global variable USB_powered is set to true if USB power is present, and false if not
+// The global variable HP41_powermode is set to the current power mode of the HP41, which can be one of the following:
+//  PowerMode_Running
+//  PowerMode_LightSleep
+//  PowerMode_DeepSleep
+
 void PowerMode_task()
 {
-    // monitor PWO and SYNC to keep the HP41 power mode up to date
+
     uint8_t prev_mode = 0;
     float clk_div;
     struct TLine TraceLineTimeTag;      
     uint8_t PMode = 0;
 
-    // check if there was a VBUS state change and modify the speed accordingly
-    if (gpio_get(PICO_VBUS_PIN)) {
-        // USB power is present
-        if (!USB_powered) {
-            // there has been a change, USB power is now present
-            USB_powered = true;
-            // set CPU to 150 MHz
-            // set_sys_clock_khz(TULIP_CLOCK_FAST, true);
-            clock_configure(
-                clk_sys,
-                CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
-                CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
-                TULIP_CLOCK_FAST *1000,
-                TULIP_CLOCK_FAST *1000
+    // first check if there was a change in USB power, and if so change the CPU clock speed accordingly
+    if (gpio_get(PICO_VBUS_PIN) != USB_powered) {
+        // There was a change in USB power, so change the CPU clock speed accordingly
+        USB_powered = gpio_get(PICO_VBUS_PIN);
+        if (USB_powered) {
+            // USB power is now present, set CPU to 150 MHz
+            clock_configure(clk_sys,
+                            CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                            CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                            TULIP_CLOCK_FAST *1000,
+                            TULIP_CLOCK_FAST *1000
             );
 
             // adjust the speed or the irout state machine
-
             pio_sm_set_enabled(pio1_pio, irout_sm, false);   // disable the state machine before changing the program
             clk_div = (float)clock_get_hz(clk_sys) / (float)IROUT_CLOCK;
             hp41_pio_irout_program_init(pio1_pio, irout_sm, irout_offset, 0, P_IR_LED, 0, clk_div);    // uses only sideset, clock divider added for correct frequency
-            // printf("USB power detected, CPU set to 150 MHz\n");
-        }
-    }
-    else {
-        // USB power is not present
-        if (USB_powered) {
-            // there has been a change, USB power is removed
-            USB_powered = false;
-            // set CPU to 75 MHz
-            // set_sys_clock_khz(TULIP_CLOCK_SLOW, true);
-            clock_configure(
-                clk_sys,
-                CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
-                CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
-                TULIP_CLOCK_FAST * 1000,
-                TULIP_CLOCK_SLOW * 1000);
 
-            // printf("USB power lost, CPU set to 75 MHz\n");
+            // and report to the UART
+            printf("USB power detected, CPU set to 150 MHz\n");
+        } else {
+            // USB power is removed, set CPU to 75 MHz
+            clock_configure(clk_sys,
+                            CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                            CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+                            TULIP_CLOCK_FAST * 1000,
+                            TULIP_CLOCK_SLOW * 1000
+            );
 
             // adjust the speed or the irout state machine
             pio_sm_set_enabled(pio1_pio, irout_sm, false);   // disable the state machine before changing the program
             clk_div = (float)clock_get_hz(clk_sys) / (float)IROUT_CLOCK;
             hp41_pio_irout_program_init(pio1_pio, irout_sm, irout_offset, 0, P_IR_LED, 0, clk_div);    // uses only sideset, clock divider added for correct frequency
+
+            // and report to the UART
+            printf("USB power lost, CPU set to 75 MHz\n");
         }
     }
+
+    // now handle changes in the HP41 power mode, these are reprorted to the tracer (if connected)
+    // some transitions will actually change the the CPU clock speed
+    // care must be taken if there is pending IR output, since the IR output is generated by a PIO state machine that is clocked by the CPU clock
+    // when USB power is present the CPU clock will never change
+
+    // notable transitions are:
+    //      light sleep -> deep sleep       go to power down mode, stop clock and prepare for wake-up interrupt on PWO
+    //      light sleep -> running          go to 75 MHz
+    //      running     -> light sleep      go to 10 MHz (or 25 MHz, to be tested)
+    //      running     -> deep sleep       go to power down mode, stop clock and prepare for wake-up interrupt on PWO
+    //      deep sleep  -> running          wake up and go to 75 MHz
 
     //     0x00 - unknown event
     //     0x01 - deep sleep  -> light sleep transition
@@ -750,7 +804,10 @@ void PowerMode_task()
     //                                total size is 35 bytes
 
 
+    // first task: check if there is a change in the power mode
+
     prev_mode = HP41_powermode;
+    PMode = 0x00;    // default to no change
     if (gpio_get(P_PWO)) {
         // PWO is high, HP41 is running
         HP41_powermode = PowerMode_Running;    // HP41 is running
@@ -758,11 +815,8 @@ void PowerMode_task()
             PMode = 0x04; // light sleep -> running transition
         } else if (prev_mode == PowerMode_DeepSleep) {
             PMode = 0x03; // deep sleep -> running transition
-        } else if (prev_mode == PowerMode_Running) {
-            PMode = 0x00; // no change
-        } else {
-            PMode = 0x00; // unknown event
         }
+        // else no change, PMode = 0x00
     } else {
         // PWO is low, HP41 is sleeping (DEEP or LIGHT sleep)
         if (gpio_get(P_SYNC)) {
@@ -770,25 +824,32 @@ void PowerMode_task()
             HP41_powermode = PowerMode_LightSleep;
             if (prev_mode == PowerMode_Running) {
                 PMode = 0x05; // running -> light sleep transition
+                printf("HP41 Power Mode: Running -> Light Sleep\n");
             } else if (prev_mode == PowerMode_LightSleep) {
                 PMode = 0x00; // no change
+
             } else if (prev_mode == PowerMode_DeepSleep) {
                 PMode = 0x01; // deep sleep -> light sleep transition, which should not be possible
+                printf("HP41 Power Mode: Deep Sleep -> Light Sleep (unexpected)\n");
             } else {
                 PMode = 0x00; // unknown event
+                printf("HP41 Power Mode: Unknown event\n");
             }
 
-        } else{
+        } else {
             // SYNC is low, PWO is low
             HP41_powermode = PowerMode_DeepSleep;
             if (prev_mode == PowerMode_Running) {
                 PMode = 0x06; // running -> deep sleep transition
+                printf("HP41 Power Mode: Running -> Deep Sleep\n");
             } else if (prev_mode == PowerMode_LightSleep) {
                 PMode = 0x02; // light sleep -> deep sleep transition
+                printf("HP41 Power Mode: Light Sleep -> Deep Sleep\n");
             } else if (prev_mode == PowerMode_DeepSleep) {
                 PMode = 0x00; // no change
             } else {
                 PMode = 0x00; // unknown event
+                printf("HP41 Power Mode: Unknown event\n");
             }
         }
     }
@@ -829,21 +890,25 @@ void PowerMode_task()
         // now add to the TraceBuffer, non blocking of course
         queue_try_add(&TraceBuffer, &TraceLineTimeTag);
 
-
         // if PWO is now low the calculator has stopped running
         // this means that we need to cleanup some dirty stuff
         if ((HP41_powermode != PowerMode_Running)) {
+            
             // save the global settings to FRAM
-            // globsetting.save();              // save global settings to FRAM
+            printf("HP41 stopped running, saving global settings to FRAM\n");
+            globsetting.save();              // save global settings to FRAM
 
             // if the banks are dirty we need to save the ROM map to FRAM
             if (Banks_dirty) {
                 // save the ROM map to FRAM
+                printf("HP41 stopped running, saving dirty ROM map to FRAM\n");
                 TULIP_Pages.save();
                 Banks_dirty = false;            // reset dirty flag
             }          
         }
     }
+
+    // if there is no change do nothing
 }
 
 
@@ -990,8 +1055,8 @@ void __not_in_flash_func(core1_pio)()
 
                 // this is new
                 // queue_try_remove(&WandBuffer, &WandCached);
-                regdata = WandCached;
-                WandCached = 0xFFFF;       // mark cache as consumed
+                regdata = WandCached & 0xFF;    // ensure that 8 bits are transferred, issue #25
+                WandCached = 0xFFFF;            // mark cache as consumed
                 pio_sm_put_blocking(pio1_pio, dataout_sm, regdata);  // send the data
                 pio_sm_put_blocking(pio1_pio, dataout_sm, 0);  // send the data
                 data_out_active = true;

@@ -2,6 +2,13 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
+VERSION 0.991
+-   Intermediate release for V1.1 hardware
+-   Switched to Pico SDK 2.3.0
+-   OTP programming string updated to V1.1 hardware
+-   Fixed an issue that prevented serial number OTP programming in cli-binding.c
+-   Issue #25 fixed, Wand now returns only 8 bits. This might have confused code that relies on all unused bit to return 0
+
 VERSION 0.990
 -   Changed IR framing generation to a lookup table to reduce CPU load 
 -   Added debug mode to the system command instead of the #ifdef DEBUG guards (only in userinterface.cpp)

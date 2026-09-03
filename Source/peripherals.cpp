@@ -379,9 +379,6 @@ inline void hp82143a_send_char(uint8_t hp_code, int (*putchar_func)(int)) {
 
 
 
-static uint16_t ir_code;
-static uint32_t ir_frame;
-
 static bool irframe_pending = false;   // true when there is an IR frame ready to be sent, but the PIO is still busy sending the previous frame
 static bool serial_pending = false;    // true when there is a serial character ready to be sent
 static bool char_pending = false;      // a char was read from the printbuffer, but not completely sent yet
@@ -518,8 +515,6 @@ const ILScope_struct IL_mnemonics[] =
     {0x600, 0x700, "IDY"},      // Identify
     {0x700, 0x700, "ISR"},      //                          //  element #48
     };
-
-
 
 // General functions for GPIO control
 
@@ -797,6 +792,20 @@ void PrintBuffer_init()
 }
 
 
+
+// sending data to the IR printer requires the following:
+// - throttling with programmable delay between frames when printing to a real printer
+// - translation of character codes to the appropriate IR printer format
+// - managing the printer queue
+//
+// background printing is used here to avoid blocking the main execution flow of the program
+void IRPrinter_task()
+{
+
+
+}
+
+
 void Print_task()
 {
     // check for a first connection
@@ -823,10 +832,6 @@ void Print_task()
         // there is a pending IR frame to be sent, so try that first
         if (!ir_busy()) {
             // the PIO is not busy anymore, so we can send the pending frame
-            // and construct the frame for the IR LED
-            // ir_code = calculate_frame_payload((uint8_t)PrintChar);
-            // ir_frame = construct_frame(ir_code);
-            // send_ir_frame(ir_frame);
             send_ir_frame(BYTE_FRAME_LUT[(uint8_t)PrintChar]);
             irframe_pending = false;   // clear the pending flag
         } 
@@ -976,18 +981,16 @@ void Print_task()
         // if output mode was 0 (no output) the frame is now simply discarded
 
         // line below for debugging the construction of the IR frame
-        // printf("IR char = %02X, code = %04X, frame = %08X\n", PrintChar, ir_code, ir_frame);
+        // printf("IR char = %02X, frame = %08X\n", PrintChar, BYTE_FRAME_LUT[(uint8_t)PrintChar]);
     }
 }
 
 void PrintIRchar(uint8_t c)
 {
     // send a character to the IR printer, for testing the IR LED
-    // ir_code = calculate_frame_payload(c);
-    // ir_frame = construct_frame(ir_code);
-    // send_ir_frame(ir_frame);
 
-    // the fast way with the LUTs is about 100 times faster than the slow way, so we can easily send the character at the baudrate of the IR printer (about 2400 baud)
+    // the fast way with the LUTs is about 100 times faster than the slow way, 
+    // so we can easily send the character at the baudrate of the IR printer (about 2400 baud)
     // keep in mind that this function is blocking
     // better use in combination with ir_busy() and a queue
     send_ir_frame(BYTE_FRAME_LUT[c]);

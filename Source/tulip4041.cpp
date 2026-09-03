@@ -205,7 +205,7 @@ int main() {
 
         runCLI();                   // process the 'new' embedded CLI
 
-        // serial_loop();           // process the 'old' user interface
+        serial_loop();              // process the 'old' user interface
                                     // we keep it here for debugging and the PWO monitoring just in case
 
         Trace_task();               // process HP41 Trace/disassembler

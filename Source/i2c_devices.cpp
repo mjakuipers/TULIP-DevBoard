@@ -118,7 +118,7 @@ void pcf8520_reset() {
     // bit 5..3 COF[2:0] - 110, 1024 Hz output
     // all other bits are 0
     buf[0] = 0x0F; // Tmr_CLKOUT register
-    buf[1] = 0x30; // set COF[2:0] to 110 for 1 kHz output
+    buf[1] = 0x30; // set COF[2:0] to 110 for 1 Hz output
     i2c_write_blocking(i2c1, PCF8523_ADDRESS, buf, 2, false);
 }
 

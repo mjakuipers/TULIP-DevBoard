@@ -38,7 +38,6 @@ extern "C" {
 #include "fram.h"
 #include "tracer.h"
 #include "ffmanager.h"
-#include "powermodes.h"
 
 #include "hardware/pll.h"
 #include "hardware/clocks.h"
@@ -53,7 +52,6 @@ extern "C" {
 #include "i2c_devices.h"
 #include "cli-binding.h"
 #include "fram.h"
-#include "powermodes.h"
 
 #include "module.h"
 

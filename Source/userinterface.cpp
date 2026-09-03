@@ -1081,11 +1081,11 @@ void uif_owner(const char *str)
 
 void uif_serial(const char *str)
 {
-  // program/read the TULIp serial number
+  // program/read the TULIP serial number and hardware version
   // program if str has the correct format, otherwise just read the serial number
-  // the string programmed is "TULIP4041 HW V0.9 serial #xxxx", 31 chars
+  // the string programmed is "TULIP4041 HW V1.1 serial #xxxx", 31 chars
   // the string must be 4 characters with the serial, the start of the string is fixed
-  char ser_string[32] = "TULIP4041 HW V1.0 serial #xxxx";   // this string is 30 characters long
+  char ser_string[32] = "TULIP4041 HW V1.1 serial #xxxx";   // this string is 30 characters long
                                                             // xxx is the placeholder for the serial number
 
   if (str == NULL) {
@@ -5741,7 +5741,7 @@ void uif_printer(int i) {
             cli_printf("  test string sent to IR LED"); 
 
 
-            // also tests the serial output for compatobility of ASCII or UTF-8 mapping
+            // also tests the serial output for compatibility of ASCII or UTF-8 mapping
             // send the ASCII character mapping of the HP82143A Printer to the serial port in lines of 16 chars, this is a test, so no throttling
             cli_printf("  sending ASCII test string to serial port:");
 
@@ -5760,7 +5760,7 @@ void uif_printer(int i) {
               PrintLineLen++;
               PrintLine[PrintLineLen] = 0x00; // null terminator
               
-              cli_printf("  %s", PrintLine); // print the line to the console
+              cli_printfn("  %s", PrintLine); // print the line to the console
 
               // now print to the printer port, but only if the printer is connected 
               if (cdc_connected_now[ITF_PRINT]) {
@@ -5770,6 +5770,7 @@ void uif_printer(int i) {
               cdc_flush(ITF_PRINT); // flush the buffer to ensure the line is sent immediately
             }
             
+            cli_printf("  sending UTF-8 test string to serial port:");
             for (int i = 0; i < 8; i++) {
               for (int j = 0; j < 16; j++) {
                 // add the char to the PrintLine Buffer
@@ -5787,8 +5788,8 @@ void uif_printer(int i) {
               PrintLineLen++;
               PrintLine[PrintLineLen] = 0x00; // null terminator
               
-
-              cli_printf("  %s", PrintLine); // print the line to the console
+              cli_printfn("  %s", PrintLine); // print the line to the console
+                                              // it already has the CR/LF
 
               // now print to the printer port, but only if the printer is connected and the output mode is set to serial or both
               if (cdc_connected_now[ITF_PRINT]) {
@@ -5799,6 +5800,7 @@ void uif_printer(int i) {
             cdc_flush(ITF_PRINT); // flush the buffer to ensure the line is sent immediately
              
             break;
+
       case printer_irtog: // test the IR LED power consumption by toggling it
             IR_toggle(); // toggle the IR LED
             // wait for 10 ms

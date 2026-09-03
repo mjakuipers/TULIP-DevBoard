@@ -42,13 +42,13 @@ extern "C" {
 #include "hp41_defs.h"
 #include "hpinterface_hardware.h"
 #include "hp41_pio.pio.h"
-// #include "userinterface.h"
 #include "fram.h"
 #include "cdc_helper.h"
 #include "peripherals.h"
 #include "globalsettings.h"
 #include "module.h"
 #include "embed_roms.h"  
+#include "powermodes.h"
 
 // Definitions for HP41 peripheral mode
 
