@@ -19,14 +19,14 @@ It is possible to keep a HEPRAM page out of the chain with the ***hepram reserve
 Best is to create a copy of the file with a new name (must be done from the host PC), import and plug that.
 
 **LIBRARY4-CX.MOD and LIBRARY4-CV.MOD**
--  2 versions of Ángels wonderful Library#4 ROMs to be used in a CX or C/CV respectively. The CV version is a 2-bank ROM, and both will be plugged in Page 4.
+-  2 versions of Ángels wonderful Library#4 ROMs to be used in a CX or C/CV respectively. The CV version is a 2-bank ROM, and both will be plugged in Page 4. Keep in mind that when you use the physical HP-IL module, a disabled printer (by using the tiny switch on the back of the HP-IL module) will be moved to Page 4 which will cause a conflict with Library#4. 
 
 **OSX-BS4X MOD file variations**
 - Various versions of the famous OSX+ ROM, developed by Ángel Martin and based on the original CDD ROM. This ROM is a must for your calculator and uses Library#4. The files with P6 and P7 will be plugged in Pages 6 or 7 in case you prefer that, but obviously cannot be used in combination with the printer and/or HP-IL. The version xx-CV.MOD is for use in the HP-41C or CV (and will work in the HP41CX as well), the xx-CX.MOD variants will work only in the HP41CX as it relies on features in the CX mainframe ROMs (you will get an error message on the calculator) when plugged in a -C or -CV). The OSX-BS4X-CX-LIB4.MOD and OSX-BS4X-CV-LIB4.MOD are the same files but with Library#4 included (in Page 4) and you now have to plug only one file.
 
 **QROM-4K.MOD and QROM-8K.MOD**
 - EMPTY QROM (MLDL RAM) images. Although it is possible to plug a file a second time (and this could be useful in advanced configurations) this is the same physical memory (located in FRAM on the TULIP).
-A change in one Page will also be a change in the other plugged Page. Best is to create a copy of the file with a new name, and plug that. A change in a QROM Page is an immediate change in the file and the file will not be an empty QROM Page anymore. It can be exported to the uSD card without the need to save to FRAM. Tip: rename the empty QROM file to something that reflects your mcode project.
+A change in one Page will also be a change in the other plugged Page. Best is to create a copy of the file in FRAM with a new name, and plug that. A change in a QROM Page is an immediate change in the file and the file will not be an empty QROM Page anymore. It can be exported to the uSD card without the need to save to FRAM. Tip: rename the empty QROM file to something that reflects your mcode project.
 - If you want full control over which Page (or Bank) the QROM is plugged in you will have to use ROM files or modify the MOD file header so it contains your desired configuration
 - Check out the CLI ***qrom*** command in the manual for some tricks
 
