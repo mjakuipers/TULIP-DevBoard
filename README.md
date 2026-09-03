@@ -5,7 +5,7 @@ README for the TULIP4041 DevBoard and Module.
 
 
 
-A new batch of TULIP units is available, please contact me for an order form. The new batch of V1.1 hardware has a few minor changes that will be documented. It will run the same firmware as the V1.0 hardware.
+A new batch of TULIP units is available, please contact me for an order form. The new batch of V1.1 hardware has a few minor changes that will be documented. It will run the same firmware as the V1.0 hardware. The schematics for the V1.1 hardware as produced and the new firmware are published.
 
 The firmware binaries are now in the Firmware directory, updated to 0.990. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module V1.0 **and** V1.1
