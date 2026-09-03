@@ -30,5 +30,5 @@ A change in one Page will also be a change in the other plugged Page. Best is to
 - If you want full control over which Page (or Bank) the QROM is plugged in you will have to use ROM files or modify the MOD file header so it contains your desired configuration
 - Check out the CLI ***qrom*** command in the manual for some tricks
 
-File names have been changed to relate these better to the actual configuration for and HP41CV or -CX
+File names have been changed to relate these better to the actual configuration for an HP41CV or -CX
 The original files and documentation are available at hp41.org and in the ROM repository (zip archive) at https://systemyde.com/hp41/archive.html (ROM files only).
