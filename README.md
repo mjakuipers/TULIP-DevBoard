@@ -8,10 +8,10 @@ README for the TULIP4041 DevBoard and Module.
 A new batch of TULIP units is available, please contact me for an order form. The new batch of V1.1 hardware has a few minor changes that will be documented. It will run the same firmware as the V1.0 hardware.
 
 The firmware binaries are now in the Firmware directory, updated to 0.990. The firmware files are:
-   - tulip4041_module.uf2      For the TULIP Module V1.0 and V1.1
+   - tulip4041_module.uf2      For the TULIP Module V1.0 **and** V1.1
    - tulip4041_devboard.uf2    For the TULIP DevBoard
 
-DO NOT mix up the firmware files for the Module or Devboard, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues
+DO NOT mix up the firmware files for the Module or Devboard, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues. V1.1 hardware will run all firmware versions for the Module.
 
 The MOD files are now in their own subdirectory with explanation and instructions for using HEPAX RAM.
 
@@ -19,25 +19,15 @@ My favourite community for HP calculators is https://www.hpmuseum.org/forum/inde
 
 The files CHEAT_SHEET.md and USER_MANUAL.md are AI generated documents. I use VSCode with the Pico extension in combinations with GitHub CoPilot for coding the TULIP firmware in C/C++.
 
-**VERSION 0.990 Release Notes** Previous firmware release notes are at the end of this page
--   Changed IR framing generation to a lookup table to reduce CPU load 
--   Added debug mode to the system command instead of the #ifdef DEBUG guards (only in userinterface.cpp)
-    to allow easier debugging by users if needed
--   Modified serial port handling to reduce issues with Windows
--   Printer mode now cycles trough the option MAN, NORM and TRACE
--   Serial connection for printer port improved
--   Implemented HP82143A serial printer emulation mode for pure ASCII and UTF-8
--   Printer power and OOP status do not block IR output when powered only by the calculator (no USB)
--   Added the filter command, including save and load
--   Modified handling of the TraceLine in the core1 loop for more accurate information
--   Modified handling of the HP-IL flags to output to FI
--   Modified handling of TraceLine for HP-IL traffic
--   Removed sysloop, sysrom and ilrom options from the tracer command, this can easily be handled with the filters
--   Added sysloop option to the filter command
--   Added a time tag for power mode events to the tracer
--   ENBANK2 and ENBANK3 mnemonics corrected in the disassembler, these were swapped (but correct in the emulation)
-
-**Remember to unplug your embedded ROMs (HP-IL, ILPrinter) when doing a firmware upgrade (this is automatic from Firmware V0.95, but only when doing a system BOOTSEL, nut by hardware enforced BOOTSEL mode)**
+**VERSION 0.991 Release Notes, September 2026** Previous firmware release notes are at the end of this page
+-   Intermediate release for V1.1 hardware
+-   Switched to Pico SDK 2.3.0
+-   OTP programming string (containing also the serial number) updated to V1.1 hardware (which is done during final test and assembly), cannot be re-done by the user
+-   Fixed an issue that prevented serial number OTP programming in cli-binding.c
+-   Issue #25 fixed, Wand now returns only 8 bits. This might have confused code that relies on all unused bit to return 0
+For V1.0 Hardware owners there is no urgency to update. Issue #25 did not (as fas a I know) cause any problems
+  
+**Remember to unplug your embedded ROMs (HP-IL, ILPrinter, Printer) when doing a firmware upgrade (this is automatic from Firmware V0.95, but only when doing a system BOOTSEL, not by hardware enforced BOOTSEL mode)**
 
 **USE THE CORRECT .UF2 FIRMWARE FILE FOR THE DEVBOARD OR MODULE!**
 
@@ -45,7 +35,7 @@ The files CHEAT_SHEET.md and USER_MANUAL.md are AI generated documents. I use VS
 
 **WARNING for Wand users:**
 When experimenting with the Wand please be aware that sending strings with characters < 0x10 can lead to
-a crash of the calculator that can be recoverd from only by completely removing power (and batteries) and 
+a crash of the calculator that can be recovered from only by completely removing power (and batteries) and 
 the TULIP. The firmware replaces these characters with a space. With the wand send command it is still 
 possible to construct these strings and send this.
 
@@ -113,10 +103,27 @@ User Karel designed a tray for the mainboard and a module-like housing for the c
 All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
 
 **Previous Firmware release notes**
+VERSION 0.990, May 2026
+-   Changed IR framing generation to a lookup table to reduce CPU load 
+-   Added debug mode to the system command instead of the #ifdef DEBUG guards (only in userinterface.cpp)
+    to allow easier debugging by users if needed
+-   Modified serial port handling to reduce issues with Windows
+-   Printer mode now cycles trough the option MAN, NORM and TRACE
+-   Serial connection for printer port improved
+-   Implemented HP82143A serial printer emulation mode for pure ASCII and UTF-8
+-   Printer power and OOP status do not block IR output when powered only by the calculator (no USB)
+-   Added the filter command, including save and load
+-   Modified handling of the TraceLine in the core1 loop for more accurate information
+-   Modified handling of the HP-IL flags to output to FI
+-   Modified handling of TraceLine for HP-IL traffic
+-   Removed sysloop, sysrom and ilrom options from the tracer command, this can easily be handled with the filters
+-   Added sysloop option to the filter command
+-   Added a time tag for power mode events to the tracer
+-   ENBANK2 and ENBANK3 mnemonics corrected in the disassembler, these were swapped (but correct in the emulation)
 
 VERSION 0.98b, April 2026
 -   Restructured the ILScope tracer, now decoupled from the IL traffic with a queue
--   While doing this found an ommision in the code which was probably responsible for issues with the serial ports
+-   While doing this found an omission in the code which was probably responsible for issues with the serial ports
     These should now be resolved
     
 VERSION 0.98, April 2026
