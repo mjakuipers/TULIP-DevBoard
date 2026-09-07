@@ -4,10 +4,9 @@ README for the TULIP4041 DevBoard and Module.
 ![TULIP_small](https://github.com/user-attachments/assets/48ce1872-c028-45d0-808b-75ce184649b9)
 
 
-
 A new batch of TULIP units is available, please contact me for an order form. The new batch of V1.1 hardware has a few minor changes that will be documented. It will run the same firmware as the V1.0 hardware. The schematics for the V1.1 hardware as produced and the new firmware are published.
 
-The firmware binaries are now in the Firmware directory, updated to 0.990. The firmware files are:
+The firmware binaries are now in the Firmware directory, updated to 0.991. The firmware files are:
    - tulip4041_module.uf2      For the TULIP Module V1.0 **and** V1.1
    - tulip4041_devboard.uf2    For the TULIP DevBoard
 
@@ -19,14 +18,11 @@ My favourite community for HP calculators is https://www.hpmuseum.org/forum/inde
 
 The files CHEAT_SHEET.md and USER_MANUAL.md are AI generated documents. I use VSCode with the Pico extension in combinations with GitHub CoPilot for coding the TULIP firmware in C/C++.
 
-**VERSION 0.991 Release Notes, September 2026** Previous firmware release notes are at the end of this page
--   Intermediate release for V1.1 hardware
--   Switched to Pico SDK 2.3.0
--   OTP programming string (containing also the serial number) updated to V1.1 hardware (which is done during final test and assembly), cannot be re-done by the user
--   Fixed an issue that prevented serial number OTP programming in cli-binding.c
--   Issue #25 fixed, Wand now returns only 8 bits. This might have confused code that relies on all unused bit to return 0
-For V1.0 Hardware owners there is no urgency to update. Issue #25 did not (as fas a I know) cause any problems
-  
+**VERSION 0.992 Release Notes, September 2026**
+-   Fixed issue #49 that freezes the CLI and USB when using printer irtest
+-   Changed the order of the printer status listing for better readability
+This is an update mainly to facilitate production testing of the V1.1 hardware by fixing issue #49
+ 
 **Remember to unplug your embedded ROMs (HP-IL, ILPrinter, Printer) when doing a firmware upgrade (this is automatic from Firmware V0.95, but only when doing a system BOOTSEL, not by hardware enforced BOOTSEL mode)**
 
 **USE THE CORRECT .UF2 FIRMWARE FILE FOR THE DEVBOARD OR MODULE!**
@@ -103,6 +99,15 @@ User Karel designed a tray for the mainboard and a module-like housing for the c
 All files are open source. Use of the hardware and software AT YOUR OWN RISK, no warranty
 
 **Previous Firmware release notes**
+
+VERSION 0.991, September 2026
+-   Intermediate release for V1.1 hardware
+-   Switched to Pico SDK 2.3.0
+-   OTP programming string (containing also the serial number) updated to V1.1 hardware (which is done during final test and assembly), cannot be re-done by the user
+-   Fixed an issue that prevented serial number OTP programming in cli-binding.c
+-   Issue #25 fixed, Wand now returns only 8 bits. This might have confused code that relies on all unused bit to return 0
+For V1.0 Hardware owners there is no urgency to update. Issue #25 did not (as fas a I know) cause any problems
+
 VERSION 0.990, May 2026
 -   Changed IR framing generation to a lookup table to reduce CPU load 
 -   Added debug mode to the system command instead of the #ifdef DEBUG guards (only in userinterface.cpp)
