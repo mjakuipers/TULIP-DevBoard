@@ -5617,15 +5617,7 @@ void uif_printer(int i) {
   switch (i) {
     case printer_status: // status
     case 0: cli_printf("  printer power   : %s", globsetting.get(PRT_power) ? "ON":"OFF");
-            pr_mode = globsetting.get(PRT_mode);
-            switch (pr_mode) {
-              case 0:  cli_printfn("          mode    : MAN"); break;
-              case 1:  cli_printfn("          mode    : NORM"); break;
-              case 2:  cli_printfn("          mode    : TRACE"); break;
-              case 3:  cli_printfn("          mode    : TRACE*"); break;
-              default: cli_printfn("          mode    : <invalid>");
-            }
-
+            
             // get printer output mode from settings
             pr_output_mode = globsetting.get(PRT_output_mode);
             switch (pr_output_mode) {
@@ -5640,7 +5632,17 @@ void uif_printer(int i) {
               case 0:  cli_printf("      serial mode : HP82143A"); break;
               case 1:  cli_printf("      serial mode : Serial Printer ASCII (no Graphics)"); break;
               case 2:  cli_printf("      serial mode : Serial Printer UTF-8 (no Graphics)"); break;
-              default: cli_printf("      serial mode : <invalid>"); break;
+              default: cli_printf("      serial mode : <invalid>"); break;    
+            }
+
+            pr_mode = globsetting.get(PRT_mode);
+
+            switch (pr_mode) {
+              case 0:  cli_printf("          mode    : MAN"); break;
+              case 1:  cli_printf("          mode    : NORM"); break;
+              case 2:  cli_printf("          mode    : TRACE"); break;
+              case 3:  cli_printf("          mode    : TRACE*"); break;
+              default: cli_printf("          mode    : <invalid>");
             }
 
             cli_printf("          paper   : %s", (SELP9_status & prt_OOP_mask) ? "EMPTY":"OK");
@@ -5748,6 +5750,7 @@ void uif_printer(int i) {
             PrintLineLen = 0;        // reset line length for the test
 
             for (int i = 0; i < 8; i++) {
+              PrintLineLen = 0;     // reset line length at the start of each line
               for (int j = 0; j < 16; j++) {
                 // add the char to the PrintLine Buffer
                 PrintLine[PrintLineLen] = HP82143A_CHAR_MAP_ASCII[(int)i * 16 + j].data[0];
@@ -5772,6 +5775,7 @@ void uif_printer(int i) {
             
             cli_printf("  sending UTF-8 test string to serial port:");
             for (int i = 0; i < 8; i++) {
+              PrintLineLen = 0;     // reset line length at the start of each line
               for (int j = 0; j < 16; j++) {
                 // add the char to the PrintLine Buffer
                 // HP82143A character set translated to UTF-8 character set
@@ -5807,6 +5811,7 @@ void uif_printer(int i) {
             sleep_ms(10); // wait for 10 ms
             cli_printf("  IR LED (GPIO %d) is %s", P_IR_LED, gpio_get(P_IR_LED) ? "ON" : "OFF");
             break;
+
       case printer_output: // cycle through the printer output modes: 0=none, 1=serial, 2=infrared, 3=both
               pr_output_mode = globsetting.get(PRT_output_mode);
               pr_output_mode = (pr_output_mode + 1) % 4; // cycle through the modes

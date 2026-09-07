@@ -2,7 +2,11 @@ TULIP4041 RELEASE NOTES
 
 The TULIP4041 soft- and hardware is released under the MIT copyright license
 
-VERSION 0.991
+VERSION 0.992, September 2026
+-   Fixed issue that freezes the CLI and USB when using printer irtest
+-   Changed the order of the printer status listing for better readability
+
+VERSION 0.991, September 2026
 -   Intermediate release for V1.1 hardware
 -   Switched to Pico SDK 2.3.0
 -   OTP programming string updated to V1.1 hardware

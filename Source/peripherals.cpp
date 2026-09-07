@@ -805,6 +805,15 @@ void IRPrinter_task()
 
 }
 
+/* Translation of character codes from the HP82143A to HP82240B 
+
+  HP82143 character arrive as a stream of bytes
+
+
+
+
+
+*/
 
 void Print_task()
 {
