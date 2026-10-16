@@ -79,7 +79,8 @@ Here are links to some videos I made:
 - Preview of the pre-production units, firmware and housing: https://www.youtube.com/watch?v=8PRu2yhQjck
 - Overview of the pre-production units: https://www.youtube.com/watch?v=zgKlAMlz9vY
 - Demonstration of the Wand emulation: https://youtu.be/-Lm2CUnrXPQ
-- Assembly and soldering of the new battery board: https://youtu.be/wtu5E9yf-MI
+- Assembling the V1.1 battery board on the V1.0 hardware: https://youtu.be/wtu5E9yf-MI
+- Assembling the battery board on the V1.1 hardware: https://www.youtube.com/watch?v=u6b-faicqRg
 
 Robert Prosperi gave a talk about the TULIP on the 2025 HHC confernce in Orlando, with a Q+A session where I particpated online: https://www.youtube.com/watch?v=4R3ebXHAJd4, here is the presentation PDF: https://hhuc.us/2025/Presentations/TULIP4041%20-%20The%20Next%20Chapter.pdf
 
