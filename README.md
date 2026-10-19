@@ -10,7 +10,9 @@ The firmware binaries are now in the Firmware directory, updated to 0.991. The f
    - tulip4041_module.uf2      For the TULIP Module V1.0 **and** V1.1
    - tulip4041_devboard.uf2    For the TULIP DevBoard
 
-DO NOT mix up the firmware files for the Module or Devboard, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues. V1.1 hardware will run all firmware versions for the Module.
+**IMPORTANT**: if you are upgrading from a firmware version _before_ 0.97 you will have to re-initialise FRAM due to the changes in the FRAM file system!
+
+**DO NOT** mix up the firmware files for the Module or Devboard, some hardware I/O and memory sized are different. The previous firmware files are available as well in order to downgrade in case of issues. V1.1 hardware will run all firmware versions for the Module.
 
 The MOD files are now in their own subdirectory with explanation and instructions for using HEPAX RAM.
 
